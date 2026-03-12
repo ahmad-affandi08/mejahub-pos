@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { hasPermission } from "@/lib/rbac";
 import type { UserRole } from "@prisma/client";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 import {
   LayoutDashboard,
   UtensilsCrossed,
@@ -18,6 +20,7 @@ import {
   Settings,
   ShieldCheck,
   Warehouse,
+  Plus,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -28,7 +31,7 @@ interface SidebarProps {
   };
 }
 
-const navItems = [
+const mainNavItems = [
   {
     title: "Dashboard",
     href: "/dashboard",
@@ -40,18 +43,6 @@ const navItems = [
     href: "/dashboard/tables",
     icon: Grid3X3,
     permission: "table:view" as const,
-  },
-  {
-    title: "Produk",
-    href: "/dashboard/products",
-    icon: UtensilsCrossed,
-    permission: "product:manage" as const,
-  },
-  {
-    title: "Kategori",
-    href: "/dashboard/categories",
-    icon: Package,
-    permission: "category:manage" as const,
   },
   {
     title: "Pesanan",
@@ -66,11 +57,26 @@ const navItems = [
     permission: "kds:view" as const,
   },
   {
+    title: "Produk",
+    href: "/dashboard/products",
+    icon: UtensilsCrossed,
+    permission: "product:manage" as const,
+  },
+  {
+    title: "Kategori",
+    href: "/dashboard/categories",
+    icon: Package,
+    permission: "category:manage" as const,
+  },
+  {
     title: "Inventori",
     href: "/dashboard/inventory",
     icon: Warehouse,
     permission: "inventory:view" as const,
   },
+];
+
+const managementNavItems = [
   {
     title: "Pengguna",
     href: "/dashboard/users",
@@ -106,59 +112,112 @@ const navItems = [
 export function DashboardSidebar({ user }: SidebarProps) {
   const pathname = usePathname();
 
-  const filteredItems = navItems.filter((item) =>
+  const filteredMain = mainNavItems.filter((item) =>
+    hasPermission(user.role, item.permission)
+  );
+  const filteredManagement = managementNavItems.filter((item) =>
     hasPermission(user.role, item.permission)
   );
 
   return (
-    <aside className="hidden w-64 flex-col border-r bg-card lg:flex">
-      {/* Logo */}
-      <div className="flex h-16 items-center gap-2 border-b px-6">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-          <span className="text-sm font-bold text-primary-foreground">MH</span>
+    <aside className="hidden w-60 flex-col bg-primary lg:flex rounded-tr-[100px]  overflow-hidden">
+      <div className="px-4 pb-4">
+        <Separator className="mb-3" />
+        <div className="p-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              Cabang Aktif
+            </span>
+          </div>
+          <p className="text-sm font-medium text-foreground truncate">
+            {user.branchId ? "Cabang Utama" : "Semua Cabang"}
+          </p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {user.role.replace(/_/g, " ")}
+          </p>
         </div>
-        <span className="text-lg font-bold">MejaHub</span>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 space-y-1 overflow-y-auto p-4">
-        {filteredItems.map((item) => {
-          const isActive =
-            pathname === item.href ||
-            (item.href !== "/dashboard" && pathname.startsWith(item.href));
+      {/* Main Navigation */}
+      <nav className="flex-1 overflow-y-auto px-2 pb-3">
+        <div className="space-y-0.5">
+          {filteredMain.map((item) => {
+            const isActive =
+              pathname === item.href ||
+              (item.href !== "/dashboard" && pathname.startsWith(item.href));
 
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                isActive
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-              )}
-            >
-              <item.icon className="h-4 w-4 shrink-0" />
-              {item.title}
-            </Link>
-          );
-        })}
-      </nav>
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  "group flex items-center gap-4 rounded-full px-4 py-2.5 text-sm font-medium transition-all duration-200",
+                  isActive
+                    ? "bg-secondary text-primary font-semibold"
+                    : "text-foreground/70 hover:bg-secondary hover:text-primary"
+                )}
+              >
+                <item.icon
+                  className={cn(
+                    "h-4.5 w-4.5 shrink-0",
+                    isActive ? "text-primary" : "text-foreground/50",
+                    "transition-colors group-hover:text-primary"
+                  )}
+                />
+                {item.title}
+                {isActive && (
+                  <div className="ml-auto h-1.5 w-1.5 rounded-full bg-primary" />
+                )}
+              </Link>
+            );
+          })}
+        </div>
 
-      {/* User info */}
-      <div className="border-t p-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs font-bold">
-            {user.name.charAt(0).toUpperCase()}
-          </div>
-          <div className="flex-1 truncate">
-            <p className="text-sm font-medium truncate">{user.name}</p>
-            <p className="text-xs text-muted-foreground">
-              {user.role.replace("_", " ")}
+        {/* Separator */}
+        {filteredManagement.length > 0 && (
+          <>
+            <Separator className="my-3" />
+
+            <p className="mb-2 px-4 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+              Manajemen
             </p>
-          </div>
-        </div>
-      </div>
+
+            <div className="space-y-0.5">
+              {filteredManagement.map((item) => {
+                const isActive =
+                  pathname === item.href ||
+                  (item.href !== "/dashboard" &&
+                    pathname.startsWith(item.href));
+
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                      "group flex items-center gap-4 rounded-full px-4 py-2.5 text-sm font-medium transition-all duration-200",
+                      isActive
+                        ? "bg-secondary text-primary font-semibold"
+                        : "text-foreground/70 hover:bg-secondary hover:text-primary"
+                    )}
+                  >
+                    <item.icon
+                      className={cn(
+                        "h-4.5 w-4.5 shrink-0",
+                        isActive ? "text-primary" : "text-foreground/50",
+                        "transition-colors group-hover:text-primary"
+                      )}
+                    />
+                    {item.title}
+                    {isActive && (
+                      <div className="ml-auto h-1.5 w-1.5 rounded-full bg-primary" />
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </nav>
     </aside>
   );
 }
