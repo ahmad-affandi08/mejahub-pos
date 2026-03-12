@@ -1,28 +1,42 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import prisma from "@/lib/prisma";
+import { KDSClient } from "@/components/kitchen/kds-client";
 
 export default async function KitchenPage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
 
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Kitchen Display System (KDS)</h1>
-        <p className="text-muted-foreground">
-          Layar dapur untuk melihat dan mengelola pesanan masuk
-        </p>
-      </div>
+  const branchId = session.user.branchId;
+  if (!branchId) redirect("/dashboard");
 
-      <div className="flex items-center justify-center rounded-lg border-2 border-dashed p-16">
-        <div className="text-center text-muted-foreground">
-          <p className="text-lg font-medium">KDS akan tersedia di Sprint 3</p>
-          <p className="text-sm">
-            Fitur Kitchen Display System (auto-refresh, station routing, bump
-            timer) akan diimplementasikan pada sprint berikutnya.
-          </p>
-        </div>
-      </div>
-    </div>
+  // Get all pending/cooking order items for this branch
+  const orderItems = await prisma.orderItem.findMany({
+    where: {
+      order: { branchId, status: "OPEN" },
+      status: { in: ["PENDING", "COOKING", "READY"] },
+    },
+    include: {
+      product: { select: { id: true, name: true } },
+      variant: { select: { id: true, name: true } },
+      modifiers: { select: { id: true, name: true, price: true } },
+      order: {
+        select: {
+          id: true,
+          orderNumber: true,
+          type: true,
+          tableId: true,
+          table: { select: { number: true, name: true } },
+          createdAt: true,
+        },
+      },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
+  return (
+    <KDSClient
+      orderItems={JSON.parse(JSON.stringify(orderItems))}
+    />
   );
 }

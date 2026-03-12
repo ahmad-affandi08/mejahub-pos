@@ -66,7 +66,7 @@ export function DashboardHeader({ user }: HeaderProps) {
         <Button
           variant="ghost"
           size="icon"
-          className="h-9 w-9 rounded-full text-foreground/60 hover:bg-muted"
+          className="h-9 w-9 rounded-full text-foreground/60 hover:bg-primary/50"
         >
           <HelpCircle className="h-4.5 w-4.5" />
         </Button>
@@ -74,7 +74,7 @@ export function DashboardHeader({ user }: HeaderProps) {
         <Button
           variant="ghost"
           size="icon"
-          className="h-9 w-9 rounded-full text-foreground/60 hover:bg-muted"
+          className="h-9 w-9 rounded-full text-foreground/60 hover:bg-primary/50"
         >
           <Settings className="h-4.5 w-4.5" />
         </Button>
@@ -82,7 +82,7 @@ export function DashboardHeader({ user }: HeaderProps) {
         <Button
           variant="ghost"
           size="icon"
-          className="relative h-9 w-9 rounded-full text-foreground/60 hover:bg-muted"
+          className="relative h-9 w-9 rounded-full text-foreground/60 hover:bg-primary/50"
         >
           <Bell className="h-4.5 w-4.5" />
           <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-destructive" />
@@ -90,7 +90,7 @@ export function DashboardHeader({ user }: HeaderProps) {
 
         {/* User Dropdown */}
         <DropdownMenu>
-          <DropdownMenuTrigger className="flex items-center gap-2.5 rounded-full py-1 pl-3 pr-1 ml-1 hover:bg-muted transition-colors">
+          <DropdownMenuTrigger className="flex items-center gap-2.5 rounded-full py-1 pl-3 pr-1 ml-1 hover:bg-primary/50 transition-colors">
             <span className="hidden text-sm font-medium md:inline-block text-foreground/80">
               {user.name}
             </span>

@@ -182,3 +182,14 @@
     letter-spacing: var(--tracking-normal);
   }
 }
+button,
+a,
+label,
+summary,
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+input[type="checkbox"],
+input[type="radio"] {
+  cursor: pointer;
+}

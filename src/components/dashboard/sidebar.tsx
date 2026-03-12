@@ -153,15 +153,15 @@ export function DashboardSidebar({ user }: SidebarProps) {
                 className={cn(
                   "group flex items-center gap-4 rounded-full px-4 py-2.5 text-sm font-medium transition-all duration-200",
                   isActive
-                    ? "bg-secondary text-primary font-semibold"
-                    : "text-foreground/70 hover:bg-secondary hover:text-primary"
+                    ? "bg-secondary text-background font-semibold"
+                    : "text-foreground/70 hover:bg-secondary hover:text-background"
                 )}
               >
                 <item.icon
                   className={cn(
                     "h-4.5 w-4.5 shrink-0",
-                    isActive ? "text-primary" : "text-foreground/50",
-                    "transition-colors group-hover:text-primary"
+                    isActive ? "text-background" : "text-foreground/50",
+                    "transition-colors group-hover:text-background"
                   )}
                 />
                 {item.title}
@@ -196,15 +196,15 @@ export function DashboardSidebar({ user }: SidebarProps) {
                     className={cn(
                       "group flex items-center gap-4 rounded-full px-4 py-2.5 text-sm font-medium transition-all duration-200",
                       isActive
-                        ? "bg-secondary text-primary font-semibold"
-                        : "text-foreground/70 hover:bg-secondary hover:text-primary"
+                        ? "bg-secondary text-background font-semibold"
+                        : "text-foreground/70 hover:bg-secondary hover:text-background"
                     )}
                   >
                     <item.icon
                       className={cn(
                         "h-4.5 w-4.5 shrink-0",
-                        isActive ? "text-primary" : "text-foreground/50",
-                        "transition-colors group-hover:text-primary"
+                        isActive ? "text-background" : "text-foreground/50",
+                        "transition-colors group-hover:text-background"
                       )}
                     />
                     {item.title}

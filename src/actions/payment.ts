@@ -1,0 +1,334 @@
+"use server";
+
+import prisma from "@/lib/prisma";
+import { auth } from "@/lib/auth";
+import { hasPermission } from "@/lib/rbac";
+import { revalidatePath } from "next/cache";
+import type { ActionResult } from "@/lib/utils";
+import { calculateChange } from "@/lib/calculations";
+import {
+  processPaymentSchema,
+  splitBillPaymentSchema,
+} from "@/lib/validations/order";
+import type { Payment } from "@prisma/client";
+
+// ============================================================
+// PROCESS SINGLE PAYMENT
+// ============================================================
+
+export async function processPayment(input: {
+  orderId: string;
+  method: string;
+  amount: number;
+  receivedAmount?: number;
+  reference?: string;
+}): Promise<ActionResult<Payment>> {
+  const session = await auth();
+  if (!session?.user || !hasPermission(session.user.role, "payment:process")) {
+    return { success: false, error: "Anda tidak memiliki akses." };
+  }
+
+  const validated = processPaymentSchema.safeParse(input);
+  if (!validated.success) {
+    return { success: false, error: validated.error.issues[0].message };
+  }
+
+  const data = validated.data;
+
+  try {
+    const payment = await prisma.$transaction(async (tx) => {
+      // 1. Get order
+      const order = await tx.order.findUnique({
+        where: { id: data.orderId },
+        include: { payments: true, shift: true },
+      });
+      if (!order) throw new Error("Pesanan tidak ditemukan.");
+      if (order.status !== "OPEN") {
+        throw new Error("Pesanan sudah dibayar atau dibatalkan.");
+      }
+
+      // 2. Validate payment amount covers total
+      const existingPaid = order.payments
+        .filter((p) => p.status === "COMPLETED")
+        .reduce((sum, p) => sum + Number(p.amount), 0);
+      const remaining = Number(order.totalAmount) - existingPaid;
+
+      if (data.amount < remaining) {
+        throw new Error(
+          `Pembayaran kurang. Sisa tagihan: Rp ${remaining.toLocaleString("id-ID")}`
+        );
+      }
+
+      // 3. Calculate change (cash only)
+      const receivedAmount =
+        data.method === "CASH"
+          ? data.receivedAmount || data.amount
+          : data.amount;
+      const changeAmount =
+        data.method === "CASH"
+          ? calculateChange(remaining, receivedAmount)
+          : 0;
+
+      // 4. Create payment record
+      const newPayment = await tx.payment.create({
+        data: {
+          method: data.method as Payment["method"],
+          status: "COMPLETED",
+          amount: remaining, // Actual amount applied
+          receivedAmount,
+          changeAmount,
+          reference: data.reference,
+          orderId: data.orderId,
+        },
+      });
+
+      // 5. Mark order as PAID
+      await tx.order.update({
+        where: { id: data.orderId },
+        data: { status: "PAID" },
+      });
+
+      // 6. Release table
+      if (order.tableId) {
+        await tx.table.update({
+          where: { id: order.tableId },
+          data: { status: "AVAILABLE" },
+        });
+      }
+
+      // 7. Update shift totals (if shift exists)
+      if (order.shiftId) {
+        await tx.shift.update({
+          where: { id: order.shiftId },
+          data: {
+            totalSales: { increment: Number(order.totalAmount) },
+            totalOrders: { increment: 1 },
+          },
+        });
+
+        // Record cash drawer transaction (for CASH payments)
+        if (data.method === "CASH") {
+          await tx.cashDrawerTransaction.create({
+            data: {
+              type: "CASH_IN",
+              amount: remaining,
+              reason: `Pembayaran order ${order.orderNumber}`,
+              shiftId: order.shiftId,
+              userId: session.user!.id,
+            },
+          });
+        }
+      }
+
+      return newPayment;
+    });
+
+    revalidatePath("/dashboard/orders");
+    revalidatePath("/dashboard/tables");
+
+    return { success: true, data: payment };
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        error instanceof Error ? error.message : "Gagal memproses pembayaran.",
+    };
+  }
+}
+
+// ============================================================
+// SPLIT BILL PAYMENT
+// ============================================================
+
+export async function processSplitBill(input: {
+  orderId: string;
+  payments: Array<{
+    method: string;
+    amount: number;
+    receivedAmount?: number;
+    reference?: string;
+  }>;
+}): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user || !hasPermission(session.user.role, "payment:process")) {
+    return { success: false, error: "Anda tidak memiliki akses." };
+  }
+
+  const validated = splitBillPaymentSchema.safeParse(input);
+  if (!validated.success) {
+    return { success: false, error: validated.error.issues[0].message };
+  }
+
+  const data = validated.data;
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      // 1. Get order
+      const order = await tx.order.findUnique({
+        where: { id: data.orderId },
+        include: { payments: true },
+      });
+      if (!order) throw new Error("Pesanan tidak ditemukan.");
+      if (order.status !== "OPEN") {
+        throw new Error("Pesanan sudah dibayar atau dibatalkan.");
+      }
+
+      // 2. Validate total covers order
+      const totalPayment = data.payments.reduce((sum, p) => sum + p.amount, 0);
+      if (totalPayment < Number(order.totalAmount)) {
+        throw new Error(
+          `Total pembayaran (Rp ${totalPayment.toLocaleString("id-ID")}) kurang dari tagihan (Rp ${Number(order.totalAmount).toLocaleString("id-ID")})`
+        );
+      }
+
+      // 3. Create payment records
+      let totalCashIn = 0;
+      for (const payment of data.payments) {
+        const receivedAmount =
+          payment.method === "CASH"
+            ? payment.receivedAmount || payment.amount
+            : payment.amount;
+        const changeAmount =
+          payment.method === "CASH"
+            ? calculateChange(payment.amount, receivedAmount)
+            : 0;
+
+        await tx.payment.create({
+          data: {
+            method: payment.method as Payment["method"],
+            status: "COMPLETED",
+            amount: payment.amount,
+            receivedAmount,
+            changeAmount,
+            reference: payment.reference,
+            orderId: data.orderId,
+          },
+        });
+
+        if (payment.method === "CASH") {
+          totalCashIn += payment.amount;
+        }
+      }
+
+      // 4. Mark order as PAID
+      await tx.order.update({
+        where: { id: data.orderId },
+        data: { status: "PAID" },
+      });
+
+      // 5. Release table
+      if (order.tableId) {
+        await tx.table.update({
+          where: { id: order.tableId },
+          data: { status: "AVAILABLE" },
+        });
+      }
+
+      // 6. Update shift
+      if (order.shiftId) {
+        await tx.shift.update({
+          where: { id: order.shiftId },
+          data: {
+            totalSales: { increment: Number(order.totalAmount) },
+            totalOrders: { increment: 1 },
+          },
+        });
+
+        if (totalCashIn > 0) {
+          await tx.cashDrawerTransaction.create({
+            data: {
+              type: "CASH_IN",
+              amount: totalCashIn,
+              reason: `Split bill - order ${order.orderNumber}`,
+              shiftId: order.shiftId,
+              userId: session.user!.id,
+            },
+          });
+        }
+      }
+    });
+
+    revalidatePath("/dashboard/orders");
+    revalidatePath("/dashboard/tables");
+
+    return { success: true, data: undefined };
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        error instanceof Error ? error.message : "Gagal memproses split bill.",
+    };
+  }
+}
+
+// ============================================================
+// REFUND PAYMENT
+// ============================================================
+
+export async function refundPayment(
+  paymentId: string,
+  reason: string
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user || !hasPermission(session.user.role, "payment:refund")) {
+    return { success: false, error: "Anda tidak memiliki akses." };
+  }
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      const payment = await tx.payment.findUnique({
+        where: { id: paymentId },
+        include: { order: true },
+      });
+      if (!payment) throw new Error("Pembayaran tidak ditemukan.");
+      if (payment.status !== "COMPLETED") {
+        throw new Error("Hanya pembayaran COMPLETED yang bisa di-refund.");
+      }
+
+      // Refund payment
+      await tx.payment.update({
+        where: { id: paymentId },
+        data: { status: "REFUNDED" },
+      });
+
+      // Re-open order
+      await tx.order.update({
+        where: { id: payment.orderId },
+        data: { status: "OPEN" },
+      });
+
+      // Reverse shift totals
+      if (payment.order.shiftId) {
+        await tx.shift.update({
+          where: { id: payment.order.shiftId },
+          data: {
+            totalSales: { decrement: Number(payment.amount) },
+            totalOrders: { decrement: 1 },
+          },
+        });
+      }
+
+      // Audit log
+      await tx.auditLog.create({
+        data: {
+          action: "REFUND",
+          entity: "payments",
+          entityId: paymentId,
+          oldData: { status: "COMPLETED" },
+          newData: { status: "REFUNDED", reason },
+          userId: session.user!.id,
+          branchId: payment.order.branchId,
+        },
+      });
+    });
+
+    revalidatePath("/dashboard/orders");
+
+    return { success: true, data: undefined };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Gagal refund.",
+    };
+  }
+}
