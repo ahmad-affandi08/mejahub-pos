@@ -32,7 +32,20 @@ export default async function TablesPage() {
       },
     },
     orderBy: { number: "asc" },
-  });
+  }) as Array<{
+    id: string;
+    number: number;
+    name: string | null;
+    capacity: number;
+    status: import("@prisma/client").TableStatus;
+    qrCode: string | null;
+    orders: {
+      id: string;
+      orderNumber: string;
+      totalAmount: unknown;
+      items: { id: string }[];
+    }[];
+  }>;
 
   return (
     <div className="space-y-6">

@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { hasPermission } from "@/lib/rbac";
 import type { UserRole } from "@prisma/client";
-import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import {
   LayoutDashboard,
@@ -21,6 +20,7 @@ import {
   ShieldCheck,
   Warehouse,
   Plus,
+  Timer,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -45,7 +45,7 @@ const mainNavItems = [
     permission: "table:view" as const,
   },
   {
-    title: "Pesanan",
+    title: "Point of Sale (POS)",
     href: "/dashboard/orders",
     icon: ClipboardList,
     permission: "order:view" as const,
@@ -73,6 +73,12 @@ const mainNavItems = [
     href: "/dashboard/inventory",
     icon: Warehouse,
     permission: "inventory:view" as const,
+  },
+  {
+    title: "Shift",
+    href: "/dashboard/shifts",
+    icon: Timer,
+    permission: "shift:view" as const,
   },
 ];
 

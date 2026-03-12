@@ -131,10 +131,10 @@ export function ProductList({ products, categories }: ProductListProps) {
                 </div>
               )}
               <div className="flex gap-2 pt-1">
-                <Button variant="outline" size="sm" className="flex-1 text-xs">
+                <Button variant="outline" size="sm" className="flex-1 text-xs bg-secondary text-white hover:bg-secondary/70 hover:text-white">
                   Edit
                 </Button>
-                <Button variant="outline" size="sm" className="text-xs">
+                <Button variant="outline" size="sm" className="text-xs bg-red-500 text-white hover:bg-red-700 hover:text-white">
                   {product.isAvailable ? "Non-aktifkan" : "Aktifkan"}
                 </Button>
               </div>

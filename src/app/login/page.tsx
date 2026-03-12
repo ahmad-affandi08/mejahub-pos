@@ -14,6 +14,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { toast } from "sonner";
+import {Logo } from "@/components/ui/logo";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -52,12 +53,10 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1 text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary">
-            <span className="text-2xl font-bold text-primary-foreground">
-              MH
-            </span>
+          <div className="flex justify-center p-6">
+            <Logo className="h-10 w-auto" />
           </div>
-          <CardTitle className="text-2xl font-bold">MejaHub</CardTitle>
+          <CardTitle className="text-2xl">Selamat Datang Kembali</CardTitle>
           <CardDescription>
             Masuk ke sistem POS untuk mulai mengelola restoran Anda
           </CardDescription>

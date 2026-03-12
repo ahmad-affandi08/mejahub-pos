@@ -32,6 +32,7 @@ import {
   MapPin,
   User,
   Hash,
+  MessageCircle,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { cancelOrder, voidOrderItem } from "@/actions/order";
@@ -40,6 +41,10 @@ import {
   calculateChange,
   suggestCashDenominations,
 } from "@/lib/calculations";
+import {
+  buildWhatsAppReceiptUrl,
+  getPaymentMethodLabel,
+} from "@/lib/whatsapp";
 import Link from "next/link";
 
 interface OrderDetailProps {
@@ -212,6 +217,57 @@ export function OrderDetail({ order }: OrderDetailProps) {
               <CreditCard className="h-4 w-4 mr-1" /> Bayar
             </Button>
           </div>
+        )}
+
+        {order.status === "PAID" && order.customerPhone && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="text-green-600 border-green-600 hover:bg-green-50"
+            onClick={() => {
+              const lastPayment = order.payments[order.payments.length - 1];
+              const url = buildWhatsAppReceiptUrl(order.customerPhone!, {
+                orderNumber: order.orderNumber,
+                branchName: order.branch?.name || "MejaHub",
+                tableName: order.table
+                  ? `#${order.table.number}${order.table.name ? ` - ${order.table.name}` : ""}`
+                  : "Takeaway",
+                customerName: order.customerName || "Pelanggan",
+                items: order.items
+                  .filter((i) => i.status !== "CANCELLED")
+                  .map((i) => ({
+                    name: i.product.name,
+                    variantName: i.variant?.name,
+                    quantity: i.quantity,
+                    subtotal: Number(i.subtotal),
+                    modifiers: i.modifiers.map((m) => ({
+                      name: m.name,
+                      price: Number(m.price),
+                    })),
+                  })),
+                subtotal: Number(order.subtotal),
+                taxRate: Number(order.taxRate),
+                taxAmount: Number(order.taxAmount),
+                serviceRate: Number(order.serviceRate),
+                serviceAmount: Number(order.serviceAmount),
+                discountAmount: Number(order.discountAmount),
+                totalAmount: Number(order.totalAmount),
+                paymentMethod: lastPayment
+                  ? getPaymentMethodLabel(lastPayment.method)
+                  : undefined,
+                paidAmount: lastPayment
+                  ? Number(lastPayment.receivedAmount)
+                  : undefined,
+                changeAmount: lastPayment
+                  ? Number(lastPayment.changeAmount)
+                  : undefined,
+                createdAt: new Date(order.createdAt),
+              });
+              window.open(url, "_blank");
+            }}
+          >
+            <MessageCircle className="h-4 w-4 mr-1" /> Kirim Struk WA
+          </Button>
         )}
       </div>
 

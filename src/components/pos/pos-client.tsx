@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { useCartStore } from "@/stores/cart-store";
-import { ProductGrid } from "./product-grid";
-import { CartPanel } from "./cart-panel";
-import { OpenOrdersList } from "./open-orders-list";
+import { ProductGrid } from "@/components/pos/product-grid";
+import { CartPanel } from "@/components/pos/cart-panel";
+import { OpenOrdersList } from "@/components/pos/open-orders-list";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ShoppingCart, ClipboardList } from "lucide-react";
 
