@@ -82,7 +82,7 @@ export default async function TablesPage() {
         </div>
       </div>
 
-      <TableGrid tables={tables} />
+      <TableGrid tables={tables} branchId={branchId} />
     </div>
   );
 }

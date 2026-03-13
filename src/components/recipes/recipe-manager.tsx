@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -86,15 +86,12 @@ export function RecipeManager({
   }, [products, search]);
 
   const selectedProduct = useMemo(
-    () => products.find((product) => product.id === selectedProductId) ?? null,
-    [products, selectedProductId]
+    () =>
+      products.find((product) => product.id === selectedProductId) ??
+      filteredProducts[0] ??
+      null,
+    [filteredProducts, products, selectedProductId]
   );
-
-  useEffect(() => {
-    if (!selectedProduct && filteredProducts[0]) {
-      setSelectedProductId(filteredProducts[0].id);
-    }
-  }, [filteredProducts, selectedProduct]);
 
   function openEditor() {
     if (!selectedProduct) return;
@@ -197,7 +194,7 @@ export function RecipeManager({
                 className="pl-9"
               />
             </div>
-            <ScrollArea className="h-[480px] pr-3">
+            <ScrollArea className="h-120 pr-3">
               <div className="space-y-2">
                 {filteredProducts.map((product) => (
                   <button
@@ -205,7 +202,7 @@ export function RecipeManager({
                     type="button"
                     onClick={() => setSelectedProductId(product.id)}
                     className={`w-full rounded-lg border p-3 text-left transition ${
-                      product.id === selectedProductId
+                      product.id === selectedProduct?.id
                         ? "border-primary bg-primary/5"
                         : "hover:border-primary/40"
                     }`}

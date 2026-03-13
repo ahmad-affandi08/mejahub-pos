@@ -4,9 +4,26 @@ import { logAudit } from "@/lib/audit";
 import prisma from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/rbac";
-import { productSchema, updateProductSchema } from "@/lib/validations/product";
+import {
+  attachProductModifierGroupSchema,
+  createProductModifierGroupSchema,
+  modifierSchema,
+  productSchema,
+  productVariantSchema,
+  updateModifierGroupSchema,
+  updateModifierSchema,
+  updateProductSchema,
+  updateProductVariantSchema,
+} from "@/lib/validations/product";
+import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/lib/utils";
-import type { Product } from "@prisma/client";
+import type {
+  Modifier,
+  ModifierGroup,
+  Product,
+  ProductModifierGroup,
+  ProductVariant,
+} from "@prisma/client";
 
 export async function getProducts(branchId?: string) {
   const session = await auth();
@@ -198,6 +215,466 @@ export async function toggleProductAvailability(
     return {
       success: false,
       error: error instanceof Error ? error.message : "Gagal update produk.",
+    };
+  }
+}
+
+export async function createProductVariant(
+  formData: FormData
+): Promise<ActionResult<ProductVariant>> {
+  const session = await auth();
+  if (!session?.user || !hasPermission(session.user.role, "product:manage")) {
+    return { success: false, error: "Anda tidak memiliki akses." };
+  }
+
+  const raw = Object.fromEntries(formData);
+  const validated = productVariantSchema.safeParse(raw);
+  if (!validated.success) {
+    return { success: false, error: validated.error.issues[0].message };
+  }
+
+  try {
+    const variant = await prisma.productVariant.create({
+      data: validated.data,
+    });
+
+    await logAudit({
+      action: "CREATE",
+      entity: "product_variants",
+      entityId: variant.id,
+      newData: variant,
+      userId: session.user.id,
+      branchId: session.user.branchId,
+    });
+
+    revalidatePath("/dashboard/products");
+    return { success: true, data: variant };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Gagal membuat varian.",
+    };
+  }
+}
+
+export async function updateProductVariant(
+  id: string,
+  formData: FormData
+): Promise<ActionResult<ProductVariant>> {
+  const session = await auth();
+  if (!session?.user || !hasPermission(session.user.role, "product:manage")) {
+    return { success: false, error: "Anda tidak memiliki akses." };
+  }
+
+  const raw = Object.fromEntries(formData);
+  const validated = updateProductVariantSchema.safeParse(raw);
+  if (!validated.success) {
+    return { success: false, error: validated.error.issues[0].message };
+  }
+
+  try {
+    const previous = await prisma.productVariant.findUnique({ where: { id } });
+    const variant = await prisma.productVariant.update({
+      where: { id },
+      data: validated.data,
+    });
+
+    await logAudit({
+      action: "UPDATE",
+      entity: "product_variants",
+      entityId: variant.id,
+      oldData: previous,
+      newData: variant,
+      userId: session.user.id,
+      branchId: session.user.branchId,
+    });
+
+    revalidatePath("/dashboard/products");
+    return { success: true, data: variant };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Gagal update varian.",
+    };
+  }
+}
+
+export async function deleteProductVariant(id: string): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user || !hasPermission(session.user.role, "product:manage")) {
+    return { success: false, error: "Anda tidak memiliki akses." };
+  }
+
+  try {
+    const previous = await prisma.productVariant.findUnique({ where: { id } });
+    await prisma.productVariant.update({
+      where: { id },
+      data: { isActive: false },
+    });
+
+    await logAudit({
+      action: "DELETE",
+      entity: "product_variants",
+      entityId: id,
+      oldData: previous,
+      newData: { isActive: false },
+      userId: session.user.id,
+      branchId: session.user.branchId,
+    });
+
+    revalidatePath("/dashboard/products");
+    return { success: true, data: undefined };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Gagal menghapus varian.",
+    };
+  }
+}
+
+export async function createProductModifierGroup(
+  formData: FormData
+): Promise<
+  ActionResult<
+    ProductModifierGroup & {
+      modifierGroup: ModifierGroup & { modifiers: Modifier[] };
+    }
+  >
+> {
+  const session = await auth();
+  if (!session?.user || !hasPermission(session.user.role, "product:manage")) {
+    return { success: false, error: "Anda tidak memiliki akses." };
+  }
+
+  const raw = Object.fromEntries(formData);
+  const validated = createProductModifierGroupSchema.safeParse(raw);
+  if (!validated.success) {
+    return { success: false, error: validated.error.issues[0].message };
+  }
+
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      const group = await tx.modifierGroup.create({
+        data: {
+          name: validated.data.name,
+          type: validated.data.type,
+          isRequired: validated.data.isRequired,
+          minSelect: validated.data.minSelect,
+          maxSelect: validated.data.maxSelect,
+        },
+      });
+
+      const junction = await tx.productModifierGroup.create({
+        data: {
+          productId: validated.data.productId,
+          modifierGroupId: group.id,
+        },
+        include: {
+          modifierGroup: {
+            include: {
+              modifiers: { where: { isActive: true } },
+            },
+          },
+        },
+      });
+
+      return junction;
+    });
+
+    await logAudit({
+      action: "CREATE",
+      entity: "product_modifier_groups",
+      entityId: result.id,
+      newData: {
+        productId: validated.data.productId,
+        modifierGroupId: result.modifierGroupId,
+      },
+      userId: session.user.id,
+      branchId: session.user.branchId,
+    });
+
+    revalidatePath("/dashboard/products");
+    return { success: true, data: result };
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Gagal membuat modifier group produk.",
+    };
+  }
+}
+
+export async function attachExistingModifierGroup(
+  formData: FormData
+): Promise<
+  ActionResult<
+    ProductModifierGroup & {
+      modifierGroup: ModifierGroup & { modifiers: Modifier[] };
+    }
+  >
+> {
+  const session = await auth();
+  if (!session?.user || !hasPermission(session.user.role, "product:manage")) {
+    return { success: false, error: "Anda tidak memiliki akses." };
+  }
+
+  const raw = Object.fromEntries(formData);
+  const validated = attachProductModifierGroupSchema.safeParse(raw);
+  if (!validated.success) {
+    return { success: false, error: validated.error.issues[0].message };
+  }
+
+  try {
+    const existing = await prisma.productModifierGroup.findUnique({
+      where: {
+        productId_modifierGroupId: {
+          productId: validated.data.productId,
+          modifierGroupId: validated.data.modifierGroupId,
+        },
+      },
+    });
+
+    if (existing) {
+      return {
+        success: false,
+        error: "Modifier group sudah terpasang pada produk ini.",
+      };
+    }
+
+    const result = await prisma.productModifierGroup.create({
+      data: {
+        productId: validated.data.productId,
+        modifierGroupId: validated.data.modifierGroupId,
+      },
+      include: {
+        modifierGroup: {
+          include: {
+            modifiers: { where: { isActive: true } },
+          },
+        },
+      },
+    });
+
+    await logAudit({
+      action: "CREATE",
+      entity: "product_modifier_groups",
+      entityId: result.id,
+      newData: {
+        productId: validated.data.productId,
+        modifierGroupId: validated.data.modifierGroupId,
+        attachedExistingGroup: true,
+      },
+      userId: session.user.id,
+      branchId: session.user.branchId,
+    });
+
+    revalidatePath("/dashboard/products");
+    return { success: true, data: result };
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Gagal memasang modifier group ke produk.",
+    };
+  }
+}
+
+export async function updateModifierGroup(
+  id: string,
+  formData: FormData
+): Promise<ActionResult<ModifierGroup>> {
+  const session = await auth();
+  if (!session?.user || !hasPermission(session.user.role, "product:manage")) {
+    return { success: false, error: "Anda tidak memiliki akses." };
+  }
+
+  const raw = Object.fromEntries(formData);
+  const validated = updateModifierGroupSchema.safeParse(raw);
+  if (!validated.success) {
+    return { success: false, error: validated.error.issues[0].message };
+  }
+
+  try {
+    const previous = await prisma.modifierGroup.findUnique({ where: { id } });
+    const group = await prisma.modifierGroup.update({
+      where: { id },
+      data: validated.data,
+    });
+
+    await logAudit({
+      action: "UPDATE",
+      entity: "modifier_groups",
+      entityId: group.id,
+      oldData: previous,
+      newData: group,
+      userId: session.user.id,
+      branchId: session.user.branchId,
+    });
+
+    revalidatePath("/dashboard/products");
+    return { success: true, data: group };
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        error instanceof Error ? error.message : "Gagal update modifier group.",
+    };
+  }
+}
+
+export async function removeProductModifierGroup(
+  productId: string,
+  modifierGroupId: string
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user || !hasPermission(session.user.role, "product:manage")) {
+    return { success: false, error: "Anda tidak memiliki akses." };
+  }
+
+  try {
+    await prisma.productModifierGroup.delete({
+      where: {
+        productId_modifierGroupId: {
+          productId,
+          modifierGroupId,
+        },
+      },
+    });
+
+    await logAudit({
+      action: "DELETE",
+      entity: "product_modifier_groups",
+      newData: { productId, modifierGroupId, unlinked: true },
+      userId: session.user.id,
+      branchId: session.user.branchId,
+    });
+
+    revalidatePath("/dashboard/products");
+    return { success: true, data: undefined };
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Gagal melepas modifier group dari produk.",
+    };
+  }
+}
+
+export async function createModifier(
+  formData: FormData
+): Promise<ActionResult<Modifier>> {
+  const session = await auth();
+  if (!session?.user || !hasPermission(session.user.role, "product:manage")) {
+    return { success: false, error: "Anda tidak memiliki akses." };
+  }
+
+  const raw = Object.fromEntries(formData);
+  const validated = modifierSchema.safeParse(raw);
+  if (!validated.success) {
+    return { success: false, error: validated.error.issues[0].message };
+  }
+
+  try {
+    const modifier = await prisma.modifier.create({
+      data: validated.data,
+    });
+
+    await logAudit({
+      action: "CREATE",
+      entity: "modifiers",
+      entityId: modifier.id,
+      newData: modifier,
+      userId: session.user.id,
+      branchId: session.user.branchId,
+    });
+
+    revalidatePath("/dashboard/products");
+    return { success: true, data: modifier };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Gagal membuat modifier.",
+    };
+  }
+}
+
+export async function updateModifier(
+  id: string,
+  formData: FormData
+): Promise<ActionResult<Modifier>> {
+  const session = await auth();
+  if (!session?.user || !hasPermission(session.user.role, "product:manage")) {
+    return { success: false, error: "Anda tidak memiliki akses." };
+  }
+
+  const raw = Object.fromEntries(formData);
+  const validated = updateModifierSchema.safeParse(raw);
+  if (!validated.success) {
+    return { success: false, error: validated.error.issues[0].message };
+  }
+
+  try {
+    const previous = await prisma.modifier.findUnique({ where: { id } });
+    const modifier = await prisma.modifier.update({
+      where: { id },
+      data: validated.data,
+    });
+
+    await logAudit({
+      action: "UPDATE",
+      entity: "modifiers",
+      entityId: modifier.id,
+      oldData: previous,
+      newData: modifier,
+      userId: session.user.id,
+      branchId: session.user.branchId,
+    });
+
+    revalidatePath("/dashboard/products");
+    return { success: true, data: modifier };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Gagal update modifier.",
+    };
+  }
+}
+
+export async function deleteModifier(id: string): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user || !hasPermission(session.user.role, "product:manage")) {
+    return { success: false, error: "Anda tidak memiliki akses." };
+  }
+
+  try {
+    const previous = await prisma.modifier.findUnique({ where: { id } });
+    await prisma.modifier.update({
+      where: { id },
+      data: { isActive: false },
+    });
+
+    await logAudit({
+      action: "DELETE",
+      entity: "modifiers",
+      entityId: id,
+      oldData: previous,
+      newData: { isActive: false },
+      userId: session.user.id,
+      branchId: session.user.branchId,
+    });
+
+    revalidatePath("/dashboard/products");
+    return { success: true, data: undefined };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Gagal menghapus modifier.",
     };
   }
 }

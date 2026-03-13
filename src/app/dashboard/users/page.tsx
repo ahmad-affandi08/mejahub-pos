@@ -1,30 +1,7 @@
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { redirect } from "next/navigation";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-
-const roleBadgeVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-  SUPER_ADMIN: "destructive",
-  BRANCH_MANAGER: "default",
-  CASHIER: "secondary",
-  WAITER: "secondary",
-  KITCHEN_STAFF: "outline",
-  BAR_STAFF: "outline",
-};
+import { UserManager } from "@/components/dashboard/user-manager";
 
 export default async function UsersPage() {
   const session = await auth();
@@ -43,9 +20,23 @@ export default async function UsersPage() {
       name: true,
       role: true,
       isActive: true,
+      branchId: true,
       createdAt: true,
       branch: { select: { name: true } },
     },
+    orderBy: { name: "asc" },
+  });
+
+  const branches = await prisma.branch.findMany({
+    where: {
+      isActive: true,
+      ...(session.user.role === "SUPER_ADMIN"
+        ? {}
+        : session.user.branchId
+          ? { id: session.user.branchId }
+          : { id: "" }),
+    },
+    select: { id: true, name: true },
     orderBy: { name: "asc" },
   });
 
@@ -59,44 +50,20 @@ export default async function UsersPage() {
           </p>
         </div>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Daftar Pengguna ({users.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nama</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Cabang</TableHead>
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {users.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell className="font-medium">{user.name}</TableCell>
-                  <TableCell>{user.email}</TableCell>
-                  <TableCell>
-                    <Badge variant={roleBadgeVariant[user.role] || "outline"}>
-                      {user.role.replace("_", " ")}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{user.branch?.name ?? "-"}</TableCell>
-                  <TableCell>
-                    <Badge variant={user.isActive ? "default" : "secondary"}>
-                      {user.isActive ? "Aktif" : "Non-aktif"}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <UserManager
+        users={users.map((user) => ({
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          isActive: user.isActive,
+          branchId: user.branchId,
+          branchName: user.branch?.name ?? null,
+        }))}
+        branches={branches}
+        currentRole={session.user.role}
+        currentBranchId={session.user.branchId}
+      />
     </div>
   );
 }

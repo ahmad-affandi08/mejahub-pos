@@ -22,18 +22,37 @@ export const productVariantSchema = z.object({
   productId: z.string().min(1),
 });
 
+export const updateProductVariantSchema = productVariantSchema.partial().omit({
+  productId: true,
+});
+
 export const modifierGroupSchema = z.object({
   name: z.string().min(1, "Nama modifier group wajib diisi"),
   type: z.enum(["SINGLE", "MULTIPLE"]).default("SINGLE"),
-  isRequired: z.boolean().default(false),
+  isRequired: z.coerce.boolean().default(false),
   minSelect: z.coerce.number().int().min(0).default(0),
   maxSelect: z.coerce.number().int().min(1).default(1),
 });
+
+export const createProductModifierGroupSchema = modifierGroupSchema.extend({
+  productId: z.string().min(1),
+});
+
+export const attachProductModifierGroupSchema = z.object({
+  productId: z.string().min(1),
+  modifierGroupId: z.string().min(1),
+});
+
+export const updateModifierGroupSchema = modifierGroupSchema.partial();
 
 export const modifierSchema = z.object({
   name: z.string().min(1, "Nama modifier wajib diisi"),
   price: z.coerce.number().min(0).default(0),
   modifierGroupId: z.string().min(1),
+});
+
+export const updateModifierSchema = modifierSchema.partial().omit({
+  modifierGroupId: true,
 });
 
 export type ProductInput = z.infer<typeof productSchema>;

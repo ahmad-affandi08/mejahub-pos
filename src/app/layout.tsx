@@ -34,6 +34,7 @@ export default function RootLayout({
   return (
     <html lang="id" suppressHydrationWarning>
       <body
+        suppressHydrationWarning
         className={`${inter.variable} ${jetbrainsMono.variable} ${lobsterTwo.variable} antialiased`}
       >
         <Providers>

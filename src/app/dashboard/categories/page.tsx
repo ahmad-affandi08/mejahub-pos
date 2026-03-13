@@ -1,13 +1,7 @@
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { redirect } from "next/navigation";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { CategoryManager } from "@/components/dashboard/category-manager";
 
 export default async function CategoriesPage() {
   const session = await auth();
@@ -24,9 +18,6 @@ export default async function CategoriesPage() {
 
   const categories = await prisma.category.findMany({
     where: { branchId, isActive: true },
-    include: {
-      _count: { select: { products: { where: { isActive: true } } } },
-    },
     orderBy: { sortOrder: "asc" },
   });
 
@@ -40,40 +31,15 @@ export default async function CategoriesPage() {
           </p>
         </div>
       </div>
-
-      <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-        {categories.map((category) => (
-          <Card
-            key={category.id}
-            className="cursor-pointer transition-all hover:shadow-md"
-          >
-            <CardHeader className="p-4 pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base">{category.name}</CardTitle>
-                <Badge variant="secondary" className="text-xs">
-                  #{category.sortOrder}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="p-4 pt-0">
-              {category.description && (
-                <p className="text-sm text-muted-foreground">
-                  {category.description}
-                </p>
-              )}
-              <p className="mt-2 text-sm font-medium">
-                {category._count.products} produk
-              </p>
-            </CardContent>
-          </Card>
-        ))}
-
-        {categories.length === 0 && (
-          <div className="col-span-full py-12 text-center text-muted-foreground">
-            Belum ada kategori. Mulai dengan menambahkan kategori baru.
-          </div>
-        )}
-      </div>
+      <CategoryManager
+        branchId={branchId}
+        categories={categories.map((category) => ({
+          id: category.id,
+          name: category.name,
+          description: category.description,
+          sortOrder: category.sortOrder,
+        }))}
+      />
     </div>
   );
 }

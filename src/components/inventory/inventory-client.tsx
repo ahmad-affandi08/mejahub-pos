@@ -39,10 +39,13 @@ import {
   Trash2,
   Search,
   BarChart3,
+  Pencil,
 } from "lucide-react";
 import {
   addStockMovement,
   createIngredient,
+  updateIngredient,
+  deleteIngredient,
 } from "@/actions/stock";
 
 interface IngredientData {
@@ -95,6 +98,7 @@ export function InventoryClient({
   const [isPending, startTransition] = useTransition();
   const [search, setSearch] = useState("");
   const [addIngredientOpen, setAddIngredientOpen] = useState(false);
+  const [editIngredientOpen, setEditIngredientOpen] = useState(false);
   const [stockMoveOpen, setStockMoveOpen] = useState(false);
   const [selectedIngredient, setSelectedIngredient] =
     useState<IngredientData | null>(null);
@@ -104,6 +108,12 @@ export function InventoryClient({
   const [newUnit, setNewUnit] = useState("GRAM");
   const [newMinStock, setNewMinStock] = useState("");
   const [newCost, setNewCost] = useState("");
+
+  // Edit ingredient form
+  const [editName, setEditName] = useState("");
+  const [editUnit, setEditUnit] = useState("GRAM");
+  const [editMinStock, setEditMinStock] = useState("");
+  const [editCost, setEditCost] = useState("");
 
   // Stock movement form
   const [moveType, setMoveType] = useState<string>("IN");
@@ -149,6 +159,58 @@ export function InventoryClient({
     setMoveQty("");
     setMoveNotes("");
     setStockMoveOpen(true);
+  }
+
+  function openEditIngredient(ingredient: IngredientData) {
+    setSelectedIngredient(ingredient);
+    setEditName(ingredient.name);
+    setEditUnit(ingredient.unit);
+    setEditMinStock(String(Number(ingredient.minStock)));
+    setEditCost(String(Number(ingredient.costPerUnit)));
+    setEditIngredientOpen(true);
+  }
+
+  function handleUpdateIngredient() {
+    if (!selectedIngredient) return;
+
+    if (!editName.trim()) {
+      toast.error("Nama bahan wajib diisi");
+      return;
+    }
+
+    startTransition(async () => {
+      const result = await updateIngredient(selectedIngredient.id, {
+        name: editName.trim(),
+        unit: editUnit,
+        minStock: parseFloat(editMinStock) || 0,
+        costPerUnit: parseFloat(editCost) || 0,
+      });
+
+      if (result.success) {
+        toast.success("Bahan berhasil diperbarui");
+        setEditIngredientOpen(false);
+        router.refresh();
+      } else {
+        toast.error(result.error);
+      }
+    });
+  }
+
+  function handleDeleteIngredient() {
+    if (!selectedIngredient) return;
+    if (!window.confirm(`Hapus bahan ${selectedIngredient.name}?`)) return;
+
+    startTransition(async () => {
+      const result = await deleteIngredient(selectedIngredient.id);
+
+      if (result.success) {
+        toast.success("Bahan berhasil dihapus");
+        setEditIngredientOpen(false);
+        router.refresh();
+      } else {
+        toast.error(result.error);
+      }
+    });
   }
 
   function handleStockMove() {
@@ -335,6 +397,15 @@ export function InventoryClient({
                           variant="outline"
                           size="icon"
                           className="h-7 w-7"
+                          title="Edit Bahan"
+                          onClick={() => openEditIngredient(ingredient)}
+                        >
+                          <Pencil className="h-3 w-3 text-blue-600" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-7 w-7"
                           title="Waste"
                           onClick={() => openStockMove(ingredient, "WASTE")}
                         >
@@ -421,6 +492,76 @@ export function InventoryClient({
               Batal
             </Button>
             <Button onClick={handleAddIngredient} disabled={isPending}>
+              {isPending ? "Menyimpan..." : "Simpan"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Ingredient Dialog */}
+      <Dialog open={editIngredientOpen} onOpenChange={setEditIngredientOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Bahan Baku</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm font-medium">Nama</label>
+              <Input
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Satuan</label>
+              <Select value={editUnit} onValueChange={(v) => v && setEditUnit(v)}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="KILOGRAM">Kilogram (kg)</SelectItem>
+                  <SelectItem value="GRAM">Gram (g)</SelectItem>
+                  <SelectItem value="LITER">Liter (L)</SelectItem>
+                  <SelectItem value="MILILITER">Mililiter (mL)</SelectItem>
+                  <SelectItem value="PIECE">Piece (pcs)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Stok Minimum</label>
+              <Input
+                type="number"
+                value={editMinStock}
+                onChange={(e) => setEditMinStock(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Harga per Satuan</label>
+              <Input
+                type="number"
+                value={editCost}
+                onChange={(e) => setEditCost(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteIngredient}
+              disabled={isPending}
+            >
+              Hapus
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setEditIngredientOpen(false)}
+            >
+              Batal
+            </Button>
+            <Button onClick={handleUpdateIngredient} disabled={isPending}>
               {isPending ? "Menyimpan..." : "Simpan"}
             </Button>
           </DialogFooter>

@@ -28,19 +28,18 @@ import {
 import { formatCurrency } from "@/lib/utils";
 import { createCustomerOrder } from "@/actions/customer-order";
 import { toast } from "sonner";
-import type { Decimal } from "@prisma/client/runtime/library";
 
 interface Branch {
   id: string;
   name: string;
-  taxRate: Decimal;
-  serviceRate: Decimal;
+  taxRate: number;
+  serviceRate: number;
 }
 
 interface Modifier {
   id: string;
   name: string;
-  price: Decimal;
+  price: number;
   isActive: boolean;
 }
 
@@ -58,14 +57,14 @@ interface Product {
   id: string;
   name: string;
   description: string | null;
-  price: Decimal;
+  price: number;
   image: string | null;
   station: string;
   isAvailable: boolean;
   variants: {
     id: string;
     name: string;
-    price: Decimal;
+    price: number;
     isActive: boolean;
   }[];
   modifierGroups: {

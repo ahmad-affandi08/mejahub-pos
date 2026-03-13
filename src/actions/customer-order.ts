@@ -15,7 +15,9 @@ import {
   publicCustomerOrderSchema,
   type PublicCustomerOrderInput,
 } from "@/lib/validations/order";
-import type { Order } from "@prisma/client";
+import { OrderStatus, type Order } from "@prisma/client";
+
+const HAS_PENDING_APPROVAL_STATUS = "PENDING_APPROVAL" in OrderStatus;
 
 /**
  * Get branch info and menu for customer QR ordering (public, no auth required)
@@ -35,16 +37,48 @@ export async function getPublicMenu(branchId: string) {
 
   const categories = await prisma.category.findMany({
     where: { branchId, isActive: true },
-    include: {
+    select: {
+      id: true,
+      name: true,
       products: {
         where: { isActive: true, isAvailable: true },
-        include: {
-          variants: { where: { isActive: true }, orderBy: { price: "asc" } },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          price: true,
+          image: true,
+          station: true,
+          isAvailable: true,
+          variants: {
+            where: { isActive: true },
+            orderBy: { price: "asc" },
+            select: {
+              id: true,
+              name: true,
+              price: true,
+              isActive: true,
+            },
+          },
           modifierGroups: {
-            include: {
+            select: {
               modifierGroup: {
-                include: {
-                  modifiers: { where: { isActive: true } },
+                select: {
+                  id: true,
+                  name: true,
+                  type: true,
+                  isRequired: true,
+                  minSelect: true,
+                  maxSelect: true,
+                  modifiers: {
+                    where: { isActive: true },
+                    select: {
+                      id: true,
+                      name: true,
+                      price: true,
+                      isActive: true,
+                    },
+                  },
                 },
               },
             },
@@ -56,7 +90,49 @@ export async function getPublicMenu(branchId: string) {
     orderBy: { sortOrder: "asc" },
   });
 
-  return { branch, categories };
+  return {
+    branch: {
+      id: branch.id,
+      name: branch.name,
+      taxRate: Number(branch.taxRate),
+      serviceRate: Number(branch.serviceRate),
+    },
+    categories: categories.map((category) => ({
+      id: category.id,
+      name: category.name,
+      products: category.products.map((product) => ({
+        id: product.id,
+        name: product.name,
+        description: product.description,
+        price: Number(product.price),
+        image: product.image,
+        station: product.station,
+        isAvailable: product.isAvailable,
+        variants: product.variants.map((variant) => ({
+          id: variant.id,
+          name: variant.name,
+          price: Number(variant.price),
+          isActive: variant.isActive,
+        })),
+        modifierGroups: product.modifierGroups.map((productGroup) => ({
+          modifierGroup: {
+            id: productGroup.modifierGroup.id,
+            name: productGroup.modifierGroup.name,
+            type: productGroup.modifierGroup.type,
+            isRequired: productGroup.modifierGroup.isRequired,
+            minSelect: productGroup.modifierGroup.minSelect,
+            maxSelect: productGroup.modifierGroup.maxSelect,
+            modifiers: productGroup.modifierGroup.modifiers.map((modifier) => ({
+              id: modifier.id,
+              name: modifier.name,
+              price: Number(modifier.price),
+              isActive: modifier.isActive,
+            })),
+          },
+        })),
+      })),
+    })),
+  };
 }
 
 /**
@@ -145,9 +221,11 @@ export async function createCustomerOrder(
       }
 
       // 3. Check if table already has a pending QR order
-      const existingPendingOrder = await tx.order.findFirst({
-        where: { tableId: input.tableId, status: "PENDING_APPROVAL" },
-      });
+      const existingPendingOrder = HAS_PENDING_APPROVAL_STATUS
+        ? await tx.order.findFirst({
+            where: { tableId: input.tableId, status: OrderStatus.PENDING_APPROVAL },
+          })
+        : null;
 
       // 4. Validate products
       const productIds = safeInput.items.map((item) => item.productId);
@@ -298,7 +376,9 @@ export async function createCustomerOrder(
         data: {
           orderNumber: generateOrderNumber(),
           type: "DINE_IN",
-          status: "PENDING_APPROVAL",
+          status: HAS_PENDING_APPROVAL_STATUS
+            ? OrderStatus.PENDING_APPROVAL
+            : OrderStatus.OPEN,
           subtotal: totals.subtotal,
           taxAmount: totals.taxAmount,
           taxRate: Number(branch.taxRate),
@@ -349,7 +429,7 @@ export async function createCustomerOrder(
       entityId: order.id,
       newData: {
         source: "qr-self-order",
-        approvalStatus: "PENDING_APPROVAL",
+        approvalStatus: HAS_PENDING_APPROVAL_STATUS ? OrderStatus.PENDING_APPROVAL : OrderStatus.OPEN,
         orderNumber: order.orderNumber,
         customerName: safeInput.customerName,
         itemCount: safeInput.items.length,

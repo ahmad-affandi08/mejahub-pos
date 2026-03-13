@@ -27,7 +27,12 @@ import {
   transferTableSchema,
   type CreateOrderInput,
 } from "@/lib/validations/order";
-import type { Order, OrderItem } from "@prisma/client";
+import { OrderStatus, type Order, type OrderItem } from "@prisma/client";
+
+const HAS_PENDING_APPROVAL_STATUS = "PENDING_APPROVAL" in OrderStatus;
+const ACTIVE_TABLE_ORDER_STATUSES: OrderStatus[] = HAS_PENDING_APPROVAL_STATUS
+  ? [OrderStatus.OPEN, OrderStatus.PENDING_APPROVAL]
+  : [OrderStatus.OPEN];
 
 // ============================================================
 // GET ORDERS
@@ -87,11 +92,12 @@ export async function getPendingApprovalOrders() {
 
   const branchId = session.user.branchId;
   if (!branchId) return [];
+  if (!HAS_PENDING_APPROVAL_STATUS) return [];
 
   return prisma.order.findMany({
     where: {
       branchId,
-      status: "PENDING_APPROVAL",
+      status: OrderStatus.PENDING_APPROVAL,
     },
     include: {
       table: true,
@@ -197,11 +203,11 @@ export async function createOrder(
 
         // Check if table already has an open order
         const existingOrder = await tx.order.findFirst({
-          where: { tableId: data.tableId, status: { in: ["OPEN", "PENDING_APPROVAL"] } },
+          where: { tableId: data.tableId, status: { in: ACTIVE_TABLE_ORDER_STATUSES } },
         });
         if (existingOrder) {
           throw new Error(
-            existingOrder.status === "PENDING_APPROVAL"
+            HAS_PENDING_APPROVAL_STATUS && existingOrder.status === OrderStatus.PENDING_APPROVAL
               ? `Meja ${table.number} memiliki pesanan QR menunggu approval (${existingOrder.orderNumber}). Approve/tolak dulu di POS.`
               : `Meja ${table.number} sudah memiliki pesanan aktif (${existingOrder.orderNumber}). Tambahkan item ke pesanan tersebut.`
           );
@@ -1261,7 +1267,7 @@ export async function rejectQrOrder(
         const hasAnotherActiveOrder = await tx.order.findFirst({
           where: {
             tableId: order.tableId,
-            status: { in: ["OPEN", "PENDING_APPROVAL"] },
+            status: { in: ACTIVE_TABLE_ORDER_STATUSES },
             id: { not: order.id },
           },
         });

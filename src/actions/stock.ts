@@ -350,6 +350,50 @@ export async function updateIngredient(
   }
 }
 
+export async function deleteIngredient(
+  id: string
+): Promise<ActionResult<Ingredient>> {
+  const session = await auth();
+  if (
+    !session?.user ||
+    !hasPermission(session.user.role, "inventory:manage")
+  ) {
+    return { success: false, error: "Anda tidak memiliki akses." };
+  }
+
+  try {
+    const previous = await prisma.ingredient.findUnique({ where: { id } });
+    if (!previous) {
+      return { success: false, error: "Bahan tidak ditemukan." };
+    }
+
+    const ingredient = await prisma.ingredient.update({
+      where: { id },
+      data: { isActive: false },
+    });
+
+    revalidatePath("/dashboard/inventory");
+
+    await logAudit({
+      action: "DELETE",
+      entity: "ingredients",
+      entityId: ingredient.id,
+      oldData: previous,
+      newData: { isActive: false },
+      userId: session.user.id,
+      branchId: session.user.branchId,
+    });
+
+    return { success: true, data: ingredient };
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        error instanceof Error ? error.message : "Gagal menghapus bahan.",
+    };
+  }
+}
+
 // ============================================================
 // GET STOCK MOVEMENT HISTORY
 // ============================================================
