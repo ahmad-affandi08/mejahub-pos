@@ -171,7 +171,7 @@ export async function createProduct(
       branchId: session.user.branchId,
     });
 
-    return { success: true, data: product };
+    return { success: true, data: undefined };
   } catch (error) {
     if (uploadedImagePath) {
       await deleteProductImage(uploadedImagePath);
@@ -247,7 +247,7 @@ export async function updateProduct(
       branchId: session.user.branchId,
     });
 
-    return { success: true, data: product };
+    return { success: true, data: undefined };
   } catch (error) {
     if (uploadedImagePath && uploadedImagePath !== previousImagePath) {
       await deleteProductImage(uploadedImagePath);
@@ -319,7 +319,7 @@ export async function toggleProductAvailability(
       branchId: session.user.branchId,
     });
 
-    return { success: true, data: updated };
+    return { success: true, data: undefined };
   } catch (error) {
     return {
       success: false,
@@ -357,7 +357,7 @@ export async function createProductVariant(
     });
 
     revalidatePath("/dashboard/products");
-    return { success: true, data: variant };
+    return { success: true, data: undefined };
   } catch (error) {
     return {
       success: false,
@@ -399,7 +399,7 @@ export async function updateProductVariant(
     });
 
     revalidatePath("/dashboard/products");
-    return { success: true, data: variant };
+    return { success: true, data: undefined };
   } catch (error) {
     return {
       success: false,
@@ -503,7 +503,7 @@ export async function createProductModifierGroup(
     });
 
     revalidatePath("/dashboard/products");
-    return { success: true, data: result };
+    return { success: true, data: undefined };
   } catch (error) {
     return {
       success: false,
@@ -580,7 +580,7 @@ export async function attachExistingModifierGroup(
     });
 
     revalidatePath("/dashboard/products");
-    return { success: true, data: result };
+    return { success: true, data: undefined };
   } catch (error) {
     return {
       success: false,
@@ -625,7 +625,7 @@ export async function updateModifierGroup(
     });
 
     revalidatePath("/dashboard/products");
-    return { success: true, data: group };
+    return { success: true, data: undefined };
   } catch (error) {
     return {
       success: false,
@@ -704,7 +704,7 @@ export async function createModifier(
     });
 
     revalidatePath("/dashboard/products");
-    return { success: true, data: modifier };
+    return { success: true, data: undefined };
   } catch (error) {
     return {
       success: false,
@@ -746,7 +746,7 @@ export async function updateModifier(
     });
 
     revalidatePath("/dashboard/products");
-    return { success: true, data: modifier };
+    return { success: true, data: undefined };
   } catch (error) {
     return {
       success: false,

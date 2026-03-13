@@ -48,6 +48,11 @@ interface CartPanelProps {
   tables: TableData[];
 }
 
+const orderTypeLabels: Record<"DINE_IN" | "TAKEAWAY", string> = {
+  DINE_IN: "Makan di Tempat",
+  TAKEAWAY: "Bawa Pulang",
+};
+
 export function CartPanel({ tables }: CartPanelProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -187,11 +192,13 @@ export function CartPanel({ tables }: CartPanelProps) {
             onValueChange={(v) => setOrderType(v as "DINE_IN" | "TAKEAWAY")}
           >
             <SelectTrigger className="h-9 text-xs">
-              <SelectValue />
+              <span className="line-clamp-1 flex flex-1 items-center text-left">
+                {orderTypeLabels[orderType]}
+              </span>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="DINE_IN">Dine In</SelectItem>
-              <SelectItem value="TAKEAWAY">Takeaway</SelectItem>
+              <SelectItem value="DINE_IN">Makan di Tempat</SelectItem>
+              <SelectItem value="TAKEAWAY">Bawa Pulang</SelectItem>
             </SelectContent>
           </Select>
 
@@ -203,7 +210,7 @@ export function CartPanel({ tables }: CartPanelProps) {
                 setTableId(v, table ? `Meja ${table.number}` : null);
               }}
             >
-              <SelectTrigger className="h-9 text-xs">
+              <SelectTrigger className="h-9 text-xs data-placeholder:text-foreground">
                 <SelectValue placeholder="Pilih Meja" />
               </SelectTrigger>
               <SelectContent>

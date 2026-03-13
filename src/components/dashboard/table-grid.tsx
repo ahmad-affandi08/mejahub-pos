@@ -22,7 +22,6 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "@/components/ui/select";
 import {
   createTable,
@@ -53,9 +52,9 @@ const statusBadgeColors: Record<
 const statusLabels: Record<TableStatus, string> = {
   AVAILABLE: "Kosong",
   OCCUPIED: "Terisi",
-  WAITING_FOOD: "Menunggu",
-  REQUESTING_BILL: "Minta Bill",
-  RESERVED: "Reserved",
+  WAITING_FOOD: "Menunggu Makanan",
+  REQUESTING_BILL: "Minta Tagihan",
+  RESERVED: "Dipesan",
 };
 
 interface TableData {
@@ -262,14 +261,16 @@ export function TableGrid({ tables, branchId }: TableGridProps) {
                     }
                   >
                     <SelectTrigger className="h-7 text-xs">
-                      <SelectValue />
+                      <span className="line-clamp-1 flex flex-1 items-center text-left">
+                        {statusLabels[table.status]}
+                      </span>
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="AVAILABLE">Kosong</SelectItem>
                       <SelectItem value="OCCUPIED">Terisi</SelectItem>
                       <SelectItem value="WAITING_FOOD">Menunggu Makanan</SelectItem>
-                      <SelectItem value="REQUESTING_BILL">Minta Bill</SelectItem>
-                      <SelectItem value="RESERVED">Reserved</SelectItem>
+                      <SelectItem value="REQUESTING_BILL">Minta Tagihan</SelectItem>
+                      <SelectItem value="RESERVED">Dipesan</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
