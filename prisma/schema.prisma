@@ -34,6 +34,7 @@ enum TableStatus {
 }
 
 enum OrderStatus {
+  PENDING_APPROVAL
   OPEN
   PAID
   CANCELLED

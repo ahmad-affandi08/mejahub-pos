@@ -134,6 +134,15 @@ export const transferTableSchema = z.object({
   newTableId: z.string().min(1, "Meja tujuan wajib dipilih"),
 });
 
+export const approveQrOrderSchema = z.object({
+  orderId: z.string().min(1, "Order ID wajib"),
+});
+
+export const rejectQrOrderSchema = z.object({
+  orderId: z.string().min(1, "Order ID wajib"),
+  reason: z.string().min(3, "Alasan minimal 3 karakter").max(300),
+});
+
 export const publicCustomerOrderSchema = z.object({
   branchId: z.string().min(1, "Branch wajib"),
   tableId: z.string().min(1, "Meja wajib"),
@@ -157,3 +166,5 @@ export type SplitBillPaymentInput = z.infer<typeof splitBillPaymentSchema>;
 export type StockMovementInput = z.infer<typeof stockMovementSchema>;
 export type TransferTableInput = z.infer<typeof transferTableSchema>;
 export type PublicCustomerOrderInput = z.infer<typeof publicCustomerOrderSchema>;
+export type ApproveQrOrderInput = z.infer<typeof approveQrOrderSchema>;
+export type RejectQrOrderInput = z.infer<typeof rejectQrOrderSchema>;

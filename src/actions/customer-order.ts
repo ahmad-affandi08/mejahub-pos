@@ -133,9 +133,19 @@ export async function createCustomerOrder(
       });
       if (!table) throw new Error("Meja tidak ditemukan.");
 
-      // 3. Check if table already has an OPEN order — attach to it or create new
-      const existingOrder = await tx.order.findFirst({
+      const existingOpenOrder = await tx.order.findFirst({
         where: { tableId: input.tableId, status: "OPEN" },
+      });
+
+      if (existingOpenOrder) {
+        throw new Error(
+          `Meja ini sudah memiliki pesanan aktif (${existingOpenOrder.orderNumber}). Minta staf menambahkan item dari POS.`
+        );
+      }
+
+      // 3. Check if table already has a pending QR order
+      const existingPendingOrder = await tx.order.findFirst({
+        where: { tableId: input.tableId, status: "PENDING_APPROVAL" },
       });
 
       // 4. Validate products
@@ -217,12 +227,12 @@ export async function createCustomerOrder(
         Number(branch.serviceRate)
       );
 
-      if (existingOrder) {
-        // Add items to existing order
+      if (existingPendingOrder) {
+        // Add items to existing pending approval order
         for (const itemData of orderItemsData) {
           await tx.orderItem.create({
             data: {
-              orderId: existingOrder.id,
+              orderId: existingPendingOrder.id,
               productId: itemData.productId,
               variantId: itemData.variantId,
               quantity: itemData.quantity,
@@ -244,7 +254,7 @@ export async function createCustomerOrder(
 
         // Recalculate order totals
         const allItems = await tx.orderItem.findMany({
-          where: { orderId: existingOrder.id, status: { not: "CANCELLED" } },
+          where: { orderId: existingPendingOrder.id, status: { not: "CANCELLED" } },
           include: { modifiers: true },
         });
 
@@ -261,14 +271,14 @@ export async function createCustomerOrder(
         );
 
         const updatedOrder = await tx.order.update({
-          where: { id: existingOrder.id },
+          where: { id: existingPendingOrder.id },
           data: {
             subtotal: newTotals.subtotal,
             taxAmount: newTotals.taxAmount,
             serviceAmount: newTotals.serviceAmount,
             totalAmount: newTotals.totalAmount,
-            customerName: safeInput.customerName || existingOrder.customerName,
-            customerPhone: safeInput.customerPhone || existingOrder.customerPhone,
+            customerName: safeInput.customerName || existingPendingOrder.customerName,
+            customerPhone: safeInput.customerPhone || existingPendingOrder.customerPhone,
           },
         });
 
@@ -282,18 +292,12 @@ export async function createCustomerOrder(
       });
       if (!staffUser) throw new Error("Tidak ada staf tersedia.");
 
-      const activeShift = await tx.shift.findFirst({
-        where: { branchId: input.branchId, closedAt: null },
-        orderBy: { openedAt: "desc" },
-        select: { id: true },
-      });
-
       // 8. Create new order
       const newOrder = await tx.order.create({
         data: {
           orderNumber: generateOrderNumber(),
           type: "DINE_IN",
-          status: "OPEN",
+          status: "PENDING_APPROVAL",
           subtotal: totals.subtotal,
           taxAmount: totals.taxAmount,
           taxRate: Number(branch.taxRate),
@@ -307,7 +311,6 @@ export async function createCustomerOrder(
           tableId: input.tableId,
           branchId: input.branchId,
           userId: staffUser.id,
-          shiftId: activeShift?.id,
           items: {
             create: orderItemsData.map((item) => ({
               productId: item.productId,
@@ -345,6 +348,7 @@ export async function createCustomerOrder(
       entityId: order.id,
       newData: {
         source: "qr-self-order",
+        approvalStatus: "PENDING_APPROVAL",
         orderNumber: order.orderNumber,
         customerName: safeInput.customerName,
         itemCount: safeInput.items.length,

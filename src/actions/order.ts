@@ -16,6 +16,8 @@ import {
   addOrderItemsSchema,
   updateOrderItemStatusSchema,
   cancelOrderSchema,
+  approveQrOrderSchema,
+  rejectQrOrderSchema,
   transferTableSchema,
   type CreateOrderInput,
 } from "@/lib/validations/order";
@@ -68,6 +70,36 @@ export async function getOrders(filters?: {
       payments: true,
     },
     orderBy: { createdAt: "desc" },
+  });
+}
+
+export async function getPendingApprovalOrders() {
+  const session = await auth();
+  if (!session?.user || !hasPermission(session.user.role, "qr_order:approve")) {
+    throw new Error("Unauthorized");
+  }
+
+  const branchId = session.user.branchId;
+  if (!branchId) return [];
+
+  return prisma.order.findMany({
+    where: {
+      branchId,
+      status: "PENDING_APPROVAL",
+    },
+    include: {
+      table: true,
+      user: { select: { id: true, name: true, role: true } },
+      items: {
+        include: {
+          product: true,
+          variant: true,
+          modifiers: true,
+        },
+        orderBy: { createdAt: "asc" },
+      },
+    },
+    orderBy: { createdAt: "asc" },
   });
 }
 
@@ -159,11 +191,13 @@ export async function createOrder(
 
         // Check if table already has an open order
         const existingOrder = await tx.order.findFirst({
-          where: { tableId: data.tableId, status: "OPEN" },
+          where: { tableId: data.tableId, status: { in: ["OPEN", "PENDING_APPROVAL"] } },
         });
         if (existingOrder) {
           throw new Error(
-            `Meja ${table.number} sudah memiliki pesanan aktif (${existingOrder.orderNumber}). Tambahkan item ke pesanan tersebut.`
+            existingOrder.status === "PENDING_APPROVAL"
+              ? `Meja ${table.number} memiliki pesanan QR menunggu approval (${existingOrder.orderNumber}). Approve/tolak dulu di POS.`
+              : `Meja ${table.number} sudah memiliki pesanan aktif (${existingOrder.orderNumber}). Tambahkan item ke pesanan tersebut.`
           );
         }
       }
@@ -917,6 +951,260 @@ export async function transferTable(
     return {
       success: false,
       error: error instanceof Error ? error.message : "Gagal pindah meja.",
+    };
+  }
+}
+
+// ============================================================
+// QR ORDER APPROVAL
+// ============================================================
+
+export async function approveQrOrder(
+  input: { orderId: string }
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user || !hasPermission(session.user.role, "qr_order:approve")) {
+    return { success: false, error: "Anda tidak memiliki akses." };
+  }
+
+  const validated = approveQrOrderSchema.safeParse(input);
+  if (!validated.success) {
+    return { success: false, error: validated.error.issues[0].message };
+  }
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({
+        where: { id: validated.data.orderId },
+        include: {
+          items: {
+            include: { modifiers: true },
+            where: { status: { not: "CANCELLED" } },
+          },
+          table: true,
+        },
+      });
+
+      if (!order) throw new Error("Pesanan tidak ditemukan.");
+      if (order.status !== "PENDING_APPROVAL") {
+        throw new Error("Pesanan ini tidak menunggu approval.");
+      }
+
+      const activeShift = await tx.shift.findFirst({
+        where: {
+          userId: session.user!.id,
+          branchId: order.branchId,
+          closedAt: null,
+        },
+        orderBy: { openedAt: "desc" },
+      });
+
+      if (!activeShift) {
+        throw new Error("Buka shift terlebih dahulu untuk approve pesanan QR.");
+      }
+
+      const existingOpenOrder = order.tableId
+        ? await tx.order.findFirst({
+            where: {
+              tableId: order.tableId,
+              status: "OPEN",
+            },
+            include: {
+              items: {
+                where: { status: { not: "CANCELLED" } },
+                include: { modifiers: true },
+              },
+            },
+          })
+        : null;
+
+      if (existingOpenOrder) {
+        for (const item of order.items) {
+          await tx.orderItem.create({
+            data: {
+              orderId: existingOpenOrder.id,
+              productId: item.productId,
+              variantId: item.variantId,
+              quantity: item.quantity,
+              unitPrice: Number(item.unitPrice),
+              subtotal: Number(item.subtotal),
+              notes: item.notes,
+              status: "PENDING",
+              station: item.station,
+              modifiers: {
+                create: item.modifiers.map((modifier) => ({
+                  modifierId: modifier.modifierId,
+                  name: modifier.name,
+                  price: Number(modifier.price),
+                })),
+              },
+            },
+          });
+        }
+
+        const allItems = await tx.orderItem.findMany({
+          where: {
+            orderId: existingOpenOrder.id,
+            status: { not: "CANCELLED" },
+          },
+          include: { modifiers: true },
+        });
+
+        const allLineItems: OrderLineItem[] = allItems.map((item) => ({
+          unitPrice: Number(item.unitPrice),
+          quantity: item.quantity,
+          modifierTotal: item.modifiers.reduce((sum, modifier) => sum + Number(modifier.price), 0),
+        }));
+
+        const totals = calculateOrderTotal(
+          allLineItems,
+          Number(existingOpenOrder.taxRate),
+          Number(existingOpenOrder.serviceRate)
+        );
+
+        await tx.order.update({
+          where: { id: existingOpenOrder.id },
+          data: {
+            subtotal: totals.subtotal,
+            taxAmount: totals.taxAmount,
+            serviceAmount: totals.serviceAmount,
+            totalAmount: totals.totalAmount,
+            customerName: existingOpenOrder.customerName || order.customerName,
+            customerPhone: existingOpenOrder.customerPhone || order.customerPhone,
+          },
+        });
+
+        await tx.orderItem.updateMany({
+          where: { orderId: order.id },
+          data: { status: "CANCELLED" },
+        });
+
+        await tx.order.update({
+          where: { id: order.id },
+          data: {
+            status: "VOID",
+            notes:
+              `${order.notes || ""}\n[APPROVED] Digabung ke ${existingOpenOrder.orderNumber}`.trim(),
+          },
+        });
+      } else {
+        await tx.order.update({
+          where: { id: order.id },
+          data: {
+            status: "OPEN",
+            shiftId: activeShift.id,
+          },
+        });
+      }
+
+      if (order.tableId) {
+        await tx.table.update({
+          where: { id: order.tableId },
+          data: { status: "WAITING_FOOD" },
+        });
+      }
+    });
+
+    revalidatePath("/dashboard/orders");
+    revalidatePath("/dashboard/kitchen");
+    revalidatePath("/dashboard/tables");
+
+    await logAudit({
+      action: "UPDATE",
+      entity: "orders",
+      entityId: validated.data.orderId,
+      newData: {
+        approval: "approved",
+      },
+      userId: session.user.id,
+      branchId: session.user.branchId,
+    });
+
+    return { success: true, data: undefined };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Gagal approve pesanan QR.",
+    };
+  }
+}
+
+export async function rejectQrOrder(
+  input: { orderId: string; reason: string }
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user || !hasPermission(session.user.role, "qr_order:approve")) {
+    return { success: false, error: "Anda tidak memiliki akses." };
+  }
+
+  const validated = rejectQrOrderSchema.safeParse(input);
+  if (!validated.success) {
+    return { success: false, error: validated.error.issues[0].message };
+  }
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({
+        where: { id: validated.data.orderId },
+      });
+
+      if (!order) throw new Error("Pesanan tidak ditemukan.");
+      if (order.status !== "PENDING_APPROVAL") {
+        throw new Error("Pesanan ini tidak menunggu approval.");
+      }
+
+      await tx.orderItem.updateMany({
+        where: { orderId: order.id },
+        data: { status: "CANCELLED" },
+      });
+
+      await tx.order.update({
+        where: { id: order.id },
+        data: {
+          status: "CANCELLED",
+          notes: `${order.notes || ""}\n[REJECTED] ${validated.data.reason}`.trim(),
+        },
+      });
+
+      if (order.tableId) {
+        const hasAnotherActiveOrder = await tx.order.findFirst({
+          where: {
+            tableId: order.tableId,
+            status: { in: ["OPEN", "PENDING_APPROVAL"] },
+            id: { not: order.id },
+          },
+        });
+
+        if (!hasAnotherActiveOrder) {
+          await tx.table.update({
+            where: { id: order.tableId },
+            data: { status: "AVAILABLE" },
+          });
+        }
+      }
+    });
+
+    revalidatePath("/dashboard/orders");
+    revalidatePath("/dashboard/kitchen");
+    revalidatePath("/dashboard/tables");
+
+    await logAudit({
+      action: "UPDATE",
+      entity: "orders",
+      entityId: validated.data.orderId,
+      newData: {
+        approval: "rejected",
+        reason: validated.data.reason,
+      },
+      userId: session.user.id,
+      branchId: session.user.branchId,
+    });
+
+    return { success: true, data: undefined };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Gagal menolak pesanan QR.",
     };
   }
 }
