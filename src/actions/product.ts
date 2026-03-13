@@ -1,5 +1,8 @@
 "use server";
 
+import { mkdir, unlink, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { randomUUID } from "node:crypto";
 import { logAudit } from "@/lib/audit";
 import prisma from "@/lib/prisma";
 import { auth } from "@/lib/auth";
@@ -24,6 +27,63 @@ import type {
   ProductModifierGroup,
   ProductVariant,
 } from "@prisma/client";
+
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+const PRODUCT_IMAGE_DIR = join(process.cwd(), "public", "uploads", "products");
+
+const MIME_EXTENSION_MAP: Record<string, string> = {
+  "image/jpeg": ".jpg",
+  "image/png": ".png",
+  "image/webp": ".webp",
+  "image/gif": ".gif",
+};
+
+function getExtensionFromFile(file: File): string {
+  const mimeExt = MIME_EXTENSION_MAP[file.type];
+  if (mimeExt) return mimeExt;
+
+  const match = file.name.toLowerCase().match(/\.(jpg|jpeg|png|webp|gif)$/);
+  if (!match) return ".jpg";
+  return match[1] === "jpeg" ? ".jpg" : `.${match[1]}`;
+}
+
+async function saveProductImage(file: File): Promise<string> {
+  if (!file.type.startsWith("image/")) {
+    throw new Error("File harus berupa gambar.");
+  }
+
+  if (file.size > MAX_IMAGE_SIZE) {
+    throw new Error("Ukuran gambar maksimal 5MB.");
+  }
+
+  await mkdir(PRODUCT_IMAGE_DIR, { recursive: true });
+
+  const extension = getExtensionFromFile(file);
+  const fileName = `${Date.now()}-${randomUUID()}${extension}`;
+  const absolutePath = join(PRODUCT_IMAGE_DIR, fileName);
+  const relativePath = `/uploads/products/${fileName}`;
+  const buffer = Buffer.from(await file.arrayBuffer());
+
+  await writeFile(absolutePath, buffer);
+  return relativePath;
+}
+
+async function deleteProductImage(imagePath?: string | null) {
+  if (!imagePath) return;
+
+  const normalized = imagePath.replace(/\\/g, "/");
+  if (!normalized.startsWith("/uploads/products/") || normalized.includes("..")) {
+    return;
+  }
+
+  const absolutePath = join(process.cwd(), "public", normalized.slice(1));
+
+  try {
+    await unlink(absolutePath);
+  } catch {
+    // ignore missing file
+  }
+}
 
 export async function getProducts(branchId?: string) {
   const session = await auth();
@@ -87,9 +147,19 @@ export async function createProduct(
     return { success: false, error: validated.error.issues[0].message };
   }
 
+  let uploadedImagePath: string | null = null;
+
   try {
+    const imageFile = formData.get("imageFile");
+    if (imageFile instanceof File && imageFile.size > 0) {
+      uploadedImagePath = await saveProductImage(imageFile);
+    }
+
     const product = await prisma.product.create({
-      data: validated.data,
+      data: {
+        ...validated.data,
+        image: uploadedImagePath,
+      },
     });
 
     await logAudit({
@@ -103,6 +173,10 @@ export async function createProduct(
 
     return { success: true, data: product };
   } catch (error) {
+    if (uploadedImagePath) {
+      await deleteProductImage(uploadedImagePath);
+    }
+
     return {
       success: false,
       error: error instanceof Error ? error.message : "Gagal membuat produk.",
@@ -125,12 +199,43 @@ export async function updateProduct(
     return { success: false, error: validated.error.issues[0].message };
   }
 
+  let uploadedImagePath: string | null = null;
+  let previousImagePath: string | null = null;
+
   try {
     const previous = await prisma.product.findUnique({ where: { id } });
+    if (!previous) {
+      return { success: false, error: "Produk tidak ditemukan." };
+    }
+    previousImagePath = previous.image;
+
+    const imageFile = formData.get("imageFile");
+    if (imageFile instanceof File && imageFile.size > 0) {
+      uploadedImagePath = await saveProductImage(imageFile);
+    }
+
+    const removeImage = formData.get("removeImage") === "true";
+    let nextImage = previous.image;
+
+    if (removeImage) {
+      nextImage = null;
+    }
+
+    if (uploadedImagePath) {
+      nextImage = uploadedImagePath;
+    }
+
     const product = await prisma.product.update({
       where: { id },
-      data: validated.data,
+      data: {
+        ...validated.data,
+        image: nextImage,
+      },
     });
+
+    if ((removeImage || uploadedImagePath) && previous.image) {
+      await deleteProductImage(previous.image);
+    }
 
     await logAudit({
       action: "UPDATE",
@@ -144,6 +249,10 @@ export async function updateProduct(
 
     return { success: true, data: product };
   } catch (error) {
+    if (uploadedImagePath && uploadedImagePath !== previousImagePath) {
+      await deleteProductImage(uploadedImagePath);
+    }
+
     return {
       success: false,
       error: error instanceof Error ? error.message : "Gagal update produk.",

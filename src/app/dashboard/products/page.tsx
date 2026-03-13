@@ -54,6 +54,7 @@ export default async function ProductsPage() {
     name: product.name,
     description: product.description,
     price: Number(product.price),
+    image: product.image,
     station: product.station,
     isAvailable: product.isAvailable,
     sku: product.sku,

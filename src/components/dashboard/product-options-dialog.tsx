@@ -341,7 +341,7 @@ export function ProductOptionsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl">
+      <DialogContent className="w-[96vw] sm:max-w-6xl">
         <DialogHeader>
           <DialogTitle>
             Kelola Varian & Modifier — {product?.name ?? "Produk"}

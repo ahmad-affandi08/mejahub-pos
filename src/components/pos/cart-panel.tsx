@@ -154,7 +154,7 @@ export function CartPanel({ tables }: CartPanelProps) {
   }
 
   return (
-    <div className="flex h-full flex-col bg-muted/30">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-muted/30">
       {/* Header */}
       <div className="border-b p-4">
         <div className="flex items-center justify-between mb-3">
@@ -230,7 +230,7 @@ export function CartPanel({ tables }: CartPanelProps) {
       </div>
 
       {/* Cart Items */}
-      <ScrollArea className="flex-1">
+      <ScrollArea className="min-h-0 flex-1">
         {items.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
             <ShoppingCart className="h-12 w-12 mb-2 opacity-50" />

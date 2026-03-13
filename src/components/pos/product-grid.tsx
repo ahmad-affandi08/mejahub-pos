@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import Image from "next/image";
 import { useCartStore, type CartItem } from "@/stores/cart-store";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -174,7 +175,7 @@ export function ProductGrid({ products }: ProductGridProps) {
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full min-h-0 flex-col">
       {/* Search + Category Filter */}
       <div className="border-b p-4 space-y-3">
         <div className="relative">
@@ -208,7 +209,7 @@ export function ProductGrid({ products }: ProductGridProps) {
       </div>
 
       {/* Product Grid */}
-      <ScrollArea className="flex-1">
+      <ScrollArea className="min-h-0 flex-1">
         <div className="grid grid-cols-2 gap-3 p-4 md:grid-cols-3 lg:grid-cols-4">
           {filtered.map((product) => (
             <Card
@@ -216,27 +217,49 @@ export function ProductGrid({ products }: ProductGridProps) {
               className="cursor-pointer transition-all hover:shadow-md hover:border-primary/50 active:scale-[0.98]"
               onClick={() => openProductDialog(product)}
             >
-              <CardContent className="p-3">
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10">
+              <CardContent className="p-0">
+                {product.image ? (
+                  <div className="relative h-24 w-full overflow-hidden rounded-t-xl border-b bg-muted">
+                    <Image
+                      src={product.image}
+                      alt={product.name}
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 768px) 50vw, (max-width: 1200px) 25vw, 20vw"
+                    />
+                  </div>
+                ) : (
+                  <div className="flex h-24 w-full items-center justify-center rounded-t-xl border-b bg-muted">
                     {product.station === "BAR" ? (
-                      <Coffee className="h-4 w-4 text-primary" />
+                      <Coffee className="h-5 w-5 text-muted-foreground" />
                     ) : (
-                      <UtensilsCrossed className="h-4 w-4 text-primary" />
+                      <UtensilsCrossed className="h-5 w-5 text-muted-foreground" />
                     )}
                   </div>
-                  {product.variants.length > 0 && (
-                    <Badge variant="secondary" className="text-[10px]">
-                      {product.variants.length} varian
-                    </Badge>
-                  )}
+                )}
+
+                <div className="p-3">
+                  <div className="mb-2 flex items-start justify-between">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10">
+                      {product.station === "BAR" ? (
+                        <Coffee className="h-4 w-4 text-primary" />
+                      ) : (
+                        <UtensilsCrossed className="h-4 w-4 text-primary" />
+                      )}
+                    </div>
+                    {product.variants.length > 0 && (
+                      <Badge variant="secondary" className="text-[10px]">
+                        {product.variants.length} varian
+                      </Badge>
+                    )}
+                  </div>
+                  <h3 className="line-clamp-2 text-sm font-medium leading-tight">
+                    {product.name}
+                  </h3>
+                  <p className="mt-1 text-sm font-semibold text-primary">
+                    {formatCurrency(Number(product.price))}
+                  </p>
                 </div>
-                <h3 className="font-medium text-sm leading-tight line-clamp-2">
-                  {product.name}
-                </h3>
-                <p className="text-sm font-semibold text-primary mt-1">
-                  {formatCurrency(Number(product.price))}
-                </p>
               </CardContent>
             </Card>
           ))}
@@ -257,6 +280,18 @@ export function ProductGrid({ products }: ProductGridProps) {
           </DialogHeader>
 
           <div className="space-y-4">
+            {selectedProduct?.image && (
+              <div className="relative h-44 w-full overflow-hidden rounded-lg border bg-muted">
+                <Image
+                  src={selectedProduct.image}
+                  alt={selectedProduct.name}
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 768px) 90vw, 420px"
+                />
+              </div>
+            )}
+
             {/* Variants */}
             {selectedProduct && selectedProduct.variants.length > 0 && (
               <div>

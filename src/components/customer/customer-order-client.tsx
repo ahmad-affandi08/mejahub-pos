@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useTransition } from "react";
+import Image from "next/image";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -389,8 +390,22 @@ export function CustomerOrderClient({
                         </div>
                       )}
                     </div>
-                    <div className="flex items-center justify-center h-16 w-16 rounded-lg bg-muted shrink-0">
-                      <ChefHat className="h-6 w-6 text-muted-foreground" />
+                    <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg border bg-muted">
+                      {product.image ? (
+                        <div className="relative h-full w-full">
+                          <Image
+                            src={product.image}
+                            alt={product.name}
+                            fill
+                            className="object-cover"
+                            sizes="64px"
+                          />
+                        </div>
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center">
+                          <ChefHat className="h-6 w-6 text-muted-foreground" />
+                        </div>
+                      )}
                     </div>
                   </div>
                 </CardContent>
@@ -427,6 +442,18 @@ export function CustomerOrderClient({
           </DialogHeader>
           {productDialog && (
             <div className="space-y-4">
+              {productDialog.image && (
+                <div className="relative h-44 w-full overflow-hidden rounded-lg border bg-muted">
+                  <Image
+                    src={productDialog.image}
+                    alt={productDialog.name}
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 768px) 90vw, 420px"
+                  />
+                </div>
+              )}
+
               {productDialog.description && (
                 <p className="text-sm text-muted-foreground">
                   {productDialog.description}

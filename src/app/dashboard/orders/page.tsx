@@ -29,16 +29,18 @@ export default async function OrdersPage() {
   ]);
 
   return (
-    <div className="space-y-4">
+    <div className="flex h-full min-h-0 flex-col gap-4 overflow-hidden">
       <PendingQROrders orders={JSON.parse(JSON.stringify(pendingQrOrders))} />
-      <POSClient
-        products={JSON.parse(JSON.stringify(products))}
-        openOrders={JSON.parse(JSON.stringify(orders))}
-        tables={JSON.parse(JSON.stringify(tables))}
-        branchId={branchId}
-        taxRate={Number(branch?.taxRate ?? 10)}
-        serviceRate={Number(branch?.serviceRate ?? 5)}
-      />
+      <div className="min-h-0 flex-1">
+        <POSClient
+          products={JSON.parse(JSON.stringify(products))}
+          openOrders={JSON.parse(JSON.stringify(orders))}
+          tables={JSON.parse(JSON.stringify(tables))}
+          branchId={branchId}
+          taxRate={Number(branch?.taxRate ?? 10)}
+          serviceRate={Number(branch?.serviceRate ?? 5)}
+        />
+      </div>
     </div>
   );
 }

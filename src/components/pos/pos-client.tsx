@@ -134,35 +134,41 @@ export function POSClient({
   }, [on, router]);
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] gap-0 -m-6">
-      {/* Left: Product Selection / Orders List */}
-      <div className="flex-1 overflow-hidden border-r">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
-          <div className="border-b px-4 pt-2">
-            <TabsList className="w-full justify-start">
-              <TabsTrigger value="new-order" className="gap-2">
-                <ShoppingCart className="h-4 w-4" />
-                Order Baru
-              </TabsTrigger>
-              <TabsTrigger value="open-orders" className="gap-2">
-                <ClipboardList className="h-4 w-4" />
-                Pesanan Aktif ({openOrders.length})
-              </TabsTrigger>
-            </TabsList>
-          </div>
+    <div className="relative h-full min-h-0 overflow-hidden">
+      <div className="h-full min-h-0 min-w-0 pr-100">
+        {/* Left: Product Selection / Orders List */}
+        <div className="h-full min-h-0 min-w-0 overflow-hidden border-r">
+          <Tabs
+            value={activeTab}
+            onValueChange={setActiveTab}
+            className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col"
+          >
+            <div className="border-b px-4 pt-2">
+              <TabsList className="w-full justify-start">
+                <TabsTrigger value="new-order" className="gap-2">
+                  <ShoppingCart className="h-4 w-4" />
+                  Order Baru
+                </TabsTrigger>
+                <TabsTrigger value="open-orders" className="gap-2">
+                  <ClipboardList className="h-4 w-4" />
+                  Pesanan Aktif ({openOrders.length})
+                </TabsTrigger>
+              </TabsList>
+            </div>
 
-          <TabsContent value="new-order" className="flex-1 overflow-hidden m-0">
-            <ProductGrid products={products} />
-          </TabsContent>
+            <TabsContent value="new-order" className="m-0 min-h-0 w-full min-w-0 flex-1 overflow-hidden">
+              <ProductGrid products={products} />
+            </TabsContent>
 
-          <TabsContent value="open-orders" className="flex-1 overflow-auto m-0 p-4">
-            <OpenOrdersList orders={openOrders} />
-          </TabsContent>
-        </Tabs>
+            <TabsContent value="open-orders" className="m-0 min-h-0 w-full min-w-0 flex-1 overflow-auto p-4">
+              <OpenOrdersList orders={openOrders} />
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
 
       {/* Right: Cart Panel */}
-      <div className="w-[400px] shrink-0">
+      <div className="fixed inset-y-0 right-0 z-50 w-100 overflow-hidden border-l bg-background shadow-2xl">
         <CartPanel tables={tables} />
       </div>
     </div>

@@ -38,6 +38,7 @@ interface ProductData {
   name: string;
   description: string | null;
   price: unknown;
+  image: string | null;
   station: "KITCHEN" | "BAR";
   isAvailable: boolean;
   sku: string | null;
@@ -100,6 +101,12 @@ export function ProductList({
   const [sku, setSku] = useState("");
   const [station, setStation] = useState<"KITCHEN" | "BAR">("KITCHEN");
   const [categoryId, setCategoryId] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [existingImage, setExistingImage] = useState<string | null>(null);
+  const [localImagePreview, setLocalImagePreview] = useState<string | null>(null);
+  const [removeImage, setRemoveImage] = useState(false);
+
+  const activeImagePreview = localImagePreview ?? (removeImage ? null : existingImage);
 
   const filtered = useMemo(() => {
     return products.filter((product) => {
@@ -115,6 +122,27 @@ export function ProductList({
     [products, optionsProductId]
   );
 
+  function handleImageSelection(file: File | null) {
+    setImageFile(file);
+
+    if (!file) {
+      setLocalImagePreview(null);
+      return;
+    }
+
+    setRemoveImage(false);
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setLocalImagePreview(typeof reader.result === "string" ? reader.result : null);
+    };
+    reader.onerror = () => {
+      setLocalImagePreview(null);
+      toast.error("Gagal membaca file gambar.");
+    };
+    reader.readAsDataURL(file);
+  }
+
   function openCreateDialog() {
     setEditingId(null);
     setName("");
@@ -123,6 +151,10 @@ export function ProductList({
     setSku("");
     setStation("KITCHEN");
     setCategoryId(categories[0]?.id ?? "");
+    setImageFile(null);
+    setExistingImage(null);
+    setLocalImagePreview(null);
+    setRemoveImage(false);
     setDialogOpen(true);
   }
 
@@ -134,6 +166,10 @@ export function ProductList({
     setSku(product.sku ?? "");
     setStation(product.station);
     setCategoryId(product.category.id);
+    setImageFile(null);
+    setExistingImage(product.image ?? null);
+    setLocalImagePreview(null);
+    setRemoveImage(false);
     setDialogOpen(true);
   }
 
@@ -160,6 +196,12 @@ export function ProductList({
       }
       formData.set("station", station);
       formData.set("categoryId", categoryId);
+      if (imageFile) {
+        formData.set("imageFile", imageFile);
+      }
+      if (editingId && removeImage) {
+        formData.set("removeImage", "true");
+      }
       if (!editingId) {
         formData.set("branchId", branchId);
       }
@@ -248,6 +290,20 @@ export function ProductList({
               !product.isAvailable && "opacity-60"
             )}
           >
+            {product.image ? (
+              <div className="h-36 overflow-hidden rounded-t-xl border-b bg-muted">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={product.image}
+                  alt={product.name}
+                  className="h-full w-full object-cover"
+                />
+              </div>
+            ) : (
+              <div className="flex h-36 items-center justify-center rounded-t-xl border-b bg-muted text-xs text-muted-foreground">
+                Tanpa gambar
+              </div>
+            )}
             <CardHeader className="p-4 pb-2">
               <div className="flex items-start justify-between gap-2">
                 <CardTitle className="text-base leading-tight">
@@ -369,6 +425,54 @@ export function ProductList({
                 placeholder="Opsional"
                 rows={3}
               />
+            </div>
+            <div>
+              <p className="mb-1 text-sm font-medium">Gambar Produk</p>
+              <Input
+                type="file"
+                accept="image/*"
+                onChange={(event) => {
+                  handleImageSelection(event.target.files?.[0] ?? null);
+                }}
+              />
+              {activeImagePreview ? (
+                <div className="mt-2 overflow-hidden rounded-md border">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={activeImagePreview}
+                    alt="Preview gambar produk"
+                    className="h-36 w-full object-cover"
+                  />
+                </div>
+              ) : (
+                <p className="mt-2 text-xs text-muted-foreground">Belum ada gambar.</p>
+              )}
+              {editingId && existingImage && !removeImage && !imageFile && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="mt-2"
+                  onClick={() => {
+                    setRemoveImage(true);
+                    setImageFile(null);
+                    setLocalImagePreview(null);
+                  }}
+                >
+                  Hapus gambar
+                </Button>
+              )}
+              {editingId && removeImage && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="mt-2"
+                  onClick={() => setRemoveImage(false)}
+                >
+                  Batalkan hapus gambar
+                </Button>
+              )}
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
