@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import {
   LayoutDashboard,
   UtensilsCrossed,
+  BookOpen,
   Grid3X3,
   Package,
   Users,
@@ -73,6 +74,12 @@ const mainNavItems = [
     href: "/dashboard/inventory",
     icon: Warehouse,
     permission: "inventory:view" as const,
+  },
+  {
+    title: "Resep BoM",
+    href: "/dashboard/recipes",
+    icon: BookOpen,
+    permission: "inventory:manage" as const,
   },
   {
     title: "Shift",

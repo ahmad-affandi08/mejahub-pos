@@ -1,12 +1,19 @@
 "use server";
 
 import prisma from "@/lib/prisma";
+import { logAudit } from "@/lib/audit";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { getClientFingerprint, sanitizeMultilineText, sanitizeText } from "@/lib/security";
 import { generateOrderNumber, type ActionResult } from "@/lib/utils";
 import {
   calculateOrderTotal,
   calculateItemSubtotal,
   type OrderLineItem,
 } from "@/lib/calculations";
+import {
+  publicCustomerOrderSchema,
+  type PublicCustomerOrderInput,
+} from "@/lib/validations/order";
 import type { Order } from "@prisma/client";
 
 /**
@@ -73,27 +80,44 @@ export async function getPublicTable(branchId: string, tableNumber: number) {
 /**
  * Customer self-ordering (no auth, public)
  */
-export async function createCustomerOrder(input: {
-  branchId: string;
-  tableId: string;
-  customerName: string;
-  customerPhone?: string;
-  notes?: string;
-  items: {
-    productId: string;
-    variantId?: string;
-    quantity: number;
-    notes?: string;
-    modifiers: { modifierId: string }[];
-  }[];
-}): Promise<ActionResult<Order>> {
-  if (!input.items.length) {
-    return { success: false, error: "Pesanan harus memiliki minimal 1 item." };
+export async function createCustomerOrder(
+  input: PublicCustomerOrderInput
+): Promise<ActionResult<Order>> {
+  const validated = publicCustomerOrderSchema.safeParse(input);
+  if (!validated.success) {
+    return { success: false, error: validated.error.issues[0].message };
   }
 
-  if (!input.customerName.trim()) {
-    return { success: false, error: "Nama pelanggan wajib diisi." };
+  const fingerprint = await getClientFingerprint(
+    "qr-order",
+    `${validated.data.branchId}:${validated.data.tableId}`
+  );
+  const rateLimit = checkRateLimit(fingerprint, {
+    limit: 6,
+    windowMs: 2 * 60 * 1000,
+  });
+
+  if (!rateLimit.allowed) {
+    return {
+      success: false,
+      error: `Terlalu banyak pesanan dari perangkat ini. Coba lagi dalam ${rateLimit.retryAfter} detik.`,
+    };
   }
+
+  const safeInput = {
+    ...validated.data,
+    customerName: sanitizeText(validated.data.customerName, 120),
+    customerPhone: validated.data.customerPhone
+      ? sanitizeText(validated.data.customerPhone, 30)
+      : undefined,
+    notes: validated.data.notes
+      ? sanitizeMultilineText(validated.data.notes, 500)
+      : undefined,
+    items: validated.data.items.map((item) => ({
+      ...item,
+      notes: item.notes ? sanitizeMultilineText(item.notes, 200) : undefined,
+    })),
+  };
 
   try {
     const order = await prisma.$transaction(async (tx) => {
@@ -115,7 +139,7 @@ export async function createCustomerOrder(input: {
       });
 
       // 4. Validate products
-      const productIds = input.items.map((item) => item.productId);
+      const productIds = safeInput.items.map((item) => item.productId);
       const products = await tx.product.findMany({
         where: { id: { in: productIds }, isActive: true, isAvailable: true },
         include: {
@@ -142,7 +166,7 @@ export async function createCustomerOrder(input: {
         modifiers: Array<{ modifierId: string; name: string; price: number }>;
       }> = [];
 
-      for (const item of input.items) {
+      for (const item of safeInput.items) {
         const product = productMap.get(item.productId);
         if (!product) throw new Error("Produk tidak tersedia.");
 
@@ -243,8 +267,8 @@ export async function createCustomerOrder(input: {
             taxAmount: newTotals.taxAmount,
             serviceAmount: newTotals.serviceAmount,
             totalAmount: newTotals.totalAmount,
-            customerName: input.customerName || existingOrder.customerName,
-            customerPhone: input.customerPhone || existingOrder.customerPhone,
+            customerName: safeInput.customerName || existingOrder.customerName,
+            customerPhone: safeInput.customerPhone || existingOrder.customerPhone,
           },
         });
 
@@ -257,6 +281,12 @@ export async function createCustomerOrder(input: {
         select: { id: true },
       });
       if (!staffUser) throw new Error("Tidak ada staf tersedia.");
+
+      const activeShift = await tx.shift.findFirst({
+        where: { branchId: input.branchId, closedAt: null },
+        orderBy: { openedAt: "desc" },
+        select: { id: true },
+      });
 
       // 8. Create new order
       const newOrder = await tx.order.create({
@@ -271,12 +301,13 @@ export async function createCustomerOrder(input: {
           serviceRate: Number(branch.serviceRate),
           discountAmount: 0,
           totalAmount: totals.totalAmount,
-          notes: input.notes,
-          customerName: input.customerName,
-          customerPhone: input.customerPhone,
+          notes: safeInput.notes,
+          customerName: safeInput.customerName,
+          customerPhone: safeInput.customerPhone,
           tableId: input.tableId,
           branchId: input.branchId,
           userId: staffUser.id,
+          shiftId: activeShift?.id,
           items: {
             create: orderItemsData.map((item) => ({
               productId: item.productId,
@@ -306,6 +337,20 @@ export async function createCustomerOrder(input: {
       });
 
       return newOrder;
+    });
+
+    await logAudit({
+      action: "CREATE",
+      entity: "orders",
+      entityId: order.id,
+      newData: {
+        source: "qr-self-order",
+        orderNumber: order.orderNumber,
+        customerName: safeInput.customerName,
+        itemCount: safeInput.items.length,
+      },
+      userId: order.userId,
+      branchId: order.branchId,
     });
 
     return { success: true, data: order };

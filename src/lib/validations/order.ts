@@ -21,6 +21,20 @@ const orderItemSchema = z.object({
   modifiers: z.array(orderItemModifierSchema).default([]),
 });
 
+const publicOrderItemSchema = z.object({
+  productId: z.string().min(1, "Product ID wajib"),
+  variantId: z.string().optional(),
+  quantity: z.coerce.number().int().min(1, "Minimal 1 item"),
+  notes: z.string().optional(),
+  modifiers: z
+    .array(
+      z.object({
+        modifierId: z.string().min(1, "Modifier ID wajib"),
+      })
+    )
+    .default([]),
+});
+
 // ============================================================
 // Create Order
 // ============================================================
@@ -120,6 +134,17 @@ export const transferTableSchema = z.object({
   newTableId: z.string().min(1, "Meja tujuan wajib dipilih"),
 });
 
+export const publicCustomerOrderSchema = z.object({
+  branchId: z.string().min(1, "Branch wajib"),
+  tableId: z.string().min(1, "Meja wajib"),
+  customerName: z.string().min(2, "Nama pelanggan wajib diisi"),
+  customerPhone: z.string().optional(),
+  notes: z.string().optional(),
+  items: z
+    .array(publicOrderItemSchema)
+    .min(1, "Order harus memiliki minimal 1 item"),
+});
+
 // ============================================================
 // Types
 // ============================================================
@@ -131,3 +156,4 @@ export type ProcessPaymentInput = z.infer<typeof processPaymentSchema>;
 export type SplitBillPaymentInput = z.infer<typeof splitBillPaymentSchema>;
 export type StockMovementInput = z.infer<typeof stockMovementSchema>;
 export type TransferTableInput = z.infer<typeof transferTableSchema>;
+export type PublicCustomerOrderInput = z.infer<typeof publicCustomerOrderSchema>;

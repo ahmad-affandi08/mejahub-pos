@@ -1,5 +1,6 @@
 "use server";
 
+import { logAudit } from "@/lib/audit";
 import prisma from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/rbac";
@@ -73,6 +74,16 @@ export async function createProduct(
     const product = await prisma.product.create({
       data: validated.data,
     });
+
+    await logAudit({
+      action: "CREATE",
+      entity: "products",
+      entityId: product.id,
+      newData: product,
+      userId: session.user.id,
+      branchId: session.user.branchId,
+    });
+
     return { success: true, data: product };
   } catch (error) {
     return {
@@ -98,10 +109,22 @@ export async function updateProduct(
   }
 
   try {
+    const previous = await prisma.product.findUnique({ where: { id } });
     const product = await prisma.product.update({
       where: { id },
       data: validated.data,
     });
+
+    await logAudit({
+      action: "UPDATE",
+      entity: "products",
+      entityId: product.id,
+      oldData: previous,
+      newData: product,
+      userId: session.user.id,
+      branchId: session.user.branchId,
+    });
+
     return { success: true, data: product };
   } catch (error) {
     return {
@@ -118,10 +141,22 @@ export async function deleteProduct(id: string): Promise<ActionResult> {
   }
 
   try {
+    const previous = await prisma.product.findUnique({ where: { id } });
     await prisma.product.update({
       where: { id },
       data: { isActive: false },
     });
+
+    await logAudit({
+      action: "DELETE",
+      entity: "products",
+      entityId: id,
+      oldData: previous,
+      newData: { isActive: false },
+      userId: session.user.id,
+      branchId: session.user.branchId,
+    });
+
     return { success: true, data: undefined };
   } catch (error) {
     return {
@@ -147,6 +182,17 @@ export async function toggleProductAvailability(
       where: { id },
       data: { isAvailable: !product.isAvailable },
     });
+
+    await logAudit({
+      action: "UPDATE",
+      entity: "products",
+      entityId: updated.id,
+      oldData: { isAvailable: product.isAvailable },
+      newData: { isAvailable: updated.isAvailable },
+      userId: session.user.id,
+      branchId: session.user.branchId,
+    });
+
     return { success: true, data: updated };
   } catch (error) {
     return {

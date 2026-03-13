@@ -36,7 +36,11 @@ export default function LoginPage() {
       });
 
       if (result?.error) {
-        toast.error("Login gagal. Periksa email dan password Anda.");
+        toast.error(
+          result.error === "CredentialsSignin"
+            ? "Login gagal. Periksa email dan password Anda."
+            : result.error
+        );
       } else {
         toast.success("Login berhasil!");
         router.push("/dashboard");

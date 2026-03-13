@@ -1,6 +1,7 @@
 "use server";
 
 import prisma from "@/lib/prisma";
+import { logAudit } from "@/lib/audit";
 import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/rbac";
 import { revalidatePath } from "next/cache";
@@ -289,6 +290,10 @@ export async function createOrder(
         orderBy: { openedAt: "desc" },
       });
 
+      if (!activeShift) {
+        throw new Error("Buka shift terlebih dahulu sebelum membuat pesanan.");
+      }
+
       // 7. Create order with nested items
       const newOrder = await tx.order.create({
         data: {
@@ -353,6 +358,20 @@ export async function createOrder(
     revalidatePath("/dashboard/tables");
     revalidatePath("/dashboard/kitchen");
     revalidatePath("/dashboard/inventory");
+
+    await logAudit({
+      action: "CREATE",
+      entity: "orders",
+      entityId: order.id,
+      newData: {
+        orderNumber: order.orderNumber,
+        totalAmount: Number(order.totalAmount),
+        tableId: order.tableId,
+        source: "pos",
+      },
+      userId: session.user.id,
+      branchId,
+    });
 
     return { success: true, data: order };
   } catch (error) {
@@ -883,6 +902,15 @@ export async function transferTable(
 
     revalidatePath("/dashboard/orders");
     revalidatePath("/dashboard/tables");
+
+    await logAudit({
+      action: "UPDATE",
+      entity: "orders",
+      entityId: validated.data.orderId,
+      newData: { newTableId: validated.data.newTableId },
+      userId: session.user.id,
+      branchId: session.user.branchId,
+    });
 
     return { success: true, data: undefined };
   } catch (error) {

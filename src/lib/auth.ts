@@ -4,6 +4,7 @@ import Credentials from "next-auth/providers/credentials";
 import bcryptjs from "bcryptjs";
 import prisma from "@/lib/prisma";
 import { loginSchema } from "@/lib/validations/auth";
+import { checkRateLimit, clearRateLimit } from "@/lib/rate-limit";
 import type { UserRole } from "@prisma/client";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -19,11 +20,25 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
-      async authorize(credentials) {
+      async authorize(credentials, request) {
         const validated = loginSchema.safeParse(credentials);
         if (!validated.success) return null;
 
-        const { email, password } = validated.data;
+        const email = validated.data.email.trim().toLowerCase();
+        const { password } = validated.data;
+        const clientIp =
+          request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+          request.headers.get("x-real-ip") ||
+          "unknown";
+        const rateLimitKey = `login:${clientIp}:${email}`;
+        const rateLimit = checkRateLimit(rateLimitKey, {
+          limit: 5,
+          windowMs: 15 * 60 * 1000,
+        });
+
+        if (!rateLimit.allowed) {
+          throw new Error("Terlalu banyak percobaan login. Coba lagi nanti.");
+        }
 
         const user = await prisma.user.findUnique({
           where: { email },
@@ -43,6 +58,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         const passwordMatch = await bcryptjs.compare(password, user.password);
         if (!passwordMatch) return null;
+
+        clearRateLimit(rateLimitKey);
+
+        void prisma.auditLog.create({
+          data: {
+            action: "LOGIN",
+            entity: "users",
+            entityId: user.id,
+            newData: { email: user.email },
+            ipAddress: clientIp,
+            userAgent: request.headers.get("user-agent"),
+            userId: user.id,
+            branchId: user.branchId,
+          },
+        });
 
         return {
           id: user.id,

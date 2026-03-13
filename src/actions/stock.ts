@@ -1,5 +1,6 @@
 "use server";
 
+import { logAudit } from "@/lib/audit";
 import prisma from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/rbac";
@@ -158,6 +159,21 @@ export async function addStockMovement(input: {
     });
 
     revalidatePath("/dashboard/inventory");
+
+    await logAudit({
+      action: "UPDATE",
+      entity: "stock_movements",
+      entityId: result.id,
+      newData: {
+        ingredientId: data.ingredientId,
+        type: data.type,
+        quantity: data.quantity,
+        notes: data.notes,
+      },
+      userId: session.user.id,
+      branchId,
+    });
+
     return { success: true, data: result };
   } catch (error) {
     return {
@@ -258,6 +274,20 @@ export async function createIngredient(input: {
     });
 
     revalidatePath("/dashboard/inventory");
+
+    await logAudit({
+      action: "CREATE",
+      entity: "ingredients",
+      entityId: ingredient.id,
+      newData: {
+        name: ingredient.name,
+        unit: ingredient.unit,
+        minStock: Number(ingredient.minStock),
+      },
+      userId: session.user.id,
+      branchId,
+    });
+
     return { success: true, data: ingredient };
   } catch (error) {
     return {
@@ -292,12 +322,24 @@ export async function updateIngredient(
     if (input.minStock !== undefined) data.minStock = input.minStock;
     if (input.costPerUnit !== undefined) data.costPerUnit = input.costPerUnit;
 
+    const previous = await prisma.ingredient.findUnique({ where: { id } });
     const ingredient = await prisma.ingredient.update({
       where: { id },
       data,
     });
 
     revalidatePath("/dashboard/inventory");
+
+    await logAudit({
+      action: "UPDATE",
+      entity: "ingredients",
+      entityId: ingredient.id,
+      oldData: previous,
+      newData: ingredient,
+      userId: session.user.id,
+      branchId: session.user.branchId,
+    });
+
     return { success: true, data: ingredient };
   } catch (error) {
     return {

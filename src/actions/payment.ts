@@ -1,5 +1,6 @@
 "use server";
 
+import { logAudit } from "@/lib/audit";
 import prisma from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/rbac";
@@ -126,6 +127,27 @@ export async function processPayment(input: {
     revalidatePath("/dashboard/orders");
     revalidatePath("/dashboard/tables");
 
+    const order = await prisma.order.findUnique({
+      where: { id: data.orderId },
+      select: { orderNumber: true, branchId: true },
+    });
+
+    if (order) {
+      await logAudit({
+        action: "UPDATE",
+        entity: "payments",
+        entityId: payment.id,
+        newData: {
+          orderNumber: order.orderNumber,
+          method: payment.method,
+          amount: Number(payment.amount),
+          status: payment.status,
+        },
+        userId: session.user.id,
+        branchId: order.branchId,
+      });
+    }
+
     return { success: true, data: payment };
   } catch (error) {
     return {
@@ -250,6 +272,27 @@ export async function processSplitBill(input: {
 
     revalidatePath("/dashboard/orders");
     revalidatePath("/dashboard/tables");
+
+    const order = await prisma.order.findUnique({
+      where: { id: data.orderId },
+      select: { orderNumber: true, branchId: true },
+    });
+
+    if (order) {
+      await logAudit({
+        action: "UPDATE",
+        entity: "payments",
+        entityId: data.orderId,
+        newData: {
+          orderNumber: order.orderNumber,
+          splitBill: true,
+          totalMethods: data.payments.length,
+          totalAmount: data.payments.reduce((sum, payment) => sum + payment.amount, 0),
+        },
+        userId: session.user.id,
+        branchId: order.branchId,
+      });
+    }
 
     return { success: true, data: undefined };
   } catch (error) {
