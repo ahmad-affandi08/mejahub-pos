@@ -1,15 +1,15 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Image from "next/image";
 import { useCartStore } from "@/stores/cart-store";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -36,6 +36,7 @@ import {
   User,
   Phone,
   StickyNote,
+  UtensilsCrossed,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { createOrder } from "@/actions/order";
@@ -65,7 +66,6 @@ export function CartPanel({ tables }: CartPanelProps) {
   const {
     items,
     tableId,
-    tableName,
     orderType,
     customerName,
     customerPhone,
@@ -242,27 +242,48 @@ export function CartPanel({ tables }: CartPanelProps) {
             {items.map((item, index) => (
               <Card key={index} className="shadow-none">
                 <CardContent className="p-3">
-                  <div className="flex items-start justify-between mb-1">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm leading-tight">
-                        {item.name}
-                      </p>
-                      {item.variantName && (
-                        <p className="text-xs text-muted-foreground">
-                          {item.variantName}
+                  <div className="mb-1 flex items-start justify-between gap-2">
+                    <div className="flex min-w-0 flex-1 gap-3">
+                      <div className="h-12 w-12 shrink-0 overflow-hidden rounded-md border bg-muted">
+                        {item.image ? (
+                          <div className="relative h-full w-full">
+                            <Image
+                              src={item.image}
+                              alt={item.name}
+                              fill
+                              className="object-cover"
+                              sizes="48px"
+                            />
+                          </div>
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center">
+                            <UtensilsCrossed className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium leading-tight">
+                          {item.name}
                         </p>
-                      )}
-                      {item.modifiers.length > 0 && (
-                        <p className="text-xs text-muted-foreground">
-                          {item.modifiers.map((m) => m.name).join(", ")}
-                        </p>
-                      )}
-                      {item.notes && (
-                        <p className="text-xs text-muted-foreground italic mt-0.5">
-                          📝 {item.notes}
-                        </p>
-                      )}
+                        {item.variantName && (
+                          <p className="text-xs text-muted-foreground">
+                            {item.variantName}
+                          </p>
+                        )}
+                        {item.modifiers.length > 0 && (
+                          <p className="text-xs text-muted-foreground">
+                            {item.modifiers.map((m) => m.name).join(", ")}
+                          </p>
+                        )}
+                        {item.notes && (
+                          <p className="mt-0.5 text-xs italic text-muted-foreground">
+                            📝 {item.notes}
+                          </p>
+                        )}
+                      </div>
                     </div>
+
                     <Button
                       variant="ghost"
                       size="icon"

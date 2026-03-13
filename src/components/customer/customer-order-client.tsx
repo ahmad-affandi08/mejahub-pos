@@ -90,6 +90,7 @@ interface CartItem {
   productId: string;
   variantId?: string;
   name: string;
+  image?: string | null;
   variantName?: string;
   price: number;
   quantity: number;
@@ -178,6 +179,7 @@ export function CustomerOrderClient({
       productId: product.id,
       variantId: selectedVariant,
       name: product.name,
+      image: product.image,
       variantName,
       price,
       quantity: itemQuantity,
@@ -589,6 +591,24 @@ export function CustomerOrderClient({
                   const itemTotal = (item.price + modTotal) * item.quantity;
                   return (
                     <div key={idx} className="flex items-start gap-3 p-2 rounded-lg border">
+                      <div className="h-12 w-12 shrink-0 overflow-hidden rounded-md border bg-muted">
+                        {item.image ? (
+                          <div className="relative h-full w-full">
+                            <Image
+                              src={item.image}
+                              alt={item.name}
+                              fill
+                              className="object-cover"
+                              sizes="48px"
+                            />
+                          </div>
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center">
+                            <ChefHat className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
+
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-sm">
                           {item.name}

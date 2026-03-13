@@ -69,6 +69,7 @@ export function ProductGrid({ products }: ProductGridProps) {
       addItem({
         productId: product.id,
         name: product.name,
+        image: product.image,
         price: Number(product.price),
         quantity: 1,
         modifiers: [],
@@ -137,6 +138,7 @@ export function ProductGrid({ products }: ProductGridProps) {
       productId: selectedProduct.id,
       variantId: selectedVariantId,
       name: selectedProduct.name,
+      image: selectedProduct.image,
       variantName,
       price,
       quantity: itemQuantity,
