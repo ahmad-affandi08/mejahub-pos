@@ -357,6 +357,8 @@ export async function refundPayment(
   }
 
   try {
+    let updatedOrder: { branchId: string; tableId: string | null } | null = null;
+
     await prisma.$transaction(async (tx) => {
       const payment = await tx.payment.findUnique({
         where: { id: paymentId },
@@ -367,27 +369,62 @@ export async function refundPayment(
         throw new Error("Hanya pembayaran COMPLETED yang bisa di-refund.");
       }
 
+      const orderWasPaid = payment.order.status === "PAID";
+
       // Refund payment
       await tx.payment.update({
         where: { id: paymentId },
         data: { status: "REFUNDED" },
       });
 
-      // Re-open order
-      await tx.order.update({
+      // Re-open order if needed
+      const nextOrder = await tx.order.update({
         where: { id: payment.orderId },
-        data: { status: "OPEN" },
+        data: {
+          status: orderWasPaid ? "OPEN" : payment.order.status,
+        },
+        select: {
+          id: true,
+          orderNumber: true,
+          branchId: true,
+          tableId: true,
+          shiftId: true,
+        },
       });
 
+      updatedOrder = {
+        branchId: nextOrder.branchId,
+        tableId: nextOrder.tableId,
+      };
+
+      if (nextOrder.tableId) {
+        await tx.table.update({
+          where: { id: nextOrder.tableId },
+          data: { status: "OCCUPIED" },
+        });
+      }
+
       // Reverse shift totals
-      if (payment.order.shiftId) {
+      if (nextOrder.shiftId) {
         await tx.shift.update({
-          where: { id: payment.order.shiftId },
+          where: { id: nextOrder.shiftId },
           data: {
             totalSales: { decrement: Number(payment.amount) },
-            totalOrders: { decrement: 1 },
+            ...(orderWasPaid ? { totalOrders: { decrement: 1 } } : {}),
           },
         });
+
+        if (payment.method === "CASH") {
+          await tx.cashDrawerTransaction.create({
+            data: {
+              type: "CASH_OUT",
+              amount: Number(payment.amount),
+              reason: `Refund order ${nextOrder.orderNumber}`,
+              shiftId: nextOrder.shiftId,
+              userId: session.user!.id,
+            },
+          });
+        }
       }
 
       // Audit log
@@ -397,7 +434,12 @@ export async function refundPayment(
           entity: "payments",
           entityId: paymentId,
           oldData: { status: "COMPLETED" },
-          newData: { status: "REFUNDED", reason },
+          newData: {
+            status: "REFUNDED",
+            reason,
+            orderId: payment.orderId,
+            amount: Number(payment.amount),
+          },
           userId: session.user!.id,
           branchId: payment.order.branchId,
         },
@@ -405,6 +447,15 @@ export async function refundPayment(
     });
 
     revalidatePath("/dashboard/orders");
+    revalidatePath("/dashboard/tables");
+    revalidatePath("/dashboard/shifts");
+
+    if (updatedOrder?.tableId) {
+      notifyTableStatusChange(updatedOrder.branchId, {
+        tableId: updatedOrder.tableId,
+        status: "OCCUPIED",
+      });
+    }
 
     return { success: true, data: undefined };
   } catch (error) {

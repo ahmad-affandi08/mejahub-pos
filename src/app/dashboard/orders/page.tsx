@@ -4,7 +4,6 @@ import { getProducts } from "@/actions/product";
 import { getOrders, getPendingApprovalOrders } from "@/actions/order";
 import prisma from "@/lib/prisma";
 import { POSClient } from "@/components/pos/pos-client";
-import { PendingQROrders } from "@/components/pos/pending-qr-orders";
 
 export default async function OrdersPage() {
   const session = await auth();
@@ -29,18 +28,16 @@ export default async function OrdersPage() {
   ]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4 overflow-hidden">
-      <PendingQROrders orders={JSON.parse(JSON.stringify(pendingQrOrders))} />
-      <div className="min-h-0 flex-1">
-        <POSClient
-          products={JSON.parse(JSON.stringify(products))}
-          openOrders={JSON.parse(JSON.stringify(orders))}
-          tables={JSON.parse(JSON.stringify(tables))}
-          branchId={branchId}
-          taxRate={Number(branch?.taxRate ?? 10)}
-          serviceRate={Number(branch?.serviceRate ?? 5)}
-        />
-      </div>
+    <div className="h-full min-h-0 overflow-hidden">
+      <POSClient
+        products={JSON.parse(JSON.stringify(products))}
+        openOrders={JSON.parse(JSON.stringify(orders))}
+        pendingQrOrders={JSON.parse(JSON.stringify(pendingQrOrders))}
+        tables={JSON.parse(JSON.stringify(tables))}
+        branchId={branchId}
+        taxRate={Number(branch?.taxRate ?? 10)}
+        serviceRate={Number(branch?.serviceRate ?? 5)}
+      />
     </div>
   );
 }

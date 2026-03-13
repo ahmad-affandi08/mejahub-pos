@@ -28,15 +28,14 @@ import {
   XCircle,
   Trash2,
   ArrowRightLeft,
-  Clock,
   MapPin,
   User,
   Hash,
   MessageCircle,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { cancelOrder, voidOrderItem } from "@/actions/order";
-import { processPayment } from "@/actions/payment";
+import { cancelOrder, transferTable, voidOrderItem } from "@/actions/order";
+import { processPayment, processSplitBill, refundPayment } from "@/actions/payment";
 import {
   calculateChange,
   suggestCashDenominations,
@@ -46,6 +45,22 @@ import {
   getPaymentMethodLabel,
 } from "@/lib/whatsapp";
 import Link from "next/link";
+
+const PAYMENT_METHOD_OPTIONS = [
+  { value: "CASH", label: "Tunai" },
+  { value: "QRIS", label: "QRIS" },
+  { value: "DEBIT_CARD", label: "Debit" },
+  { value: "CREDIT_CARD", label: "Kredit" },
+  { value: "E_WALLET", label: "E-Wallet" },
+  { value: "TRANSFER", label: "Transfer" },
+] as const;
+
+type SplitPaymentInput = {
+  method: string;
+  amount: string;
+  receivedAmount: string;
+  reference: string;
+};
 
 interface OrderDetailProps {
   order: {
@@ -95,6 +110,17 @@ interface OrderDetailProps {
       createdAt: string;
     }>;
   };
+  tables: Array<{
+    id: string;
+    number: number;
+    name: string | null;
+    status: string;
+  }>;
+  permissions: {
+    canProcessPayment: boolean;
+    canTransferTable: boolean;
+    canRefundPayment: boolean;
+  };
 }
 
 const statusColors: Record<string, string> = {
@@ -113,7 +139,7 @@ const itemStatusColors: Record<string, string> = {
   CANCELLED: "bg-red-100 text-red-800 line-through",
 };
 
-export function OrderDetail({ order }: OrderDetailProps) {
+export function OrderDetail({ order, tables, permissions }: OrderDetailProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
@@ -122,11 +148,38 @@ export function OrderDetail({ order }: OrderDetailProps) {
   const [payMethod, setPayMethod] = useState("CASH");
   const [receivedAmount, setReceivedAmount] = useState("");
   const [payRef, setPayRef] = useState("");
+  const [transferDialogOpen, setTransferDialogOpen] = useState(false);
+  const [targetTableId, setTargetTableId] = useState("");
+  const [splitDialogOpen, setSplitDialogOpen] = useState(false);
+  const [splitPayments, setSplitPayments] = useState<SplitPaymentInput[]>([
+    { method: "CASH", amount: "", receivedAmount: "", reference: "" },
+  ]);
+  const [refundDialogOpen, setRefundDialogOpen] = useState(false);
+  const [refundPaymentId, setRefundPaymentId] = useState("");
+  const [refundReason, setRefundReason] = useState("");
 
   const totalAmount = Number(order.totalAmount);
   const received = parseFloat(receivedAmount) || 0;
   const change = payMethod === "CASH" ? calculateChange(totalAmount, received) : 0;
   const cashSuggestions = suggestCashDenominations(totalAmount);
+  const availableTransferTables = tables.filter(
+    (table) => table.status === "AVAILABLE" && table.id !== order.tableId
+  );
+  const splitTotal = splitPayments.reduce(
+    (sum, payment) => sum + (parseFloat(payment.amount) || 0),
+    0
+  );
+  const splitRemaining = totalAmount - splitTotal;
+  const splitValid =
+    splitPayments.length > 0 &&
+    splitTotal >= totalAmount &&
+    splitPayments.every((payment) => {
+      const amount = parseFloat(payment.amount) || 0;
+      const receivedCash = parseFloat(payment.receivedAmount) || 0;
+      if (amount <= 0) return false;
+      if (payment.method === "CASH") return receivedCash >= amount;
+      return true;
+    });
 
   function handleCancel() {
     if (!cancelReason.trim()) {
@@ -182,6 +235,117 @@ export function OrderDetail({ order }: OrderDetailProps) {
     });
   }
 
+  function addSplitPaymentRow() {
+    setSplitPayments((prev) => [
+      ...prev,
+      { method: "CASH", amount: "", receivedAmount: "", reference: "" },
+    ]);
+  }
+
+  function removeSplitPaymentRow(index: number) {
+    setSplitPayments((prev) => prev.filter((_, idx) => idx !== index));
+  }
+
+  function updateSplitPayment(index: number, patch: Partial<SplitPaymentInput>) {
+    setSplitPayments((prev) =>
+      prev.map((item, idx) =>
+        idx === index
+          ? {
+              ...item,
+              ...patch,
+            }
+          : item
+      )
+    );
+  }
+
+  function handleSplitBill() {
+    if (!splitValid) {
+      toast.error("Pastikan semua nominal valid dan total mencukupi tagihan.");
+      return;
+    }
+
+    startTransition(async () => {
+      const result = await processSplitBill({
+        orderId: order.id,
+        payments: splitPayments.map((payment) => ({
+          method: payment.method,
+          amount: parseFloat(payment.amount) || 0,
+          receivedAmount:
+            payment.method === "CASH"
+              ? parseFloat(payment.receivedAmount) || 0
+              : undefined,
+          reference:
+            payment.method !== "CASH" && payment.reference.trim()
+              ? payment.reference.trim()
+              : undefined,
+        })),
+      });
+
+      if (result.success) {
+        toast.success("Split bill berhasil diproses.");
+        setSplitDialogOpen(false);
+        setSplitPayments([
+          { method: "CASH", amount: "", receivedAmount: "", reference: "" },
+        ]);
+        router.refresh();
+      } else {
+        toast.error(result.error);
+      }
+    });
+  }
+
+  function handleTransferTable() {
+    if (!targetTableId) {
+      toast.error("Pilih meja tujuan terlebih dahulu.");
+      return;
+    }
+
+    startTransition(async () => {
+      const result = await transferTable({
+        orderId: order.id,
+        newTableId: targetTableId,
+      });
+
+      if (result.success) {
+        toast.success("Meja berhasil dipindahkan.");
+        setTransferDialogOpen(false);
+        setTargetTableId("");
+        router.refresh();
+      } else {
+        toast.error(result.error);
+      }
+    });
+  }
+
+  function openRefund(paymentId: string) {
+    setRefundPaymentId(paymentId);
+    setRefundReason("");
+    setRefundDialogOpen(true);
+  }
+
+  function handleRefund() {
+    if (!refundPaymentId) return;
+    if (!refundReason.trim()) {
+      toast.error("Alasan refund wajib diisi.");
+      return;
+    }
+
+    startTransition(async () => {
+      const result = await refundPayment(refundPaymentId, refundReason.trim());
+
+      if (result.success) {
+        toast.success("Refund berhasil diproses.");
+        setRefundDialogOpen(false);
+        setRefundPaymentId("");
+        setRefundReason("");
+        router.refresh();
+      } else {
+        toast.error(result.error);
+      }
+    });
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -207,6 +371,24 @@ export function OrderDetail({ order }: OrderDetailProps) {
 
         {order.status === "OPEN" && (
           <div className="flex gap-2">
+            {permissions.canTransferTable && order.table && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setTransferDialogOpen(true)}
+              >
+                <ArrowRightLeft className="h-4 w-4 mr-1" /> Pindah Meja
+              </Button>
+            )}
+            {permissions.canProcessPayment && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSplitDialogOpen(true)}
+              >
+                <CreditCard className="h-4 w-4 mr-1" /> Split Bill
+              </Button>
+            )}
             <Button
               variant="destructive"
               size="sm"
@@ -214,7 +396,11 @@ export function OrderDetail({ order }: OrderDetailProps) {
             >
               <XCircle className="h-4 w-4 mr-1" /> Batalkan
             </Button>
-            <Button size="sm" onClick={() => setPayDialogOpen(true)}>
+            <Button
+              size="sm"
+              onClick={() => setPayDialogOpen(true)}
+              disabled={!permissions.canProcessPayment}
+            >
               <CreditCard className="h-4 w-4 mr-1" /> Bayar
             </Button>
           </div>
@@ -402,6 +588,17 @@ export function OrderDetail({ order }: OrderDetailProps) {
                         Ref: {payment.reference}
                       </p>
                     )}
+                    {permissions.canRefundPayment && payment.status === "COMPLETED" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-1 h-7 text-xs text-destructive border-destructive/40 hover:bg-destructive/5"
+                        onClick={() => openRefund(payment.id)}
+                        disabled={isPending}
+                      >
+                        Refund
+                      </Button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -525,12 +722,11 @@ export function OrderDetail({ order }: OrderDetailProps) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="CASH">Tunai</SelectItem>
-                <SelectItem value="QRIS">QRIS</SelectItem>
-                <SelectItem value="DEBIT_CARD">Debit</SelectItem>
-                <SelectItem value="CREDIT_CARD">Kredit</SelectItem>
-                <SelectItem value="E_WALLET">E-Wallet</SelectItem>
-                <SelectItem value="TRANSFER">Transfer</SelectItem>
+                {PAYMENT_METHOD_OPTIONS.map((method) => (
+                  <SelectItem key={method.value} value={method.value}>
+                    {method.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
 
@@ -581,6 +777,221 @@ export function OrderDetail({ order }: OrderDetailProps) {
               className="w-full"
             >
               {isPending ? "Memproses..." : "Bayar Sekarang"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={transferDialogOpen} onOpenChange={setTransferDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Pindah Meja</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            {order.table && (
+              <p className="text-sm text-muted-foreground">
+                Meja saat ini: #{order.table.number}
+                {order.table.name ? ` — ${order.table.name}` : ""}
+              </p>
+            )}
+
+            <Select
+              value={targetTableId}
+              onValueChange={(value) => setTargetTableId(value ?? "")}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Pilih meja tujuan" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableTransferTables.map((table) => (
+                  <SelectItem key={table.id} value={table.id}>
+                    Meja #{table.number}
+                    {table.name ? ` — ${table.name}` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {availableTransferTables.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                Tidak ada meja kosong yang tersedia saat ini.
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTransferDialogOpen(false)}>
+              Batal
+            </Button>
+            <Button
+              onClick={handleTransferTable}
+              disabled={isPending || !targetTableId || availableTransferTables.length === 0}
+            >
+              {isPending ? "Memproses..." : "Pindahkan"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={splitDialogOpen} onOpenChange={setSplitDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Split Bill</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="rounded-lg border bg-muted/40 p-3 text-sm">
+              <div className="flex items-center justify-between">
+                <span>Total Tagihan</span>
+                <span className="font-semibold">{formatCurrency(totalAmount)}</span>
+              </div>
+              <div className="mt-1 flex items-center justify-between">
+                <span>Total Input</span>
+                <span className="font-semibold">{formatCurrency(splitTotal)}</span>
+              </div>
+              <div className="mt-1 flex items-center justify-between">
+                <span>Sisa</span>
+                <span className={`font-semibold ${splitRemaining > 0 ? "text-destructive" : "text-green-600"}`}>
+                  {formatCurrency(Math.abs(splitRemaining))}
+                </span>
+              </div>
+            </div>
+
+            <div className="max-h-[50vh] space-y-3 overflow-y-auto pr-1">
+              {splitPayments.map((payment, index) => {
+                const amount = parseFloat(payment.amount) || 0;
+                const receivedCash = parseFloat(payment.receivedAmount) || 0;
+                const changeCash =
+                  payment.method === "CASH"
+                    ? calculateChange(amount, receivedCash)
+                    : 0;
+
+                return (
+                  <div key={`split-${index}`} className="rounded-lg border p-3 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium">Pembayaran {index + 1}</p>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-destructive"
+                        onClick={() => removeSplitPaymentRow(index)}
+                        disabled={splitPayments.length <= 1 || isPending}
+                      >
+                        Hapus
+                      </Button>
+                    </div>
+
+                    <div className="grid gap-2 md:grid-cols-2">
+                      <Select
+                        value={payment.method}
+                        onValueChange={(value) =>
+                          updateSplitPayment(index, {
+                            method: value ?? "CASH",
+                            receivedAmount: "",
+                            reference: "",
+                          })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PAYMENT_METHOD_OPTIONS.map((method) => (
+                            <SelectItem key={method.value} value={method.value}>
+                              {method.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+
+                      <Input
+                        type="number"
+                        value={payment.amount}
+                        onChange={(event) =>
+                          updateSplitPayment(index, { amount: event.target.value })
+                        }
+                        placeholder="Nominal pembayaran"
+                        className="text-right"
+                      />
+                    </div>
+
+                    {payment.method === "CASH" ? (
+                      <div className="space-y-2">
+                        <Input
+                          type="number"
+                          value={payment.receivedAmount}
+                          onChange={(event) =>
+                            updateSplitPayment(index, {
+                              receivedAmount: event.target.value,
+                            })
+                          }
+                          placeholder="Uang diterima"
+                          className="text-right"
+                        />
+                        {receivedCash > 0 && (
+                          <p
+                            className={`text-xs text-right ${
+                              receivedCash >= amount ? "text-green-600" : "text-destructive"
+                            }`}
+                          >
+                            {receivedCash >= amount
+                              ? `Kembalian: ${formatCurrency(changeCash)}`
+                              : `Kurang: ${formatCurrency(amount - receivedCash)}`}
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <Input
+                        value={payment.reference}
+                        onChange={(event) =>
+                          updateSplitPayment(index, {
+                            reference: event.target.value,
+                          })
+                        }
+                        placeholder="Referensi (opsional)"
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <DialogFooter className="justify-between gap-2 sm:justify-between">
+            <Button variant="outline" onClick={addSplitPaymentRow} disabled={isPending}>
+              Tambah Metode
+            </Button>
+            <Button onClick={handleSplitBill} disabled={isPending || !splitValid}>
+              {isPending ? "Memproses..." : "Proses Split Bill"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={refundDialogOpen} onOpenChange={setRefundDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Refund Pembayaran</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Refund akan membuka kembali pesanan ini untuk koreksi pembayaran.
+            </p>
+            <div>
+              <label className="text-sm font-medium">Alasan Refund</label>
+              <Input
+                value={refundReason}
+                onChange={(event) => setRefundReason(event.target.value)}
+                placeholder="Contoh: salah input nominal"
+                className="mt-1"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRefundDialogOpen(false)}>
+              Batal
+            </Button>
+            <Button variant="destructive" onClick={handleRefund} disabled={isPending}>
+              {isPending ? "Memproses..." : "Konfirmasi Refund"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -6,17 +6,34 @@ import { useCartStore } from "@/stores/cart-store";
 import { ProductGrid } from "@/components/pos/product-grid";
 import { CartPanel } from "@/components/pos/cart-panel";
 import { OpenOrdersList } from "@/components/pos/open-orders-list";
+import { PendingQROrders } from "@/components/pos/pending-qr-orders";
 import { useSocket } from "@/hooks/use-socket";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ShoppingCart, ClipboardList } from "lucide-react";
+import { ShoppingCart, ClipboardList, QrCode } from "lucide-react";
 
 interface POSClientProps {
   products: ProductWithRelations[];
   openOrders: OrderWithRelations[];
+  pendingQrOrders: PendingQrOrder[];
   tables: TableData[];
   branchId: string;
   taxRate: number;
   serviceRate: number;
+}
+
+interface PendingQrOrder {
+  id: string;
+  orderNumber: string;
+  status: string;
+  totalAmount: number | string;
+  createdAt: string;
+  customerName: string | null;
+  table: { id: string; number: number; name: string | null } | null;
+  items: Array<{
+    id: string;
+    quantity: number;
+    product: { id: string; name: string };
+  }>;
 }
 
 // Type definitions
@@ -103,6 +120,7 @@ export interface TableData {
 export function POSClient({
   products,
   openOrders,
+  pendingQrOrders,
   tables,
   branchId,
   taxRate,
@@ -149,6 +167,10 @@ export function POSClient({
                   <ShoppingCart className="h-4 w-4" />
                   Order Baru
                 </TabsTrigger>
+                <TabsTrigger value="qr-approval" className="gap-2">
+                  <QrCode className="h-4 w-4" />
+                  Menunggu Approval ({pendingQrOrders.length})
+                </TabsTrigger>
                 <TabsTrigger value="open-orders" className="gap-2">
                   <ClipboardList className="h-4 w-4" />
                   Pesanan Aktif ({openOrders.length})
@@ -158,6 +180,16 @@ export function POSClient({
 
             <TabsContent value="new-order" className="m-0 min-h-0 w-full min-w-0 flex-1 overflow-hidden">
               <ProductGrid products={products} />
+            </TabsContent>
+
+            <TabsContent value="qr-approval" className="m-0 min-h-0 w-full min-w-0 flex-1 overflow-auto p-4">
+              {pendingQrOrders.length > 0 ? (
+                <PendingQROrders orders={pendingQrOrders} />
+              ) : (
+                <div className="flex h-full min-h-60 items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">
+                  Tidak ada pesanan QR yang menunggu approval.
+                </div>
+              )}
             </TabsContent>
 
             <TabsContent value="open-orders" className="m-0 min-h-0 w-full min-w-0 flex-1 overflow-auto p-4">
