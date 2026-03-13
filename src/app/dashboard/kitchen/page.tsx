@@ -37,6 +37,7 @@ export default async function KitchenPage() {
   return (
     <KDSClient
       orderItems={JSON.parse(JSON.stringify(orderItems))}
+      branchId={branchId}
     />
   );
 }

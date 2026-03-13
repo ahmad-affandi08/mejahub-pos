@@ -3,6 +3,7 @@
 import prisma from "@/lib/prisma";
 import { logAudit } from "@/lib/audit";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { notifyNewCustomerOrder, notifyOrderUpdated } from "@/lib/socket-events";
 import { getClientFingerprint, sanitizeMultilineText, sanitizeText } from "@/lib/security";
 import { generateOrderNumber, type ActionResult } from "@/lib/utils";
 import {
@@ -355,6 +356,26 @@ export async function createCustomerOrder(
       },
       userId: order.userId,
       branchId: order.branchId,
+    });
+
+    const table = await prisma.table.findUnique({
+      where: { id: order.tableId ?? "" },
+      select: { number: true, name: true },
+    });
+
+    notifyNewCustomerOrder(order.branchId, {
+      orderNumber: order.orderNumber,
+      tableName: table
+        ? `Meja ${table.number}${table.name ? ` - ${table.name}` : ""}`
+        : "Unknown",
+      customerName: safeInput.customerName,
+    });
+
+    notifyOrderUpdated(order.branchId, {
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      status: order.status,
+      source: "qr-self-order",
     });
 
     return { success: true, data: order };

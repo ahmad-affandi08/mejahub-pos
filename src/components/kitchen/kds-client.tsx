@@ -2,10 +2,12 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useKDSSocket } from "@/hooks/use-socket";
 import { toast } from "sonner";
 import {
   ChefHat,
@@ -42,6 +44,7 @@ interface KDSOrderItem {
 
 interface KDSClientProps {
   orderItems: KDSOrderItem[];
+  branchId: string;
 }
 
 const statusFlow: Record<string, string> = {
@@ -79,10 +82,24 @@ const statusConfig: Record<
   },
 };
 
-export function KDSClient({ orderItems }: KDSClientProps) {
+export function KDSClient({ orderItems, branchId }: KDSClientProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [station, setStation] = useState<string>("ALL");
+  const { on } = useKDSSocket(branchId);
+
+  useEffect(() => {
+    const unsubscribers = [
+      on("new-order", () => router.refresh()),
+      on("order-updated", () => router.refresh()),
+      on("order-item-status", () => router.refresh()),
+      on("table-status-change", () => router.refresh()),
+    ];
+
+    return () => {
+      unsubscribers.forEach((unsubscribe) => unsubscribe());
+    };
+  }, [on, router]);
 
   // Filter by station
   const filteredItems =
@@ -128,7 +145,7 @@ export function KDSClient({ orderItems }: KDSClientProps) {
     const elapsed = getElapsedTime(item.cookingStartAt || item.createdAt);
     const isUrgent =
       item.status === "PENDING" &&
-      Date.now() - new Date(item.createdAt).getTime() > 10 * 60 * 1000; // >10min
+      Date.now() - new Date(item.createdAt).getTime() > 15 * 60 * 1000; // >15min
 
     return (
       <Card

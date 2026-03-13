@@ -35,6 +35,7 @@ export default async function OrdersPage() {
         products={JSON.parse(JSON.stringify(products))}
         openOrders={JSON.parse(JSON.stringify(orders))}
         tables={JSON.parse(JSON.stringify(tables))}
+        branchId={branchId}
         taxRate={Number(branch?.taxRate ?? 10)}
         serviceRate={Number(branch?.serviceRate ?? 5)}
       />

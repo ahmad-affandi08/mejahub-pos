@@ -1,6 +1,7 @@
 "use server";
 
 import { logAudit } from "@/lib/audit";
+import { notifyPaymentCompleted, notifyTableStatusChange } from "@/lib/socket-events";
 import prisma from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/rbac";
@@ -146,6 +147,25 @@ export async function processPayment(input: {
         userId: session.user.id,
         branchId: order.branchId,
       });
+
+      notifyPaymentCompleted(order.branchId, {
+        orderId: data.orderId,
+        orderNumber: order.orderNumber,
+        method: payment.method,
+        amount: Number(payment.amount),
+      });
+
+      const paidOrder = await prisma.order.findUnique({
+        where: { id: data.orderId },
+        select: { tableId: true },
+      });
+
+      if (paidOrder?.tableId) {
+        notifyTableStatusChange(order.branchId, {
+          tableId: paidOrder.tableId,
+          status: "AVAILABLE",
+        });
+      }
     }
 
     return { success: true, data: payment };
@@ -292,6 +312,25 @@ export async function processSplitBill(input: {
         userId: session.user.id,
         branchId: order.branchId,
       });
+
+      notifyPaymentCompleted(order.branchId, {
+        orderId: data.orderId,
+        orderNumber: order.orderNumber,
+        method: "SPLIT",
+        amount: data.payments.reduce((sum, payment) => sum + payment.amount, 0),
+      });
+
+      const paidOrder = await prisma.order.findUnique({
+        where: { id: data.orderId },
+        select: { tableId: true },
+      });
+
+      if (paidOrder?.tableId) {
+        notifyTableStatusChange(order.branchId, {
+          tableId: paidOrder.tableId,
+          status: "AVAILABLE",
+        });
+      }
     }
 
     return { success: true, data: undefined };

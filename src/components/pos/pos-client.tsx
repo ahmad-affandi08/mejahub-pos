@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useCartStore } from "@/stores/cart-store";
 import { ProductGrid } from "@/components/pos/product-grid";
 import { CartPanel } from "@/components/pos/cart-panel";
 import { OpenOrdersList } from "@/components/pos/open-orders-list";
+import { useSocket } from "@/hooks/use-socket";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ShoppingCart, ClipboardList } from "lucide-react";
 
@@ -12,6 +14,7 @@ interface POSClientProps {
   products: ProductWithRelations[];
   openOrders: OrderWithRelations[];
   tables: TableData[];
+  branchId: string;
   taxRate: number;
   serviceRate: number;
 }
@@ -101,17 +104,34 @@ export function POSClient({
   products,
   openOrders,
   tables,
+  branchId,
   taxRate,
   serviceRate,
 }: POSClientProps) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState("new-order");
   const { setTaxRate, setServiceRate } = useCartStore();
+  const { on } = useSocket(branchId);
 
   // Set branch tax/service rates on mount
   useEffect(() => {
     setTaxRate(taxRate);
     setServiceRate(serviceRate);
   }, [taxRate, serviceRate, setTaxRate, setServiceRate]);
+
+  useEffect(() => {
+    const unsubscribers = [
+      on("new-customer-order", () => router.refresh()),
+      on("order-updated", () => router.refresh()),
+      on("new-order", () => router.refresh()),
+      on("table-status-change", () => router.refresh()),
+      on("payment-completed", () => router.refresh()),
+    ];
+
+    return () => {
+      unsubscribers.forEach((unsubscribe) => unsubscribe());
+    };
+  }, [on, router]);
 
   return (
     <div className="flex h-[calc(100vh-4rem)] gap-0 -m-6">

@@ -2,6 +2,12 @@
 
 import prisma from "@/lib/prisma";
 import { logAudit } from "@/lib/audit";
+import {
+  notifyNewOrder,
+  notifyOrderItemStatus,
+  notifyOrderUpdated,
+  notifyTableStatusChange,
+} from "@/lib/socket-events";
 import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/rbac";
 import { revalidatePath } from "next/cache";
@@ -407,6 +413,20 @@ export async function createOrder(
       branchId,
     });
 
+    notifyNewOrder(branchId, {
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      tableId: order.tableId,
+      source: "pos",
+    });
+
+    if (order.tableId) {
+      notifyTableStatusChange(branchId, {
+        tableId: order.tableId,
+        status: "OCCUPIED",
+      });
+    }
+
     return { success: true, data: order };
   } catch (error) {
     return {
@@ -617,6 +637,19 @@ export async function addOrderItems(
     revalidatePath("/dashboard/tables");
     revalidatePath("/dashboard/kitchen");
 
+    notifyOrderUpdated(branchId, {
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      updated: "items-added",
+    });
+
+    if (order.tableId) {
+      notifyTableStatusChange(branchId, {
+        tableId: order.tableId,
+        status: "WAITING_FOOD",
+      });
+    }
+
     return { success: true, data: order };
   } catch (error) {
     return {
@@ -663,6 +696,11 @@ export async function updateOrderItemStatus(
       data: updateData,
     });
 
+    const itemOrder = await prisma.order.findFirst({
+      where: { items: { some: { id: orderItemId } } },
+      select: { id: true, branchId: true, tableId: true },
+    });
+
     // Check if all items are served → update table status
     if (status === "SERVED") {
       const order = await prisma.order.findFirst({
@@ -679,6 +717,11 @@ export async function updateOrderItemStatus(
             where: { id: order.tableId },
             data: { status: "REQUESTING_BILL" },
           });
+
+          notifyTableStatusChange(order.branchId, {
+            tableId: order.tableId,
+            status: "REQUESTING_BILL",
+          });
         }
       }
     }
@@ -686,6 +729,14 @@ export async function updateOrderItemStatus(
     revalidatePath("/dashboard/kitchen");
     revalidatePath("/dashboard/orders");
     revalidatePath("/dashboard/tables");
+
+    if (itemOrder) {
+      notifyOrderItemStatus(itemOrder.branchId, {
+        orderId: itemOrder.id,
+        itemId: item.id,
+        status,
+      });
+    }
 
     return { success: true, data: item };
   } catch (error) {
@@ -973,7 +1024,7 @@ export async function approveQrOrder(
   }
 
   try {
-    await prisma.$transaction(async (tx) => {
+    const approvalResult = await prisma.$transaction(async (tx) => {
       const order = await tx.order.findUnique({
         where: { id: validated.data.orderId },
         include: {
@@ -989,6 +1040,10 @@ export async function approveQrOrder(
       if (order.status !== "PENDING_APPROVAL") {
         throw new Error("Pesanan ini tidak menunggu approval.");
       }
+
+      let approvedOrderId = order.id;
+      let approvedOrderNumber = order.orderNumber;
+      let merged = false;
 
       const activeShift = await tx.shift.findFirst({
         where: {
@@ -1019,6 +1074,10 @@ export async function approveQrOrder(
         : null;
 
       if (existingOpenOrder) {
+        merged = true;
+        approvedOrderId = existingOpenOrder.id;
+        approvedOrderNumber = existingOpenOrder.orderNumber;
+
         for (const item of order.items) {
           await tx.orderItem.create({
             data: {
@@ -1103,6 +1162,14 @@ export async function approveQrOrder(
           data: { status: "WAITING_FOOD" },
         });
       }
+
+      return {
+        branchId: order.branchId,
+        tableId: order.tableId,
+        merged,
+        approvedOrderId,
+        approvedOrderNumber,
+      };
     });
 
     revalidatePath("/dashboard/orders");
@@ -1119,6 +1186,28 @@ export async function approveQrOrder(
       userId: session.user.id,
       branchId: session.user.branchId,
     });
+
+    notifyOrderUpdated(approvalResult.branchId, {
+      orderId: validated.data.orderId,
+      approval: "approved",
+      merged: approvalResult.merged,
+      activeOrderId: approvalResult.approvedOrderId,
+      activeOrderNumber: approvalResult.approvedOrderNumber,
+    });
+
+    notifyNewOrder(approvalResult.branchId, {
+      orderId: approvalResult.approvedOrderId,
+      orderNumber: approvalResult.approvedOrderNumber,
+      source: "qr-approval",
+      merged: approvalResult.merged,
+    });
+
+    if (approvalResult.tableId) {
+      notifyTableStatusChange(approvalResult.branchId, {
+        tableId: approvalResult.tableId,
+        status: "WAITING_FOOD",
+      });
+    }
 
     return { success: true, data: undefined };
   } catch (error) {
@@ -1143,7 +1232,7 @@ export async function rejectQrOrder(
   }
 
   try {
-    await prisma.$transaction(async (tx) => {
+    const rejectResult = await prisma.$transaction(async (tx) => {
       const order = await tx.order.findUnique({
         where: { id: validated.data.orderId },
       });
@@ -1152,6 +1241,8 @@ export async function rejectQrOrder(
       if (order.status !== "PENDING_APPROVAL") {
         throw new Error("Pesanan ini tidak menunggu approval.");
       }
+
+      let nextTableStatus = "AVAILABLE";
 
       await tx.orderItem.updateMany({
         where: { orderId: order.id },
@@ -1180,8 +1271,19 @@ export async function rejectQrOrder(
             where: { id: order.tableId },
             data: { status: "AVAILABLE" },
           });
+          nextTableStatus = "AVAILABLE";
+        } else if (hasAnotherActiveOrder.status === "OPEN") {
+          nextTableStatus = "OCCUPIED";
+        } else {
+          nextTableStatus = "WAITING_FOOD";
         }
       }
+
+      return {
+        branchId: order.branchId,
+        tableId: order.tableId,
+        nextTableStatus,
+      };
     });
 
     revalidatePath("/dashboard/orders");
@@ -1199,6 +1301,19 @@ export async function rejectQrOrder(
       userId: session.user.id,
       branchId: session.user.branchId,
     });
+
+    notifyOrderUpdated(rejectResult.branchId, {
+      orderId: validated.data.orderId,
+      approval: "rejected",
+      reason: validated.data.reason,
+    });
+
+    if (rejectResult.tableId) {
+      notifyTableStatusChange(rejectResult.branchId, {
+        tableId: rejectResult.tableId,
+        status: rejectResult.nextTableStatus,
+      });
+    }
 
     return { success: true, data: undefined };
   } catch (error) {
