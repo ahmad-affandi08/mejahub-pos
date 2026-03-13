@@ -190,22 +190,26 @@ export function ProductGrid({ products }: ProductGridProps) {
           />
         </div>
         <div className="flex gap-2 overflow-x-auto pb-1">
-          <Badge
+          <Button
+            type="button"
             variant={selectedCategory === null ? "default" : "outline"}
-            className="cursor-pointer shrink-0"
+            className="h-11 shrink-0 rounded-full px-4 text-sm font-medium"
             onClick={() => setSelectedCategory(null)}
+            aria-pressed={selectedCategory === null}
           >
             Semua
-          </Badge>
+          </Button>
           {categories.map((cat) => (
-            <Badge
+            <Button
               key={cat.id}
               variant={selectedCategory === cat.id ? "default" : "outline"}
-              className="cursor-pointer shrink-0"
+              type="button"
+              className="h-11 shrink-0 rounded-full px-4 text-sm font-medium"
               onClick={() => setSelectedCategory(cat.id)}
+              aria-pressed={selectedCategory === cat.id}
             >
               {cat.name}
-            </Badge>
+            </Button>
           ))}
         </div>
       </div>

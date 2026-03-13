@@ -90,7 +90,10 @@ export function DashboardHeader({ user }: HeaderProps) {
 
         {/* User Dropdown */}
         <DropdownMenu>
-          <DropdownMenuTrigger className="flex items-center gap-2.5 rounded-full py-1 pl-3 pr-1 ml-1 hover:bg-primary/50 transition-colors">
+          <DropdownMenuTrigger
+            id="dashboard-user-menu-trigger"
+            className="ml-1 flex items-center gap-2.5 rounded-full py-1 pl-3 pr-1 transition-colors hover:bg-primary/50"
+          >
             <span className="hidden text-sm font-medium md:inline-block text-foreground/80">
               {user.name}
             </span>
