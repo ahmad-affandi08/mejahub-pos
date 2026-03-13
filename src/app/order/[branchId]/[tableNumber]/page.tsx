@@ -1,5 +1,9 @@
 import { notFound } from "next/navigation";
-import { getPublicMenu, getPublicTable } from "@/actions/customer-order";
+import {
+  getPublicMenu,
+  getPublicOrderTracking,
+  getPublicTable,
+} from "@/actions/customer-order";
 import { CustomerOrderClient } from "@/components/customer/customer-order-client";
 
 export default async function CustomerOrderPage({
@@ -18,11 +22,17 @@ export default async function CustomerOrderPage({
 
   if (!menuData || !table) notFound();
 
+  const initialTrackingOrder = await getPublicOrderTracking({
+    branchId,
+    tableId: table.id,
+  });
+
   return (
     <CustomerOrderClient
       branch={menuData.branch}
       categories={menuData.categories}
       table={table}
+      initialTrackingOrder={initialTrackingOrder}
     />
   );
 }

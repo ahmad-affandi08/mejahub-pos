@@ -7,33 +7,62 @@ import { branchSchema, updateBranchSchema } from "@/lib/validations/branch";
 import type { ActionResult } from "@/lib/utils";
 import type { Branch } from "@prisma/client";
 
-export async function getBranches(): Promise<Branch[]> {
+type BranchPayload = {
+  id: string;
+  name: string;
+  address: string | null;
+  phone: string | null;
+  taxRate: number;
+  serviceRate: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+function serializeBranch(branch: Branch): BranchPayload {
+  return {
+    id: branch.id,
+    name: branch.name,
+    address: branch.address,
+    phone: branch.phone,
+    taxRate: Number(branch.taxRate),
+    serviceRate: Number(branch.serviceRate),
+    isActive: branch.isActive,
+    createdAt: branch.createdAt.toISOString(),
+    updatedAt: branch.updatedAt.toISOString(),
+  };
+}
+
+export async function getBranches(): Promise<BranchPayload[]> {
   const session = await auth();
   if (!session?.user) throw new Error("Unauthorized");
 
   if (session.user.role === "SUPER_ADMIN") {
-    return prisma.branch.findMany({ orderBy: { name: "asc" } });
+    const branches = await prisma.branch.findMany({ orderBy: { name: "asc" } });
+    return branches.map(serializeBranch);
   }
 
   if (session.user.branchId) {
-    return prisma.branch.findMany({
+    const branches = await prisma.branch.findMany({
       where: { id: session.user.branchId },
     });
+    return branches.map(serializeBranch);
   }
 
   return [];
 }
 
-export async function getBranchById(id: string): Promise<Branch | null> {
+export async function getBranchById(id: string): Promise<BranchPayload | null> {
   const session = await auth();
   if (!session?.user) throw new Error("Unauthorized");
 
-  return prisma.branch.findUnique({ where: { id } });
+  const branch = await prisma.branch.findUnique({ where: { id } });
+  return branch ? serializeBranch(branch) : null;
 }
 
 export async function createBranch(
   formData: FormData
-): Promise<ActionResult<Branch>> {
+): Promise<ActionResult<BranchPayload>> {
   const session = await auth();
   if (!session?.user || !hasPermission(session.user.role, "branch:manage")) {
     return { success: false, error: "Anda tidak memiliki akses." };
@@ -49,7 +78,7 @@ export async function createBranch(
     const branch = await prisma.branch.create({
       data: validated.data,
     });
-    return { success: true, data: branch };
+    return { success: true, data: serializeBranch(branch) };
   } catch (error) {
     return {
       success: false,
@@ -61,7 +90,7 @@ export async function createBranch(
 export async function updateBranch(
   id: string,
   formData: FormData
-): Promise<ActionResult<Branch>> {
+): Promise<ActionResult<BranchPayload>> {
   const session = await auth();
   if (!session?.user || !hasPermission(session.user.role, "branch:manage")) {
     return { success: false, error: "Anda tidak memiliki akses." };
@@ -78,7 +107,7 @@ export async function updateBranch(
       where: { id },
       data: validated.data,
     });
-    return { success: true, data: branch };
+    return { success: true, data: serializeBranch(branch) };
   } catch (error) {
     return {
       success: false,

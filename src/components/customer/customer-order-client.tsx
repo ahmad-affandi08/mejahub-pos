@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import Image from "next/image";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,10 +25,16 @@ import {
   ChefHat,
   CheckCircle,
   UtensilsCrossed,
+  RefreshCw,
+  Radio,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
-import { createCustomerOrder } from "@/actions/customer-order";
+import {
+  createCustomerOrder,
+  getPublicOrderTracking,
+} from "@/actions/customer-order";
 import { toast } from "sonner";
+import { useSocket } from "@/hooks/use-socket";
 
 interface Branch {
   id: string;
@@ -102,12 +108,47 @@ interface CustomerOrderClientProps {
   branch: Branch;
   categories: Category[];
   table: TableInfo;
+  initialTrackingOrder: TrackingOrder | null;
 }
+
+interface TrackingOrder {
+  id: string;
+  orderNumber: string;
+  status: string;
+  totalAmount: number;
+  createdAt: string;
+  updatedAt: string;
+  itemCounts: {
+    PENDING: number;
+    COOKING: number;
+    READY: number;
+    SERVED: number;
+    CANCELLED: number;
+    total: number;
+  };
+}
+
+const customerOrderStatusLabel: Record<string, string> = {
+  PENDING_APPROVAL: "Menunggu Approval Kasir",
+  OPEN: "Sedang Diproses",
+  PAID: "Selesai",
+  CANCELLED: "Ditolak",
+  VOID: "Digabung ke Pesanan Aktif",
+};
+
+const customerOrderStatusBadge: Record<string, string> = {
+  PENDING_APPROVAL: "bg-amber-100 text-amber-800",
+  OPEN: "bg-blue-100 text-blue-800",
+  PAID: "bg-green-100 text-green-800",
+  CANCELLED: "bg-red-100 text-red-800",
+  VOID: "bg-purple-100 text-purple-800",
+};
 
 export function CustomerOrderClient({
   branch,
   categories,
   table,
+  initialTrackingOrder,
 }: CustomerOrderClientProps) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [activeCategory, setActiveCategory] = useState(categories[0]?.id || "");
@@ -115,14 +156,86 @@ export function CustomerOrderClient({
   const [customerPhone, setCustomerPhone] = useState("");
   const [orderNotes, setOrderNotes] = useState("");
   const [showCart, setShowCart] = useState(false);
+  const [showTracking, setShowTracking] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [orderNumber, setOrderNumber] = useState("");
+  const [trackedOrderNumber, setTrackedOrderNumber] = useState(
+    initialTrackingOrder?.orderNumber || ""
+  );
+  const [trackingOrder, setTrackingOrder] = useState<TrackingOrder | null>(
+    initialTrackingOrder
+  );
+  const [isTrackingRefreshing, setIsTrackingRefreshing] = useState(false);
   const [productDialog, setProductDialog] = useState<Product | null>(null);
   const [selectedVariant, setSelectedVariant] = useState<string | undefined>();
   const [selectedModifiers, setSelectedModifiers] = useState<Record<string, string[]>>({});
   const [itemQuantity, setItemQuantity] = useState(1);
   const [itemNotes, setItemNotes] = useState("");
   const [isPending, startTransition] = useTransition();
+  const { on, isConnected } = useSocket(branch.id);
+
+  const refreshTracking = useCallback(
+    async (orderNumberOverride?: string) => {
+      const targetOrderNumber =
+        orderNumberOverride || trackedOrderNumber || trackingOrder?.orderNumber;
+      if (!targetOrderNumber) return;
+
+      setIsTrackingRefreshing(true);
+      try {
+        const latest = await getPublicOrderTracking({
+          branchId: branch.id,
+          tableId: table.id,
+          orderNumber: targetOrderNumber,
+        });
+
+        if (latest) {
+          setTrackingOrder(latest);
+          setTrackedOrderNumber(latest.orderNumber);
+        }
+      } finally {
+        setIsTrackingRefreshing(false);
+      }
+    },
+    [branch.id, table.id, trackedOrderNumber, trackingOrder?.orderNumber]
+  );
+
+  useEffect(() => {
+    if (!trackedOrderNumber) return;
+
+    const unsubscribers = [
+      on("order-updated", (data) => {
+        const payload =
+          typeof data === "object" && data !== null
+            ? (data as Record<string, unknown>)
+            : null;
+        const mergedOrderNumber =
+          payload && typeof payload.activeOrderNumber === "string"
+            ? payload.activeOrderNumber
+            : undefined;
+
+        if (mergedOrderNumber) {
+          setTrackedOrderNumber(mergedOrderNumber);
+          void refreshTracking(mergedOrderNumber);
+          return;
+        }
+
+        void refreshTracking();
+      }),
+      on("order-item-status", () => {
+        void refreshTracking();
+      }),
+      on("payment-completed", () => {
+        void refreshTracking();
+      }),
+      on("table-status-change", () => {
+        void refreshTracking();
+      }),
+    ];
+
+    return () => {
+      unsubscribers.forEach((unsubscribe) => unsubscribe());
+    };
+  }, [on, refreshTracking, trackedOrderNumber]);
 
   const taxRate = Number(branch.taxRate);
   const serviceRate = Number(branch.serviceRate);
@@ -284,12 +397,14 @@ export function CustomerOrderClient({
 
       if (result.success) {
         setOrderNumber(result.data.orderNumber);
+        setTrackedOrderNumber(result.data.orderNumber);
         setShowCart(false);
         setShowSuccess(true);
         setCart([]);
         setCustomerName("");
         setCustomerPhone("");
         setOrderNotes("");
+        await refreshTracking(result.data.orderNumber);
       } else {
         toast.error(result.error);
       }
@@ -297,37 +412,22 @@ export function CustomerOrderClient({
   };
 
   return (
-    <div className="flex flex-col h-screen max-w-lg mx-auto bg-background">
+    <div className="relative mx-auto flex h-dvh max-w-lg flex-col overflow-hidden bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-30 border-b bg-primary text-primary-foreground p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-bold flex items-center gap-2">
-              <UtensilsCrossed className="h-5 w-5" />
-              {branch.name}
-            </h1>
-            <p className="text-sm opacity-80">
-              Meja #{table.number} {table.name ? `• ${table.name}` : ""}
-            </p>
-          </div>
-          <Button
-            size="sm"
-            variant="secondary"
-            className="relative"
-            onClick={() => setShowCart(true)}
-          >
-            <ShoppingCart className="h-4 w-4" />
-            {cartItemCount > 0 && (
-              <span className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center">
-                {cartItemCount}
-              </span>
-            )}
-          </Button>
+      <header className="sticky top-0 z-30 border-b bg-primary/95 p-4 text-primary-foreground backdrop-blur supports-backdrop-filter:bg-primary/90">
+        <div>
+          <h1 className="text-lg font-bold flex items-center gap-2">
+            <UtensilsCrossed className="h-5 w-5" />
+            {branch.name}
+          </h1>
+          <p className="text-sm opacity-80">
+            Meja #{table.number} {table.name ? `• ${table.name}` : ""}
+          </p>
         </div>
       </header>
 
       {/* Category Tabs */}
-      <div className="sticky top-[73px] z-20 bg-background border-b">
+      <div className="sticky top-16 z-20 border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/80">
         <ScrollArea className="whitespace-nowrap">
           <div className="flex gap-2 p-3">
             {categories.map((cat) => (
@@ -347,7 +447,7 @@ export function CustomerOrderClient({
 
       {/* Product List */}
       <ScrollArea className="flex-1">
-        <div className="p-3 space-y-3">
+        <div className="space-y-3 p-3 pb-28">
           {categories
             .filter((c) => c.id === activeCategory)
             .flatMap((c) => c.products)
@@ -422,19 +522,57 @@ export function CustomerOrderClient({
         </div>
       </ScrollArea>
 
-      {/* Floating Cart Button */}
-      {cartItemCount > 0 && !showCart && (
-        <div className="sticky bottom-0 p-3 bg-background border-t">
+      {/* Bottom Navbar */}
+      <div className="fixed inset-x-0 bottom-0 z-40 mx-auto w-full max-w-lg border-t bg-background/95 px-3 pt-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] backdrop-blur supports-backdrop-filter:bg-background/85">
+        <div className="grid grid-cols-3 gap-2">
           <Button
-            className="w-full h-12"
+            variant={showCart || showTracking ? "outline" : "default"}
+            size="sm"
+            className="h-14 flex-col gap-1 rounded-xl text-[11px]"
+            onClick={() => {
+              setShowCart(false);
+              setShowTracking(false);
+            }}
+          >
+            <UtensilsCrossed className="h-4 w-4" />
+            Menu
+          </Button>
+
+          <Button
+            variant={showTracking ? "default" : "outline"}
+            size="sm"
+            className="relative h-14 flex-col gap-1 rounded-xl text-[11px]"
+            onClick={() => {
+              if (trackingOrder) {
+                setShowTracking(true);
+                return;
+              }
+              toast.info("Belum ada pesanan aktif untuk dilacak.");
+            }}
+          >
+            <Radio className="h-4 w-4" />
+            Track
+            {trackingOrder && (
+              <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-green-500" />
+            )}
+          </Button>
+
+          <Button
+            variant={showCart ? "default" : "outline"}
+            size="sm"
+            className="relative h-14 flex-col gap-1 rounded-xl text-[11px]"
             onClick={() => setShowCart(true)}
           >
-            <ShoppingCart className="mr-2 h-5 w-5" />
-            Lihat Keranjang ({cartItemCount} item) •{" "}
-            {formatCurrency(cartTotal.total)}
+            <ShoppingCart className="h-4 w-4" />
+            Keranjang
+            {cartItemCount > 0 && (
+              <span className="absolute -top-1 -right-1 h-5 min-w-5 rounded-full bg-destructive px-1 text-[10px] leading-5 text-destructive-foreground">
+                {cartItemCount}
+              </span>
+            )}
           </Button>
         </div>
-      )}
+      </div>
 
       {/* Product Detail Dialog */}
       <Dialog open={!!productDialog} onOpenChange={() => { setProductDialog(null); resetItemDialog(); }}>
@@ -700,7 +838,7 @@ export function CustomerOrderClient({
                     placeholder="Catatan tambahan..."
                     value={orderNotes}
                     onChange={(e) => setOrderNotes(e.target.value)}
-                    className="min-h-[60px]"
+                    className="min-h-15"
                   />
                 </div>
               </div>
@@ -745,6 +883,73 @@ export function CustomerOrderClient({
         </DialogContent>
       </Dialog>
 
+      {/* Tracking Dialog */}
+      <Dialog open={showTracking} onOpenChange={setShowTracking}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Track Pesanan</DialogTitle>
+          </DialogHeader>
+
+          {trackingOrder ? (
+            <div className="space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold">
+                    {trackingOrder.orderNumber}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Total {formatCurrency(trackingOrder.totalAmount)}
+                  </p>
+                </div>
+                <Badge className={customerOrderStatusBadge[trackingOrder.status] || ""}>
+                  {customerOrderStatusLabel[trackingOrder.status] || trackingOrder.status}
+                </Badge>
+              </div>
+
+              <div className="grid grid-cols-4 gap-2 text-center">
+                <div className="rounded-md border bg-muted/40 px-1 py-1.5">
+                  <p className="text-[10px] text-muted-foreground">Pending</p>
+                  <p className="text-xs font-semibold">{trackingOrder.itemCounts.PENDING}</p>
+                </div>
+                <div className="rounded-md border bg-muted/40 px-1 py-1.5">
+                  <p className="text-[10px] text-muted-foreground">Cooking</p>
+                  <p className="text-xs font-semibold">{trackingOrder.itemCounts.COOKING}</p>
+                </div>
+                <div className="rounded-md border bg-muted/40 px-1 py-1.5">
+                  <p className="text-[10px] text-muted-foreground">Ready</p>
+                  <p className="text-xs font-semibold">{trackingOrder.itemCounts.READY}</p>
+                </div>
+                <div className="rounded-md border bg-muted/40 px-1 py-1.5">
+                  <p className="text-[10px] text-muted-foreground">Served</p>
+                  <p className="text-xs font-semibold">{trackingOrder.itemCounts.SERVED}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span className="inline-flex items-center gap-1">
+                  <Radio className={`h-3 w-3 ${isConnected ? "text-green-600" : "text-muted-foreground"}`} />
+                  {isConnected ? "Realtime aktif" : "Menghubungkan realtime..."}
+                </span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2 text-xs"
+                  onClick={() => void refreshTracking()}
+                  disabled={isTrackingRefreshing}
+                >
+                  <RefreshCw className="mr-1 h-3 w-3" />
+                  {isTrackingRefreshing ? "Memuat..." : "Refresh"}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Belum ada pesanan aktif untuk meja ini.
+            </p>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Success Dialog */}
       <Dialog open={showSuccess} onOpenChange={setShowSuccess}>
         <DialogContent className="sm:max-w-sm">
@@ -755,16 +960,16 @@ export function CustomerOrderClient({
             <h2 className="text-xl font-bold">Pesanan Terkirim!</h2>
             <p className="text-center text-muted-foreground">
               Pesanan Anda <span className="font-semibold text-foreground">{orderNumber}</span>{" "}
-              sedang diproses oleh dapur.
+              berhasil dikirim.
             </p>
             <p className="text-sm text-muted-foreground text-center">
-              Silakan duduk dan tunggu pesanan Anda diantar ke meja.
+              Tracking status pesanan aktif real-time di halaman ini.
             </p>
             <Button
               className="w-full mt-2"
               onClick={() => setShowSuccess(false)}
             >
-              Pesan Lagi
+              Lanjut Pesan
             </Button>
           </div>
         </DialogContent>

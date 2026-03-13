@@ -16,7 +16,7 @@ export default async function TablesPage() {
     );
   }
 
-  const tables = await prisma.table.findMany({
+  const rawTables = await prisma.table.findMany({
     where: { branchId, isActive: true },
     include: {
       orders: {
@@ -32,20 +32,15 @@ export default async function TablesPage() {
       },
     },
     orderBy: { number: "asc" },
-  }) as Array<{
-    id: string;
-    number: number;
-    name: string | null;
-    capacity: number;
-    status: import("@prisma/client").TableStatus;
-    qrCode: string | null;
-    orders: {
-      id: string;
-      orderNumber: string;
-      totalAmount: unknown;
-      items: { id: string }[];
-    }[];
-  }>;
+  });
+
+  const tables = rawTables.map((table) => ({
+    ...table,
+    orders: table.orders.map((order) => ({
+      ...order,
+      totalAmount: Number(order.totalAmount),
+    })),
+  }));
 
   return (
     <div className="space-y-6">

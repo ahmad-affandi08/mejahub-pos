@@ -24,7 +24,7 @@ export async function processPayment(input: {
   amount: number;
   receivedAmount?: number;
   reference?: string;
-}): Promise<ActionResult<Payment>> {
+}): Promise<ActionResult> {
   const session = await auth();
   if (!session?.user || !hasPermission(session.user.role, "payment:process")) {
     return { success: false, error: "Anda tidak memiliki akses." };
@@ -168,7 +168,7 @@ export async function processPayment(input: {
       }
     }
 
-    return { success: true, data: payment };
+    return { success: true, data: undefined };
   } catch (error) {
     return {
       success: false,

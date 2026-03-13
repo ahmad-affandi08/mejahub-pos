@@ -10,7 +10,6 @@ import {
   closeShiftSchema,
   cashDrawerTransactionSchema,
 } from "@/lib/validations/shift";
-import type { Shift, CashDrawerTransaction } from "@prisma/client";
 
 // ============================================================
 // GET ACTIVE SHIFT
@@ -106,7 +105,7 @@ export async function getShiftHistory(filters?: { date?: string }) {
 
 export async function openShift(
   formData: FormData
-): Promise<ActionResult<Shift>> {
+): Promise<ActionResult> {
   const session = await auth();
   if (!session?.user || !hasPermission(session.user.role, "shift:manage")) {
     return { success: false, error: "Anda tidak memiliki akses." };
@@ -160,7 +159,7 @@ export async function openShift(
 
     revalidatePath("/dashboard/shifts");
     revalidatePath("/dashboard/orders");
-    return { success: true, data: shift };
+    return { success: true, data: undefined };
   } catch (error) {
     return {
       success: false,
@@ -175,7 +174,7 @@ export async function openShift(
 
 export async function closeShift(
   formData: FormData
-): Promise<ActionResult<Shift>> {
+): Promise<ActionResult> {
   const session = await auth();
   if (!session?.user || !hasPermission(session.user.role, "shift:manage")) {
     return { success: false, error: "Anda tidak memiliki akses." };
@@ -276,7 +275,7 @@ export async function closeShift(
 
     revalidatePath("/dashboard/shifts");
     revalidatePath("/dashboard/orders");
-    return { success: true, data: shift };
+    return { success: true, data: undefined };
   } catch (error) {
     return {
       success: false,
@@ -291,7 +290,7 @@ export async function closeShift(
 
 export async function addCashDrawerTransaction(
   formData: FormData
-): Promise<ActionResult<CashDrawerTransaction>> {
+): Promise<ActionResult> {
   const session = await auth();
   if (!session?.user || !hasPermission(session.user.role, "shift:manage")) {
     return { success: false, error: "Anda tidak memiliki akses." };
@@ -326,7 +325,7 @@ export async function addCashDrawerTransaction(
     });
 
     revalidatePath("/dashboard/shifts");
-    return { success: true, data: txn };
+    return { success: true, data: undefined };
   } catch (error) {
     return {
       success: false,

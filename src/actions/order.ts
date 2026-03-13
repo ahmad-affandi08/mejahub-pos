@@ -27,12 +27,18 @@ import {
   transferTableSchema,
   type CreateOrderInput,
 } from "@/lib/validations/order";
-import { OrderStatus, type Order, type OrderItem } from "@prisma/client";
+import { OrderStatus } from "@prisma/client";
 
 const HAS_PENDING_APPROVAL_STATUS = "PENDING_APPROVAL" in OrderStatus;
 const ACTIVE_TABLE_ORDER_STATUSES: OrderStatus[] = HAS_PENDING_APPROVAL_STATUS
   ? [OrderStatus.OPEN, OrderStatus.PENDING_APPROVAL]
   : [OrderStatus.OPEN];
+
+type OrderActionPayload = {
+  id: string;
+  orderNumber: string;
+  totalAmount: number;
+};
 
 // ============================================================
 // GET ORDERS
@@ -168,7 +174,7 @@ export async function getOpenOrderByTable(tableId: string) {
 
 export async function createOrder(
   input: CreateOrderInput
-): Promise<ActionResult<Order>> {
+): Promise<ActionResult<OrderActionPayload>> {
   const session = await auth();
   if (!session?.user || !hasPermission(session.user.role, "order:create")) {
     return { success: false, error: "Anda tidak memiliki akses." };
@@ -433,7 +439,14 @@ export async function createOrder(
       });
     }
 
-    return { success: true, data: order };
+    return {
+      success: true,
+      data: {
+        id: order.id,
+        orderNumber: order.orderNumber,
+        totalAmount: Number(order.totalAmount),
+      },
+    };
   } catch (error) {
     return {
       success: false,
@@ -448,7 +461,7 @@ export async function createOrder(
 
 export async function addOrderItems(
   input: { orderId: string; items: CreateOrderInput["items"] }
-): Promise<ActionResult<Order>> {
+): Promise<ActionResult<OrderActionPayload>> {
   const session = await auth();
   if (!session?.user || !hasPermission(session.user.role, "order:create")) {
     return { success: false, error: "Anda tidak memiliki akses." };
@@ -656,7 +669,14 @@ export async function addOrderItems(
       });
     }
 
-    return { success: true, data: order };
+    return {
+      success: true,
+      data: {
+        id: order.id,
+        orderNumber: order.orderNumber,
+        totalAmount: Number(order.totalAmount),
+      },
+    };
   } catch (error) {
     return {
       success: false,
@@ -671,7 +691,7 @@ export async function addOrderItems(
 
 export async function updateOrderItemStatus(
   input: { orderItemId: string; status: string }
-): Promise<ActionResult<OrderItem>> {
+): Promise<ActionResult> {
   const session = await auth();
   if (!session?.user || !hasPermission(session.user.role, "kds:update")) {
     return { success: false, error: "Anda tidak memiliki akses." };
@@ -744,7 +764,7 @@ export async function updateOrderItemStatus(
       });
     }
 
-    return { success: true, data: item };
+    return { success: true, data: undefined };
   } catch (error) {
     return {
       success: false,

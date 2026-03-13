@@ -15,9 +15,12 @@ import {
   publicCustomerOrderSchema,
   type PublicCustomerOrderInput,
 } from "@/lib/validations/order";
-import { OrderStatus, type Order } from "@prisma/client";
+import { OrderStatus } from "@prisma/client";
 
 const HAS_PENDING_APPROVAL_STATUS = "PENDING_APPROVAL" in OrderStatus;
+const PUBLIC_ACTIVE_ORDER_STATUSES: OrderStatus[] = HAS_PENDING_APPROVAL_STATUS
+  ? [OrderStatus.PENDING_APPROVAL, OrderStatus.OPEN]
+  : [OrderStatus.OPEN];
 
 /**
  * Get branch info and menu for customer QR ordering (public, no auth required)
@@ -155,11 +158,83 @@ export async function getPublicTable(branchId: string, tableNumber: number) {
 }
 
 /**
+ * Get latest tracking snapshot for customer QR order.
+ * If orderNumber is provided, returns that exact order (even if already PAID/CANCELLED).
+ * Otherwise returns latest active order (PENDING_APPROVAL/OPEN) for the table.
+ */
+export async function getPublicOrderTracking(input: {
+  branchId: string;
+  tableId: string;
+  orderNumber?: string;
+}) {
+  const branchId = input.branchId?.trim();
+  const tableId = input.tableId?.trim();
+  const orderNumber = input.orderNumber?.trim();
+
+  if (!branchId || !tableId) return null;
+
+  const order = await prisma.order.findFirst({
+    where: {
+      branchId,
+      tableId,
+      ...(orderNumber
+        ? { orderNumber }
+        : {
+            status: { in: PUBLIC_ACTIVE_ORDER_STATUSES },
+          }),
+    },
+    select: {
+      id: true,
+      orderNumber: true,
+      status: true,
+      totalAmount: true,
+      createdAt: true,
+      updatedAt: true,
+      items: {
+        select: {
+          status: true,
+          quantity: true,
+        },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  if (!order) return null;
+
+  const itemCounts = order.items.reduce(
+    (acc, item) => {
+      acc.total += item.quantity;
+      acc[item.status] += item.quantity;
+      return acc;
+    },
+    {
+      PENDING: 0,
+      COOKING: 0,
+      READY: 0,
+      SERVED: 0,
+      CANCELLED: 0,
+      total: 0,
+    }
+  );
+
+  return {
+    id: order.id,
+    orderNumber: order.orderNumber,
+    status: order.status,
+    totalAmount: Number(order.totalAmount),
+    createdAt: order.createdAt.toISOString(),
+    updatedAt: order.updatedAt.toISOString(),
+    itemCounts,
+  };
+}
+
+/**
  * Customer self-ordering (no auth, public)
  */
 export async function createCustomerOrder(
   input: PublicCustomerOrderInput
-): Promise<ActionResult<Order>> {
+): Promise<ActionResult<{ id: string; orderNumber: string; status: string }>> {
   const validated = publicCustomerOrderSchema.safeParse(input);
   if (!validated.success) {
     return { success: false, error: validated.error.issues[0].message };
@@ -458,7 +533,14 @@ export async function createCustomerOrder(
       source: "qr-self-order",
     });
 
-    return { success: true, data: order };
+    return {
+      success: true,
+      data: {
+        id: order.id,
+        orderNumber: order.orderNumber,
+        status: order.status,
+      },
+    };
   } catch (error) {
     return {
       success: false,
