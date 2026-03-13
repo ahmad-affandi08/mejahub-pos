@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "dev:socket": "npx tsx server.ts",
+    "dev:socket:clean": "rm -rf .next && npx tsx server.ts",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",

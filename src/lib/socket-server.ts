@@ -2,6 +2,12 @@ import { Server as SocketIOServer } from "socket.io";
 import type { Server as HTTPServer } from "http";
 
 let io: SocketIOServer | null = null;
+let hasLoggedBridgeWarning = false;
+
+const INTERNAL_EMIT_ENDPOINT =
+  process.env.SOCKET_INTERNAL_EMIT_ENDPOINT ||
+  `http://127.0.0.1:${process.env.PORT || "3000"}/__socket_emit`;
+const INTERNAL_EMIT_TOKEN = process.env.SOCKET_INTERNAL_TOKEN;
 
 /**
  * Initialize Socket.io server (called once from custom server or API route)
@@ -63,6 +69,36 @@ export type SocketEvent =
   | "shift-opened"
   | "shift-closed";
 
+type EmitTarget = "branch" | "kds";
+
+async function emitViaInternalBridge(
+  target: EmitTarget,
+  branchId: string,
+  event: SocketEvent,
+  data: unknown
+) {
+  try {
+    await fetch(INTERNAL_EMIT_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        ...(INTERNAL_EMIT_TOKEN
+          ? { "x-socket-token": INTERNAL_EMIT_TOKEN }
+          : {}),
+      },
+      body: JSON.stringify({ target, branchId, event, data }),
+      cache: "no-store",
+    });
+  } catch {
+    if (!hasLoggedBridgeWarning) {
+      hasLoggedBridgeWarning = true;
+      console.warn(
+        `[Socket.io] Gagal emit via bridge ${INTERNAL_EMIT_ENDPOINT}. Pastikan custom server aktif.`
+      );
+    }
+  }
+}
+
 /**
  * Emit event to a specific branch room
  */
@@ -71,7 +107,11 @@ export function emitToBranch(
   event: SocketEvent,
   data: unknown
 ): void {
-  if (!io) return;
+  if (!io) {
+    void emitViaInternalBridge("branch", branchId, event, data);
+    return;
+  }
+
   io.to(`branch:${branchId}`).emit(event, data);
 }
 
@@ -83,6 +123,10 @@ export function emitToKDS(
   event: SocketEvent,
   data: unknown
 ): void {
-  if (!io) return;
+  if (!io) {
+    void emitViaInternalBridge("kds", branchId, event, data);
+    return;
+  }
+
   io.to(`kds:${branchId}`).emit(event, data);
 }
