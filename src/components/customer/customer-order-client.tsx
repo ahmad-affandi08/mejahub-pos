@@ -27,6 +27,7 @@ import {
   UtensilsCrossed,
   RefreshCw,
   Radio,
+  Search,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import {
@@ -152,6 +153,7 @@ export function CustomerOrderClient({
 }: CustomerOrderClientProps) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [activeCategory, setActiveCategory] = useState(categories[0]?.id || "");
+  const [menuSearch, setMenuSearch] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [orderNotes, setOrderNotes] = useState("");
@@ -256,6 +258,22 @@ export function CustomerOrderClient({
   }, [cart, taxRate, serviceRate]);
 
   const cartItemCount = cart.reduce((s, i) => s + i.quantity, 0);
+
+  const activeCategoryProducts = useMemo(() => {
+    const category = categories.find((item) => item.id === activeCategory);
+    return category?.products ?? [];
+  }, [activeCategory, categories]);
+
+  const visibleProducts = useMemo(() => {
+    const keyword = menuSearch.trim().toLowerCase();
+    if (!keyword) return activeCategoryProducts;
+
+    return activeCategoryProducts.filter((product) => {
+      const inName = product.name.toLowerCase().includes(keyword);
+      const inDescription = (product.description ?? "").toLowerCase().includes(keyword);
+      return inName || inDescription;
+    });
+  }, [activeCategoryProducts, menuSearch]);
 
   const addToCart = () => {
     if (!productDialog) return;
@@ -412,30 +430,47 @@ export function CustomerOrderClient({
   };
 
   return (
-    <div className="relative mx-auto flex h-dvh max-w-lg flex-col overflow-hidden bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-30 border-b bg-primary/95 p-4 text-primary-foreground backdrop-blur supports-backdrop-filter:bg-primary/90">
-        <div>
-          <h1 className="text-lg font-bold flex items-center gap-2">
-            <UtensilsCrossed className="h-5 w-5" />
-            {branch.name}
-          </h1>
-          <p className="text-sm opacity-80">
-            Meja #{table.number} {table.name ? `• ${table.name}` : ""}
-          </p>
+    <div className="relative mx-auto flex h-dvh min-h-0 max-w-lg flex-col overflow-hidden bg-linear-to-b from-background to-muted/20">
+      <header className="sticky top-0 z-30 border-b bg-background/95 px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] backdrop-blur supports-backdrop-filter:bg-background/90">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+              Customer Order
+            </p>
+            <h1 className="mt-0.5 flex items-center gap-2 text-lg font-semibold">
+              <UtensilsCrossed className="h-5 w-5 text-primary" />
+              {branch.name}
+            </h1>
+            <p className="text-xs text-muted-foreground">
+              Meja #{table.number} {table.name ? `• ${table.name}` : ""}
+            </p>
+          </div>
+
+          <Badge variant="secondary" className="mt-1 rounded-full px-3 py-1 text-[10px]">
+            {isConnected ? "Realtime" : "Offline"}
+          </Badge>
+        </div>
+
+        <div className="relative mt-3">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={menuSearch}
+            onChange={(event) => setMenuSearch(event.target.value)}
+            placeholder="Cari menu..."
+            className="h-10 rounded-xl border-border/70 bg-background pl-10 text-sm"
+          />
         </div>
       </header>
 
-      {/* Category Tabs */}
-      <div className="sticky top-16 z-20 border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/80">
+      <div className="border-b bg-background/90 backdrop-blur supports-backdrop-filter:bg-background/80">
         <ScrollArea className="whitespace-nowrap">
-          <div className="flex gap-2 p-3">
+          <div className="flex gap-2 px-3 py-2.5">
             {categories.map((cat) => (
               <Button
                 key={cat.id}
                 size="sm"
                 variant={activeCategory === cat.id ? "default" : "outline"}
-                className="shrink-0 rounded-full"
+                className="h-8 shrink-0 rounded-full px-4 text-xs"
                 onClick={() => setActiveCategory(cat.id)}
               >
                 {cat.name}
@@ -445,90 +480,115 @@ export function CustomerOrderClient({
         </ScrollArea>
       </div>
 
-      {/* Product List */}
-      <ScrollArea className="flex-1">
-        <div className="space-y-3 p-3 pb-28">
-          {categories
-            .filter((c) => c.id === activeCategory)
-            .flatMap((c) => c.products)
-            .map((product) => (
-              <Card
-                key={product.id}
-                className="cursor-pointer hover:shadow-md transition-shadow"
-                onClick={() => openProductDialog(product)}
-              >
-                <CardContent className="p-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-sm">{product.name}</h3>
-                      {product.description && (
-                        <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
-                          {product.description}
-                        </p>
-                      )}
-                      <div className="mt-1.5 flex items-center gap-2">
-                        <span className="font-bold text-sm text-primary">
-                          {product.variants.length > 0
-                            ? `${formatCurrency(Number(product.variants[0].price))}`
-                            : formatCurrency(Number(product.price))}
-                        </span>
-                        {product.variants.length > 1 && (
-                          <span className="text-xs text-muted-foreground">
-                            - {formatCurrency(Number(product.variants[product.variants.length - 1].price))}
-                          </span>
-                        )}
-                      </div>
-                      {product.modifierGroups.length > 0 && (
-                        <div className="mt-1 flex gap-1">
-                          {product.modifierGroups.map((pmg) => (
-                            <Badge
-                              key={pmg.modifierGroup.id}
-                              variant="outline"
-                              className="text-[10px]"
-                            >
-                              {pmg.modifierGroup.name}
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg border bg-muted">
-                      {product.image ? (
-                        <div className="relative h-full w-full">
-                          <Image
-                            src={product.image}
-                            alt={product.name}
-                            fill
-                            className="object-cover"
-                            sizes="64px"
-                          />
-                        </div>
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center">
-                          <ChefHat className="h-6 w-6 text-muted-foreground" />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+      <div className="border-b bg-background/80 px-3 py-2">
+        <div className="flex items-center justify-between rounded-2xl border bg-card px-3 py-2 text-xs">
+          <span className="text-muted-foreground">
+            {visibleProducts.length} menu tersedia
+          </span>
+          <span className="font-semibold text-primary">
+            {cartItemCount} item • {formatCurrency(cartTotal.total)}
+          </span>
+        </div>
+      </div>
 
-          {categories.find((c) => c.id === activeCategory)?.products.length === 0 && (
-            <div className="text-center py-12 text-muted-foreground">
-              <p>Tidak ada produk di kategori ini</p>
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="grid grid-cols-1 gap-3 p-3 pb-36">
+          {visibleProducts.map((product) => (
+            <Card
+              key={product.id}
+              className="group cursor-pointer overflow-hidden rounded-2xl border border-border/70 bg-card shadow-sm transition-all active:scale-[0.99]"
+              onClick={() => openProductDialog(product)}
+            >
+              <CardContent className="p-3">
+                <div className="flex items-center gap-3">
+                  <div className="h-18 w-18 shrink-0 overflow-hidden rounded-xl border bg-muted">
+                    {product.image ? (
+                      <div className="relative h-full w-full">
+                        <Image
+                          src={product.image}
+                          alt={product.name}
+                          fill
+                          className="object-cover"
+                          sizes="72px"
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center">
+                        <ChefHat className="h-6 w-6 text-muted-foreground" />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <h3 className="line-clamp-1 text-sm font-semibold">{product.name}</h3>
+                    {product.description && (
+                      <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+                        {product.description}
+                      </p>
+                    )}
+
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className="text-sm font-bold text-primary">
+                        {product.variants.length > 0
+                          ? formatCurrency(Number(product.variants[0].price))
+                          : formatCurrency(Number(product.price))}
+                      </span>
+                      {product.variants.length > 1 && (
+                        <span className="text-[11px] text-muted-foreground">
+                          - {formatCurrency(Number(product.variants[product.variants.length - 1].price))}
+                        </span>
+                      )}
+                    </div>
+
+                    {product.modifierGroups.length > 0 && (
+                      <div className="mt-1.5 flex flex-wrap gap-1">
+                        {product.modifierGroups.map((pmg) => (
+                          <Badge
+                            key={pmg.modifierGroup.id}
+                            variant="outline"
+                            className="rounded-full px-2 py-0 text-[10px]"
+                          >
+                            {pmg.modifierGroup.name}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <Button
+                    size="icon"
+                    className="h-8 w-8 shrink-0 rounded-full"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      openProductDialog(product);
+                    }}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+
+          {visibleProducts.length === 0 && (
+            <div className="rounded-2xl border border-dashed bg-background/50 py-12 text-center text-muted-foreground">
+              <p className="text-sm font-medium">Menu tidak ditemukan</p>
+              <p className="mt-1 text-xs">
+                {menuSearch
+                  ? "Coba kata kunci lain atau ganti kategori."
+                  : "Belum ada menu di kategori ini."}
+              </p>
             </div>
           )}
         </div>
-      </ScrollArea>
+      </div>
 
-      {/* Bottom Navbar */}
-      <div className="fixed inset-x-0 bottom-0 z-40 mx-auto w-full max-w-lg border-t bg-background/95 px-3 pt-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] backdrop-blur supports-backdrop-filter:bg-background/85">
-        <div className="grid grid-cols-3 gap-2">
+      <div className="fixed inset-x-0 bottom-0 z-40 mx-auto w-full max-w-lg border-t bg-background/95 px-3 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2 backdrop-blur supports-backdrop-filter:bg-background/85">
+        <div className="grid grid-cols-3 gap-2 rounded-3xl border bg-card p-2 shadow-lg">
           <Button
             variant={showCart || showTracking ? "outline" : "default"}
             size="sm"
-            className="h-14 flex-col gap-1 rounded-xl text-[11px]"
+            className="h-14 flex-col gap-1 rounded-2xl text-[11px]"
             onClick={() => {
               setShowCart(false);
               setShowTracking(false);
@@ -541,7 +601,7 @@ export function CustomerOrderClient({
           <Button
             variant={showTracking ? "default" : "outline"}
             size="sm"
-            className="relative h-14 flex-col gap-1 rounded-xl text-[11px]"
+            className="relative h-14 flex-col gap-1 rounded-2xl text-[11px]"
             onClick={() => {
               if (trackingOrder) {
                 setShowTracking(true);
@@ -560,13 +620,13 @@ export function CustomerOrderClient({
           <Button
             variant={showCart ? "default" : "outline"}
             size="sm"
-            className="relative h-14 flex-col gap-1 rounded-xl text-[11px]"
+            className="relative h-14 flex-col gap-1 rounded-2xl text-[11px]"
             onClick={() => setShowCart(true)}
           >
             <ShoppingCart className="h-4 w-4" />
             Keranjang
             {cartItemCount > 0 && (
-              <span className="absolute -top-1 -right-1 h-5 min-w-5 rounded-full bg-destructive px-1 text-[10px] leading-5 text-destructive-foreground">
+              <span className="absolute -right-1 -top-1 h-5 min-w-5 rounded-full bg-destructive px-1 text-[10px] leading-5 text-destructive-foreground">
                 {cartItemCount}
               </span>
             )}
@@ -576,7 +636,7 @@ export function CustomerOrderClient({
 
       {/* Product Detail Dialog */}
       <Dialog open={!!productDialog} onOpenChange={() => { setProductDialog(null); resetItemDialog(); }}>
-        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-h-[92vh] overflow-y-auto rounded-3xl border bg-background sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{productDialog?.name}</DialogTitle>
           </DialogHeader>
@@ -709,8 +769,8 @@ export function CustomerOrderClient({
 
       {/* Cart Dialog */}
       <Dialog open={showCart} onOpenChange={setShowCart}>
-        <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col">
-          <DialogHeader>
+        <DialogContent className="max-h-[92vh] rounded-3xl border bg-background sm:max-w-md flex flex-col">
+          <DialogHeader className="border-b pb-3">
             <DialogTitle>
               <ShoppingCart className="inline mr-2 h-5 w-5" />
               Keranjang ({cartItemCount} item)
@@ -728,7 +788,7 @@ export function CustomerOrderClient({
                   const modTotal = item.modifiers.reduce((s, m) => s + m.price, 0);
                   const itemTotal = (item.price + modTotal) * item.quantity;
                   return (
-                    <div key={idx} className="flex items-start gap-3 p-2 rounded-lg border">
+                    <div key={idx} className="flex items-start gap-3 rounded-xl border bg-muted/20 p-2.5">
                       <div className="h-12 w-12 shrink-0 overflow-hidden rounded-md border bg-muted">
                         {item.image ? (
                           <div className="relative h-full w-full">
@@ -871,7 +931,7 @@ export function CustomerOrderClient({
               </div>
 
               <Button
-                className="w-full h-12"
+                className="h-12 w-full rounded-xl"
                 onClick={submitOrder}
                 disabled={isPending || !customerName.trim()}
               >
@@ -885,7 +945,7 @@ export function CustomerOrderClient({
 
       {/* Tracking Dialog */}
       <Dialog open={showTracking} onOpenChange={setShowTracking}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="rounded-3xl border bg-background sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Track Pesanan</DialogTitle>
           </DialogHeader>
@@ -907,19 +967,19 @@ export function CustomerOrderClient({
               </div>
 
               <div className="grid grid-cols-4 gap-2 text-center">
-                <div className="rounded-md border bg-muted/40 px-1 py-1.5">
+                <div className="rounded-lg border bg-muted/40 px-1 py-1.5">
                   <p className="text-[10px] text-muted-foreground">Pending</p>
                   <p className="text-xs font-semibold">{trackingOrder.itemCounts.PENDING}</p>
                 </div>
-                <div className="rounded-md border bg-muted/40 px-1 py-1.5">
+                <div className="rounded-lg border bg-muted/40 px-1 py-1.5">
                   <p className="text-[10px] text-muted-foreground">Cooking</p>
                   <p className="text-xs font-semibold">{trackingOrder.itemCounts.COOKING}</p>
                 </div>
-                <div className="rounded-md border bg-muted/40 px-1 py-1.5">
+                <div className="rounded-lg border bg-muted/40 px-1 py-1.5">
                   <p className="text-[10px] text-muted-foreground">Ready</p>
                   <p className="text-xs font-semibold">{trackingOrder.itemCounts.READY}</p>
                 </div>
-                <div className="rounded-md border bg-muted/40 px-1 py-1.5">
+                <div className="rounded-lg border bg-muted/40 px-1 py-1.5">
                   <p className="text-[10px] text-muted-foreground">Served</p>
                   <p className="text-xs font-semibold">{trackingOrder.itemCounts.SERVED}</p>
                 </div>
@@ -952,7 +1012,7 @@ export function CustomerOrderClient({
 
       {/* Success Dialog */}
       <Dialog open={showSuccess} onOpenChange={setShowSuccess}>
-        <DialogContent className="sm:max-w-sm">
+        <DialogContent className="rounded-3xl border bg-background sm:max-w-sm">
           <div className="flex flex-col items-center gap-4 py-6">
             <div className="h-16 w-16 rounded-full bg-green-100 flex items-center justify-center">
               <CheckCircle className="h-10 w-10 text-green-600" />
