@@ -8,11 +8,18 @@ import { hasPermission } from "@/lib/rbac";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/lib/utils";
 import { calculateChange } from "@/lib/calculations";
+import { z } from "zod/v4";
 import {
   processPaymentSchema,
   splitBillPaymentSchema,
 } from "@/lib/validations/order";
 import type { Payment } from "@prisma/client";
+
+const saveOrderCustomerSchema = z.object({
+  orderId: z.string().min(1, "Order ID wajib"),
+  customerName: z.string().trim().min(2, "Nama pelanggan minimal 2 karakter"),
+  customerPhone: z.string().trim().min(9, "Nomor WhatsApp tidak valid"),
+});
 
 // ============================================================
 // PROCESS SINGLE PAYMENT
@@ -24,6 +31,8 @@ export async function processPayment(input: {
   amount: number;
   receivedAmount?: number;
   reference?: string;
+  customerName?: string;
+  customerPhone?: string;
 }): Promise<ActionResult> {
   const session = await auth();
   if (!session?.user || !hasPermission(session.user.role, "payment:process")) {
@@ -71,6 +80,12 @@ export async function processPayment(input: {
           ? calculateChange(remaining, receivedAmount)
           : 0;
 
+      const customerName = data.customerName?.trim();
+      const customerPhone = data.customerPhone?.trim();
+      if ((customerName && !customerPhone) || (!customerName && customerPhone)) {
+        throw new Error("Nama dan nomor pelanggan harus diisi lengkap.");
+      }
+
       // 4. Create payment record
       const newPayment = await tx.payment.create({
         data: {
@@ -87,7 +102,11 @@ export async function processPayment(input: {
       // 5. Mark order as PAID
       await tx.order.update({
         where: { id: data.orderId },
-        data: { status: "PAID" },
+        data: {
+          status: "PAID",
+          ...(customerName ? { customerName } : {}),
+          ...(customerPhone ? { customerPhone } : {}),
+        },
       });
 
       // 6. Release table
@@ -462,6 +481,75 @@ export async function refundPayment(
     return {
       success: false,
       error: error instanceof Error ? error.message : "Gagal refund.",
+    };
+  }
+}
+
+// ============================================================
+// SAVE ORDER CUSTOMER (UNPAID)
+// ============================================================
+
+export async function saveOrderCustomerInfo(input: {
+  orderId: string;
+  customerName: string;
+  customerPhone: string;
+}): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user || !hasPermission(session.user.role, "payment:process")) {
+    return { success: false, error: "Anda tidak memiliki akses." };
+  }
+
+  const validated = saveOrderCustomerSchema.safeParse(input);
+  if (!validated.success) {
+    return { success: false, error: validated.error.issues[0].message };
+  }
+
+  const data = validated.data;
+  const normalizedPhone = data.customerPhone.replace(/\D/g, "");
+  if (normalizedPhone.length < 9) {
+    return { success: false, error: "Nomor WhatsApp tidak valid." };
+  }
+
+  try {
+    const order = await prisma.order.findUnique({
+      where: { id: data.orderId },
+      select: { id: true, branchId: true, status: true },
+    });
+
+    if (!order) {
+      return { success: false, error: "Pesanan tidak ditemukan." };
+    }
+
+    if (session.user.branchId && order.branchId !== session.user.branchId) {
+      return { success: false, error: "Akses branch tidak valid." };
+    }
+
+    if (order.status !== "OPEN") {
+      return {
+        success: false,
+        error: "Data pelanggan hanya bisa diubah sebelum pesanan dibayar.",
+      };
+    }
+
+    await prisma.order.update({
+      where: { id: data.orderId },
+      data: {
+        customerName: data.customerName,
+        customerPhone: data.customerPhone,
+      },
+    });
+
+    revalidatePath("/dashboard/orders");
+    revalidatePath(`/dashboard/orders/${data.orderId}`);
+
+    return { success: true, data: undefined };
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Gagal menyimpan data pelanggan.",
     };
   }
 }

@@ -90,6 +90,8 @@ export const processPaymentSchema = z.object({
   amount: z.coerce.number().min(0, "Jumlah pembayaran harus positif"),
   receivedAmount: z.coerce.number().min(0).optional(), // For cash
   reference: z.string().optional(), // External ref (QRIS ID, etc.)
+  customerName: z.string().optional(),
+  customerPhone: z.string().optional(),
 });
 
 // ============================================================
@@ -134,6 +136,11 @@ export const transferTableSchema = z.object({
   newTableId: z.string().min(1, "Meja tujuan wajib dipilih"),
 });
 
+export const mergeTableSchema = z.object({
+  sourceOrderId: z.string().min(1, "Order sumber wajib"),
+  targetOrderId: z.string().min(1, "Order target wajib"),
+});
+
 export const approveQrOrderSchema = z.object({
   orderId: z.string().min(1, "Order ID wajib"),
 });
@@ -165,6 +172,7 @@ export type ProcessPaymentInput = z.infer<typeof processPaymentSchema>;
 export type SplitBillPaymentInput = z.infer<typeof splitBillPaymentSchema>;
 export type StockMovementInput = z.infer<typeof stockMovementSchema>;
 export type TransferTableInput = z.infer<typeof transferTableSchema>;
+export type MergeTableInput = z.infer<typeof mergeTableSchema>;
 export type PublicCustomerOrderInput = z.infer<typeof publicCustomerOrderSchema>;
 export type ApproveQrOrderInput = z.infer<typeof approveQrOrderSchema>;
 export type RejectQrOrderInput = z.infer<typeof rejectQrOrderSchema>;

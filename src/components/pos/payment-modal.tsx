@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,7 +23,7 @@ import {
   Check,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
-import { processPayment } from "@/actions/payment";
+import { processPayment, saveOrderCustomerInfo } from "@/actions/payment";
 import {
   calculateChange,
   suggestCashDenominations,
@@ -34,6 +34,8 @@ interface PaymentModalProps {
   onOpenChange: (open: boolean) => void;
   orderId: string;
   totalAmount: number;
+  initialCustomerName?: string;
+  initialCustomerPhone?: string;
 }
 
 const PAYMENT_METHODS = [
@@ -50,21 +52,38 @@ export function PaymentModal({
   onOpenChange,
   orderId,
   totalAmount,
+  initialCustomerName,
+  initialCustomerPhone,
 }: PaymentModalProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [method, setMethod] = useState("CASH");
   const [receivedAmount, setReceivedAmount] = useState("");
   const [reference, setReference] = useState("");
+  const [customerName, setCustomerName] = useState(initialCustomerName || "");
+  const [customerPhone, setCustomerPhone] = useState(initialCustomerPhone || "");
+
+  useEffect(() => {
+    if (!open) return;
+    setCustomerName(initialCustomerName || "");
+    setCustomerPhone(initialCustomerPhone || "");
+  }, [open, initialCustomerName, initialCustomerPhone]);
 
   const received = parseFloat(receivedAmount) || 0;
   const change = method === "CASH" ? calculateChange(totalAmount, received) : 0;
+  const normalizedPhone = customerPhone.replace(/\D/g, "");
+  const isCustomerValid = customerName.trim().length >= 2 && normalizedPhone.length >= 9;
   const isValid =
-    method === "CASH" ? received >= totalAmount : true;
+    (method === "CASH" ? received >= totalAmount : true) && isCustomerValid;
 
   const cashSuggestions = suggestCashDenominations(totalAmount);
 
   function handlePay() {
+    if (!isCustomerValid) {
+      toast.error("Nama dan nomor WhatsApp pelanggan wajib diisi.");
+      return;
+    }
+
     startTransition(async () => {
       const result = await processPayment({
         orderId,
@@ -72,6 +91,8 @@ export function PaymentModal({
         amount: totalAmount,
         receivedAmount: method === "CASH" ? received : undefined,
         reference: reference || undefined,
+        customerName: customerName.trim(),
+        customerPhone: customerPhone.trim(),
       });
 
       if (result.success) {
@@ -81,6 +102,39 @@ export function PaymentModal({
       } else {
         toast.error(result.error);
       }
+    });
+  }
+
+  function handlePayLater() {
+    const trimmedName = customerName.trim();
+    const trimmedPhone = customerPhone.trim();
+    const hasAnyCustomerInput = trimmedName.length > 0 || trimmedPhone.length > 0;
+
+    if (!hasAnyCustomerInput) {
+      onOpenChange(false);
+      return;
+    }
+
+    if (!isCustomerValid) {
+      toast.error("Lengkapi nama dan nomor WhatsApp pelanggan terlebih dahulu.");
+      return;
+    }
+
+    startTransition(async () => {
+      const result = await saveOrderCustomerInfo({
+        orderId,
+        customerName: trimmedName,
+        customerPhone: trimmedPhone,
+      });
+
+      if (!result.success) {
+        toast.error(result.error);
+        return;
+      }
+
+      toast.success("Data pelanggan tersimpan.");
+      onOpenChange(false);
+      router.refresh();
     });
   }
 
@@ -98,6 +152,25 @@ export function PaymentModal({
             <p className="text-3xl font-bold text-primary">
               {formatCurrency(totalAmount)}
             </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <p className="text-sm font-medium mb-2">Nama Pelanggan *</p>
+              <Input
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                placeholder="Nama pelanggan"
+              />
+            </div>
+            <div>
+              <p className="text-sm font-medium mb-2">No. WhatsApp *</p>
+              <Input
+                value={customerPhone}
+                onChange={(e) => setCustomerPhone(e.target.value)}
+                placeholder="08xxxxxxxxxx"
+              />
+            </div>
           </div>
 
           {/* Payment Method */}
@@ -198,7 +271,8 @@ export function PaymentModal({
         <DialogFooter className="gap-2">
           <Button
             variant="outline"
-            onClick={() => onOpenChange(false)}
+            onClick={handlePayLater}
+            disabled={isPending}
             className="flex-1"
           >
             Bayar Nanti

@@ -25,9 +25,10 @@ import {
   approveQrOrderSchema,
   rejectQrOrderSchema,
   transferTableSchema,
+  mergeTableSchema,
   type CreateOrderInput,
 } from "@/lib/validations/order";
-import { OrderStatus } from "@prisma/client";
+import { OrderStatus, Prisma } from "@prisma/client";
 
 const HAS_PENDING_APPROVAL_STATUS = "PENDING_APPROVAL" in OrderStatus;
 const ACTIVE_TABLE_ORDER_STATUSES: OrderStatus[] = HAS_PENDING_APPROVAL_STATUS
@@ -1032,6 +1033,200 @@ export async function transferTable(
   }
 }
 
+export async function mergeTableOrders(
+  input: { sourceOrderId: string; targetOrderId: string }
+): Promise<ActionResult<{ targetOrderId: string }>> {
+  const session = await auth();
+  if (!session?.user || !hasPermission(session.user.role, "table:manage")) {
+    return { success: false, error: "Anda tidak memiliki akses." };
+  }
+
+  const validated = mergeTableSchema.safeParse(input);
+  if (!validated.success) {
+    return { success: false, error: validated.error.issues[0].message };
+  }
+
+  if (validated.data.sourceOrderId === validated.data.targetOrderId) {
+    return { success: false, error: "Order sumber dan target tidak boleh sama." };
+  }
+
+  try {
+    const merged = await prisma.$transaction(async (tx) => {
+      const [sourceOrder, targetOrder] = await Promise.all([
+        tx.order.findUnique({
+          where: { id: validated.data.sourceOrderId },
+          include: {
+            table: true,
+            items: {
+              include: { modifiers: true },
+            },
+          },
+        }),
+        tx.order.findUnique({
+          where: { id: validated.data.targetOrderId },
+          include: {
+            table: true,
+          },
+        }),
+      ]);
+
+      if (!sourceOrder) throw new Error("Order sumber tidak ditemukan.");
+      if (!targetOrder) throw new Error("Order target tidak ditemukan.");
+
+      if (sourceOrder.branchId !== targetOrder.branchId) {
+        throw new Error("Order harus berada di cabang yang sama.");
+      }
+
+      if (session.user?.branchId && sourceOrder.branchId !== session.user.branchId) {
+        throw new Error("Anda tidak memiliki akses order pada cabang ini.");
+      }
+
+      if (sourceOrder.status !== "OPEN" || targetOrder.status !== "OPEN") {
+        throw new Error("Hanya order OPEN yang bisa digabungkan.");
+      }
+
+      if (!sourceOrder.tableId || !targetOrder.tableId) {
+        throw new Error("Merge hanya bisa untuk order dine-in yang memiliki meja.");
+      }
+
+      if (sourceOrder.tableId === targetOrder.tableId) {
+        throw new Error("Order sudah berada di meja yang sama.");
+      }
+
+      const sourceActiveItems = sourceOrder.items.filter(
+        (item) => item.status !== "CANCELLED"
+      );
+      if (sourceActiveItems.length === 0) {
+        throw new Error("Order sumber tidak memiliki item aktif untuk digabung.");
+      }
+
+      await tx.orderItem.updateMany({
+        where: {
+          orderId: sourceOrder.id,
+          status: { not: "CANCELLED" },
+        },
+        data: {
+          orderId: targetOrder.id,
+        },
+      });
+
+      const mergedItems = await tx.orderItem.findMany({
+        where: {
+          orderId: targetOrder.id,
+          status: { not: "CANCELLED" },
+        },
+        include: {
+          modifiers: true,
+        },
+      });
+
+      const totals = calculateOrderTotal(
+        mergedItems.map((item) => ({
+          unitPrice: Number(item.unitPrice),
+          quantity: item.quantity,
+          modifierTotal: item.modifiers.reduce(
+            (sum, modifier) => sum + Number(modifier.price),
+            0
+          ),
+        })),
+        Number(targetOrder.taxRate),
+        Number(targetOrder.serviceRate)
+      );
+
+      const mergedNotes = [
+        targetOrder.notes,
+        `[MERGE] Item dari ${sourceOrder.orderNumber}`,
+      ]
+        .filter(Boolean)
+        .join("\n");
+
+      await tx.order.update({
+        where: { id: targetOrder.id },
+        data: {
+          subtotal: totals.subtotal,
+          taxAmount: totals.taxAmount,
+          serviceAmount: totals.serviceAmount,
+          totalAmount: totals.totalAmount,
+          notes: mergedNotes || null,
+          customerName: targetOrder.customerName || sourceOrder.customerName,
+          customerPhone: targetOrder.customerPhone || sourceOrder.customerPhone,
+        },
+      });
+
+      const sourceNotes = [sourceOrder.notes, `[MERGED_TO] ${targetOrder.orderNumber}`]
+        .filter(Boolean)
+        .join("\n");
+
+      await tx.order.update({
+        where: { id: sourceOrder.id },
+        data: {
+          status: "VOID",
+          subtotal: 0,
+          taxAmount: 0,
+          serviceAmount: 0,
+          discountAmount: 0,
+          totalAmount: 0,
+          notes: sourceNotes || null,
+        },
+      });
+
+      await tx.table.update({
+        where: { id: sourceOrder.tableId },
+        data: { status: "AVAILABLE" },
+      });
+
+      return {
+        branchId: sourceOrder.branchId,
+        sourceOrderId: sourceOrder.id,
+        sourceTableId: sourceOrder.tableId,
+        targetOrderId: targetOrder.id,
+      };
+    });
+
+    revalidatePath("/dashboard/orders");
+    revalidatePath("/dashboard/tables");
+    revalidatePath("/dashboard/kitchen");
+
+    await logAudit({
+      action: "UPDATE",
+      entity: "orders",
+      entityId: merged.sourceOrderId,
+      newData: {
+        mergedToOrderId: merged.targetOrderId,
+      },
+      userId: session.user.id,
+      branchId: merged.branchId,
+    });
+
+    notifyOrderUpdated(merged.branchId, {
+      orderId: merged.sourceOrderId,
+      status: "VOID",
+      mergedToOrderId: merged.targetOrderId,
+    });
+    notifyOrderUpdated(merged.branchId, {
+      orderId: merged.targetOrderId,
+      status: "OPEN",
+      mergedFromOrderId: merged.sourceOrderId,
+    });
+    notifyTableStatusChange(merged.branchId, {
+      tableId: merged.sourceTableId,
+      status: "AVAILABLE",
+    });
+
+    return {
+      success: true,
+      data: {
+        targetOrderId: merged.targetOrderId,
+      },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Gagal menggabungkan meja.",
+    };
+  }
+}
+
 // ============================================================
 // QR ORDER APPROVAL
 // ============================================================
@@ -1354,9 +1549,8 @@ export async function rejectQrOrder(
 // HELPER: Deduct stock based on Bill of Materials (BoM)
 // ============================================================
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function deductStockForItems(
-  tx: any,
+  tx: Prisma.TransactionClient,
   items: Array<{
     productId: string;
     quantity: number;
@@ -1394,9 +1588,8 @@ async function deductStockForItems(
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function reverseStockForItems(
-  tx: any,
+  tx: Prisma.TransactionClient,
   items: Array<{
     productId: string;
     quantity: number;

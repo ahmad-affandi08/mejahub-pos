@@ -34,16 +34,18 @@ import {
   MessageCircle,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { cancelOrder, transferTable, voidOrderItem } from "@/actions/order";
+import {
+  cancelOrder,
+  mergeTableOrders,
+  transferTable,
+  voidOrderItem,
+} from "@/actions/order";
 import { processPayment, processSplitBill, refundPayment } from "@/actions/payment";
+import { sendOrderReceiptViaWhatsAppService } from "@/actions/whatsapp-service";
 import {
   calculateChange,
   suggestCashDenominations,
 } from "@/lib/calculations";
-import {
-  buildWhatsAppReceiptUrl,
-  getPaymentMethodLabel,
-} from "@/lib/whatsapp";
 import Link from "next/link";
 
 const PAYMENT_METHOD_OPTIONS = [
@@ -116,9 +118,19 @@ interface OrderDetailProps {
     name: string | null;
     status: string;
   }>;
+  mergeTargets: Array<{
+    id: string;
+    orderNumber: string;
+    table: {
+      id: string;
+      number: number;
+      name: string | null;
+    } | null;
+  }>;
   permissions: {
     canProcessPayment: boolean;
     canTransferTable: boolean;
+    canMergeTable: boolean;
     canRefundPayment: boolean;
   };
 }
@@ -139,7 +151,12 @@ const itemStatusColors: Record<string, string> = {
   CANCELLED: "bg-red-100 text-red-800 line-through",
 };
 
-export function OrderDetail({ order, tables, permissions }: OrderDetailProps) {
+export function OrderDetail({
+  order,
+  tables,
+  mergeTargets,
+  permissions,
+}: OrderDetailProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
@@ -148,8 +165,12 @@ export function OrderDetail({ order, tables, permissions }: OrderDetailProps) {
   const [payMethod, setPayMethod] = useState("CASH");
   const [receivedAmount, setReceivedAmount] = useState("");
   const [payRef, setPayRef] = useState("");
+  const [payCustomerName, setPayCustomerName] = useState(order.customerName || "");
+  const [payCustomerPhone, setPayCustomerPhone] = useState(order.customerPhone || "");
   const [transferDialogOpen, setTransferDialogOpen] = useState(false);
   const [targetTableId, setTargetTableId] = useState("");
+  const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
+  const [targetMergeOrderId, setTargetMergeOrderId] = useState("");
   const [splitDialogOpen, setSplitDialogOpen] = useState(false);
   const [splitPayments, setSplitPayments] = useState<SplitPaymentInput[]>([
     { method: "CASH", amount: "", receivedAmount: "", reference: "" },
@@ -164,6 +185,9 @@ export function OrderDetail({ order, tables, permissions }: OrderDetailProps) {
   const cashSuggestions = suggestCashDenominations(totalAmount);
   const availableTransferTables = tables.filter(
     (table) => table.status === "AVAILABLE" && table.id !== order.tableId
+  );
+  const availableMergeTargets = mergeTargets.filter(
+    (target) => target.table && target.table.id !== order.tableId
   );
   const splitTotal = splitPayments.reduce(
     (sum, payment) => sum + (parseFloat(payment.amount) || 0),
@@ -217,6 +241,15 @@ export function OrderDetail({ order, tables, permissions }: OrderDetailProps) {
   }
 
   function handlePay() {
+    const customerName = payCustomerName.trim();
+    const customerPhone = payCustomerPhone.trim();
+    const normalizedPhone = customerPhone.replace(/\D/g, "");
+
+    if (customerName.length < 2 || normalizedPhone.length < 9) {
+      toast.error("Nama dan nomor WhatsApp pelanggan wajib diisi.");
+      return;
+    }
+
     startTransition(async () => {
       const result = await processPayment({
         orderId: order.id,
@@ -224,6 +257,8 @@ export function OrderDetail({ order, tables, permissions }: OrderDetailProps) {
         amount: totalAmount,
         receivedAmount: payMethod === "CASH" ? received : undefined,
         reference: payRef || undefined,
+        customerName,
+        customerPhone,
       });
       if (result.success) {
         toast.success("Pembayaran berhasil!");
@@ -324,6 +359,30 @@ export function OrderDetail({ order, tables, permissions }: OrderDetailProps) {
     setRefundDialogOpen(true);
   }
 
+  function handleMergeTable() {
+    if (!targetMergeOrderId) {
+      toast.error("Pilih order tujuan terlebih dahulu.");
+      return;
+    }
+
+    startTransition(async () => {
+      const result = await mergeTableOrders({
+        sourceOrderId: order.id,
+        targetOrderId: targetMergeOrderId,
+      });
+
+      if (result.success) {
+        toast.success("Meja berhasil digabungkan.");
+        setMergeDialogOpen(false);
+        setTargetMergeOrderId("");
+        router.push(`/dashboard/orders/${result.data.targetOrderId}`);
+        router.refresh();
+      } else {
+        toast.error(result.error);
+      }
+    });
+  }
+
   function handleRefund() {
     if (!refundPaymentId) return;
     if (!refundReason.trim()) {
@@ -380,6 +439,15 @@ export function OrderDetail({ order, tables, permissions }: OrderDetailProps) {
                 <ArrowRightLeft className="h-4 w-4 mr-1" /> Pindah Meja
               </Button>
             )}
+            {permissions.canMergeTable && order.table && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setMergeDialogOpen(true)}
+              >
+                <ArrowRightLeft className="h-4 w-4 mr-1" /> Gabung Meja
+              </Button>
+            )}
             {permissions.canProcessPayment && (
               <Button
                 variant="outline"
@@ -406,52 +474,53 @@ export function OrderDetail({ order, tables, permissions }: OrderDetailProps) {
           </div>
         )}
 
-        {order.status === "PAID" && order.customerPhone && (
+        {order.status === "PAID" && permissions.canProcessPayment && (
           <Button
             size="sm"
             variant="outline"
             className="text-green-600 border-green-600 hover:bg-green-50"
             onClick={() => {
-              const lastPayment = order.payments[order.payments.length - 1];
-              const url = buildWhatsAppReceiptUrl(order.customerPhone!, {
-                orderNumber: order.orderNumber,
-                branchName: order.branch?.name || "MejaHub",
-                tableName: order.table
-                  ? `#${order.table.number}${order.table.name ? ` - ${order.table.name}` : ""}`
-                  : "Takeaway",
-                customerName: order.customerName || "Pelanggan",
-                items: order.items
-                  .filter((i) => i.status !== "CANCELLED")
-                  .map((i) => ({
-                    name: i.product.name,
-                    variantName: i.variant?.name,
-                    quantity: i.quantity,
-                    subtotal: Number(i.subtotal),
-                    modifiers: i.modifiers.map((m) => ({
-                      name: m.name,
-                      price: Number(m.price),
-                    })),
-                  })),
-                subtotal: Number(order.subtotal),
-                taxRate: Number(order.taxRate),
-                taxAmount: Number(order.taxAmount),
-                serviceRate: Number(order.serviceRate),
-                serviceAmount: Number(order.serviceAmount),
-                discountAmount: Number(order.discountAmount),
-                totalAmount: Number(order.totalAmount),
-                paymentMethod: lastPayment
-                  ? getPaymentMethodLabel(lastPayment.method)
-                  : undefined,
-                paidAmount: lastPayment
-                  ? Number(lastPayment.receivedAmount)
-                  : undefined,
-                changeAmount: lastPayment
-                  ? Number(lastPayment.changeAmount)
-                  : undefined,
-                createdAt: new Date(order.createdAt),
+              startTransition(async () => {
+                const firstAttempt = await sendOrderReceiptViaWhatsAppService({
+                  orderId: order.id,
+                });
+
+                if (firstAttempt.success) {
+                  toast.success("Struk berhasil dikirim via WhatsApp service.");
+                  return;
+                }
+
+                const needsPhoneInput = firstAttempt.error
+                  .toLowerCase()
+                  .includes("tidak memiliki nomor whatsapp pelanggan");
+
+                if (!needsPhoneInput) {
+                  toast.error(firstAttempt.error);
+                  return;
+                }
+
+                const prompted = window.prompt(
+                  "Nomor WhatsApp pelanggan belum ada. Masukkan nomor (contoh 08xxxx atau 62xxxx):"
+                );
+
+                if (!prompted?.trim()) {
+                  toast.error("Nomor WhatsApp wajib diisi untuk kirim struk.");
+                  return;
+                }
+
+                const secondAttempt = await sendOrderReceiptViaWhatsAppService({
+                  orderId: order.id,
+                  phone: prompted.trim(),
+                });
+
+                if (secondAttempt.success) {
+                  toast.success("Struk berhasil dikirim via WhatsApp service.");
+                } else {
+                  toast.error(secondAttempt.error);
+                }
               });
-              window.open(url, "_blank");
             }}
+            disabled={isPending}
           >
             <MessageCircle className="h-4 w-4 mr-1" /> Kirim Struk WA
           </Button>
@@ -491,6 +560,12 @@ export function OrderDetail({ order, tables, permissions }: OrderDetailProps) {
               <div className="flex items-center gap-2">
                 <User className="h-4 w-4 text-muted-foreground" />
                 <span>Pelanggan: {order.customerName}</span>
+              </div>
+            )}
+            {order.customerPhone && (
+              <div className="flex items-center gap-2">
+                <MessageCircle className="h-4 w-4 text-muted-foreground" />
+                <span>WhatsApp: {order.customerPhone}</span>
               </div>
             )}
             {order.notes && (
@@ -717,6 +792,25 @@ export function OrderDetail({ order, tables, permissions }: OrderDetailProps) {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <p className="text-sm font-medium mb-2">Nama Pelanggan *</p>
+                <Input
+                  value={payCustomerName}
+                  onChange={(e) => setPayCustomerName(e.target.value)}
+                  placeholder="Nama pelanggan"
+                />
+              </div>
+              <div>
+                <p className="text-sm font-medium mb-2">No. WhatsApp *</p>
+                <Input
+                  value={payCustomerPhone}
+                  onChange={(e) => setPayCustomerPhone(e.target.value)}
+                  placeholder="08xxxxxxxxxx"
+                />
+              </div>
+            </div>
+
             <Select value={payMethod} onValueChange={(v) => v && setPayMethod(v)}>
               <SelectTrigger>
                 <SelectValue />
@@ -827,6 +921,54 @@ export function OrderDetail({ order, tables, permissions }: OrderDetailProps) {
               disabled={isPending || !targetTableId || availableTransferTables.length === 0}
             >
               {isPending ? "Memproses..." : "Pindahkan"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={mergeDialogOpen} onOpenChange={setMergeDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Gabung Meja</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Pilih order tujuan. Item aktif dari {order.orderNumber} akan dipindahkan ke
+              order tersebut.
+            </p>
+
+            <Select
+              value={targetMergeOrderId}
+              onValueChange={(value) => setTargetMergeOrderId(value ?? "")}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Pilih order tujuan" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableMergeTargets.map((target) => (
+                  <SelectItem key={target.id} value={target.id}>
+                    {target.orderNumber} • Meja #{target.table?.number}
+                    {target.table?.name ? ` — ${target.table.name}` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {availableMergeTargets.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                Belum ada order OPEN di meja lain yang bisa dijadikan tujuan merge.
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMergeDialogOpen(false)}>
+              Batal
+            </Button>
+            <Button
+              onClick={handleMergeTable}
+              disabled={isPending || !targetMergeOrderId || availableMergeTargets.length === 0}
+            >
+              {isPending ? "Memproses..." : "Gabungkan"}
             </Button>
           </DialogFooter>
         </DialogContent>

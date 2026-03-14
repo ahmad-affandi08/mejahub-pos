@@ -18,22 +18,45 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
   if (!order) notFound();
 
   const branchId = session.user.branchId;
-  const tables = branchId
-    ? await prisma.table.findMany({
-        where: { branchId, isActive: true },
-        select: {
-          id: true,
-          number: true,
-          name: true,
-          status: true,
-        },
-        orderBy: { number: "asc" },
-      })
-    : [];
+  const [tables, mergeTargets] = branchId
+    ? await Promise.all([
+        prisma.table.findMany({
+          where: { branchId, isActive: true },
+          select: {
+            id: true,
+            number: true,
+            name: true,
+            status: true,
+          },
+          orderBy: { number: "asc" },
+        }),
+        prisma.order.findMany({
+          where: {
+            branchId,
+            status: "OPEN",
+            id: { not: order.id },
+            tableId: { not: null },
+          },
+          select: {
+            id: true,
+            orderNumber: true,
+            table: {
+              select: {
+                id: true,
+                number: true,
+                name: true,
+              },
+            },
+          },
+          orderBy: { createdAt: "asc" },
+        }),
+      ])
+    : [[], []];
 
   const permissions = {
     canProcessPayment: hasPermission(session.user.role, "payment:process"),
     canTransferTable: hasPermission(session.user.role, "table:manage"),
+    canMergeTable: hasPermission(session.user.role, "table:manage"),
     canRefundPayment: hasPermission(session.user.role, "payment:refund"),
   };
 
@@ -41,6 +64,7 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
     <OrderDetail
       order={JSON.parse(JSON.stringify(order))}
       tables={JSON.parse(JSON.stringify(tables))}
+      mergeTargets={JSON.parse(JSON.stringify(mergeTargets))}
       permissions={permissions}
     />
   );

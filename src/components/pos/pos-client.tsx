@@ -200,7 +200,7 @@ export function POSClient({
       </div>
 
       {/* Right: Cart Panel */}
-      <div className="fixed inset-y-0 right-0 z-50 w-100 overflow-hidden border-l bg-background shadow-2xl">
+      <div className="fixed inset-y-0 right-0 z-50 w-100 overflow-hidden border-l bg-background">
         <CartPanel tables={tables} />
       </div>
     </div>

@@ -33,8 +33,6 @@ import {
   ShoppingCart,
   Percent,
   Tag,
-  User,
-  Phone,
   StickyNote,
   UtensilsCrossed,
 } from "lucide-react";
@@ -57,7 +55,6 @@ export function CartPanel({ tables }: CartPanelProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [discountDialogOpen, setDiscountDialogOpen] = useState(false);
-  const [customerDialogOpen, setCustomerDialogOpen] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [createdOrderId, setCreatedOrderId] = useState<string | null>(null);
   const [createdOrderTotal, setCreatedOrderTotal] = useState(0);
@@ -72,16 +69,12 @@ export function CartPanel({ tables }: CartPanelProps) {
     items,
     tableId,
     orderType,
-    customerName,
-    customerPhone,
     notes,
     discount,
     removeItem,
     updateQuantity,
     setTableId,
     setOrderType,
-    setCustomerName,
-    setCustomerPhone,
     setNotes,
     setDiscount,
     clearCart,
@@ -124,8 +117,6 @@ export function CartPanel({ tables }: CartPanelProps) {
       const input: CreateOrderInput = {
         type: orderType,
         tableId: tableId || undefined,
-        customerName: customerName || undefined,
-        customerPhone: customerPhone || undefined,
         notes: notes || undefined,
         items: items.map((item) => ({
           productId: item.productId,
@@ -227,13 +218,13 @@ export function CartPanel({ tables }: CartPanelProps) {
               variant="outline"
               size="sm"
               className="h-9 text-xs"
-              onClick={() => setCustomerDialogOpen(true)}
+              disabled
             >
-              <User className="h-3 w-3 mr-1" />
-              {customerName || "Info Pelanggan"}
+              Tanpa Meja
             </Button>
           )}
         </div>
+
       </div>
 
       {/* Cart Items */}
@@ -468,45 +459,6 @@ export function CartPanel({ tables }: CartPanelProps) {
           <DialogFooter>
             <Button onClick={handleApplyDiscount} className="w-full">
               Terapkan Diskon
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Customer Info Dialog */}
-      <Dialog open={customerDialogOpen} onOpenChange={setCustomerDialogOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Info Pelanggan</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div>
-              <label className="text-sm font-medium mb-1 block">
-                <User className="h-3 w-3 inline mr-1" /> Nama
-              </label>
-              <Input
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                placeholder="Nama pelanggan"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium mb-1 block">
-                <Phone className="h-3 w-3 inline mr-1" /> No. HP (WhatsApp)
-              </label>
-              <Input
-                value={customerPhone}
-                onChange={(e) => setCustomerPhone(e.target.value)}
-                placeholder="08xxxxxxxxxx"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              onClick={() => setCustomerDialogOpen(false)}
-              className="w-full"
-            >
-              Simpan
             </Button>
           </DialogFooter>
         </DialogContent>
