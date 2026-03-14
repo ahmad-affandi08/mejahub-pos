@@ -13,7 +13,7 @@ export default async function KitchenPage() {
   // Get all pending/cooking order items for this branch
   const orderItems = await prisma.orderItem.findMany({
     where: {
-      order: { branchId, status: "OPEN" },
+      order: { branchId, status: { in: ["OPEN", "PAID"] } },
       status: { in: ["PENDING", "COOKING", "READY"] },
     },
     include: {

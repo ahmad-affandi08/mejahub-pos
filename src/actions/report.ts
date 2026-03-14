@@ -387,7 +387,7 @@ export async function getReportData(filters?: ReportFilters) {
     .forEach((order) => {
       const key = order.tableId ?? "unknown";
       const label = order.table
-        ? `Meja ${order.table.number}${order.table.name ? ` - ${order.table.name}` : ""}`
+        ? `${order.table.number}${order.table.name ? ` - ${order.table.name}` : ""}`
         : "Tanpa Meja";
       const current = tableMap.get(key) ?? { label, orderCount: 0, revenue: 0 };
       current.orderCount += 1;

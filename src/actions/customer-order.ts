@@ -521,7 +521,7 @@ export async function createCustomerOrder(
     notifyNewCustomerOrder(order.branchId, {
       orderNumber: order.orderNumber,
       tableName: table
-        ? `Meja ${table.number}${table.name ? ` - ${table.name}` : ""}`
+        ? `${table.number}${table.name ? ` - ${table.name}` : ""}`
         : "Unknown",
       customerName: safeInput.customerName,
     });

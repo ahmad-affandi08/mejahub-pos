@@ -161,7 +161,7 @@ export function KDSClient({ orderItems, branchId }: KDSClientProps) {
                 {item.order.table ? (
                   <span className="flex items-center gap-0.5">
                     <MapPin className="h-3 w-3" />
-                    Meja {item.order.table.number}
+                    {item.order.table.number}
                   </span>
                 ) : (
                   <Badge variant="outline" className="text-[10px]">

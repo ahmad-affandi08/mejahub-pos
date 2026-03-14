@@ -442,7 +442,7 @@ export function CustomerOrderClient({
               {branch.name}
             </h1>
             <p className="text-xs text-muted-foreground">
-              Meja #{table.number} {table.name ? `• ${table.name}` : ""}
+              #{table.number} {table.name ? `• ${table.name}` : ""}
             </p>
           </div>
 

@@ -198,7 +198,7 @@ export function CartPanel({ tables }: CartPanelProps) {
               value={tableId || ""}
               onValueChange={(v) => {
                 const table = tables.find((t) => t.id === v);
-                setTableId(v, table ? `Meja ${table.number}` : null);
+                setTableId(v, table ? `${table.number}` : null);
               }}
             >
               <SelectTrigger className="h-9 text-xs data-placeholder:text-foreground">
@@ -207,7 +207,7 @@ export function CartPanel({ tables }: CartPanelProps) {
               <SelectContent>
                 {availableTables.map((table) => (
                   <SelectItem key={table.id} value={table.id}>
-                    Meja {table.number}
+                    {table.number}
                     {table.name ? ` — ${table.name}` : ""}
                   </SelectItem>
                 ))}

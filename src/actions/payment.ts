@@ -21,6 +21,95 @@ const saveOrderCustomerSchema = z.object({
   customerPhone: z.string().trim().min(9, "Nomor WhatsApp tidak valid"),
 });
 
+const refundPaymentSchema = z.object({
+  paymentId: z.string().min(1, "ID pembayaran wajib"),
+  reason: z.string().trim().min(3, "Alasan refund minimal 3 karakter").max(300),
+});
+
+type PaymentCompletionContext = {
+  orderId: string;
+  orderNumber: string;
+  branchId: string;
+  tableId: string | null;
+  tableStatusAfterPayment: "AVAILABLE" | "OCCUPIED";
+};
+
+const roundCurrency = (value: number) => Math.round(value * 100) / 100;
+
+function ensureBranchAccess(
+  userBranchId: string | null | undefined,
+  targetBranchId: string
+) {
+  if (userBranchId && userBranchId !== targetBranchId) {
+    throw new Error("Akses branch tidak valid.");
+  }
+}
+
+function resolveOptionalCustomerInfo(input: {
+  customerName?: string;
+  customerPhone?: string;
+}) {
+  const customerName = input.customerName?.trim();
+  const customerPhoneRaw = input.customerPhone?.trim();
+
+  if ((customerName && !customerPhoneRaw) || (!customerName && customerPhoneRaw)) {
+    throw new Error("Nama dan nomor pelanggan harus diisi lengkap.");
+  }
+
+  if (!customerName || !customerPhoneRaw) {
+    return { customerName: undefined, customerPhone: undefined };
+  }
+
+  if (customerName.length < 2) {
+    throw new Error("Nama pelanggan minimal 2 karakter.");
+  }
+
+  const normalizedPhone = customerPhoneRaw.replace(/\D/g, "");
+  if (normalizedPhone.length < 9) {
+    throw new Error("Nomor WhatsApp tidak valid.");
+  }
+
+  return {
+    customerName,
+    customerPhone: normalizedPhone,
+  };
+}
+
+async function handlePaymentCompletionSideEffects(params: {
+  context: PaymentCompletionContext;
+  userId: string;
+  auditEntityId: string;
+  auditData: Record<string, unknown>;
+  notifyMethod: string;
+  notifyAmount: number;
+}) {
+  await logAudit({
+    action: "UPDATE",
+    entity: "payments",
+    entityId: params.auditEntityId,
+    newData: {
+      orderNumber: params.context.orderNumber,
+      ...params.auditData,
+    },
+    userId: params.userId,
+    branchId: params.context.branchId,
+  });
+
+  notifyPaymentCompleted(params.context.branchId, {
+    orderId: params.context.orderId,
+    orderNumber: params.context.orderNumber,
+    method: params.notifyMethod,
+    amount: params.notifyAmount,
+  });
+
+  if (params.context.tableId) {
+    notifyTableStatusChange(params.context.branchId, {
+      tableId: params.context.tableId,
+      status: params.context.tableStatusAfterPayment,
+    });
+  }
+}
+
 // ============================================================
 // PROCESS SINGLE PAYMENT
 // ============================================================
@@ -47,22 +136,31 @@ export async function processPayment(input: {
   const data = validated.data;
 
   try {
-    const payment = await prisma.$transaction(async (tx) => {
+    const paymentResult = await prisma.$transaction(async (tx) => {
       // 1. Get order
       const order = await tx.order.findUnique({
         where: { id: data.orderId },
-        include: { payments: true, shift: true },
+        include: {
+          payments: {
+            where: { status: "COMPLETED" },
+            select: { amount: true },
+          },
+        },
       });
       if (!order) throw new Error("Pesanan tidak ditemukan.");
+      ensureBranchAccess(session.user.branchId, order.branchId);
       if (order.status !== "OPEN") {
         throw new Error("Pesanan sudah dibayar atau dibatalkan.");
       }
 
       // 2. Validate payment amount covers total
       const existingPaid = order.payments
-        .filter((p) => p.status === "COMPLETED")
         .reduce((sum, p) => sum + Number(p.amount), 0);
-      const remaining = Number(order.totalAmount) - existingPaid;
+      const remaining = roundCurrency(Number(order.totalAmount) - existingPaid);
+
+      if (remaining <= 0) {
+        throw new Error("Pesanan ini tidak memiliki sisa tagihan.");
+      }
 
       if (data.amount < remaining) {
         throw new Error(
@@ -71,20 +169,23 @@ export async function processPayment(input: {
       }
 
       // 3. Calculate change (cash only)
+      const { customerName, customerPhone } = resolveOptionalCustomerInfo(data);
+
       const receivedAmount =
         data.method === "CASH"
-          ? data.receivedAmount || data.amount
-          : data.amount;
+          ? roundCurrency(data.receivedAmount ?? remaining)
+          : remaining;
+
+      if (data.method === "CASH" && receivedAmount < remaining) {
+        throw new Error(
+          `Uang diterima kurang. Minimal Rp ${remaining.toLocaleString("id-ID")}`
+        );
+      }
+
       const changeAmount =
         data.method === "CASH"
           ? calculateChange(remaining, receivedAmount)
           : 0;
-
-      const customerName = data.customerName?.trim();
-      const customerPhone = data.customerPhone?.trim();
-      if ((customerName && !customerPhone) || (!customerName && customerPhone)) {
-        throw new Error("Nama dan nomor pelanggan harus diisi lengkap.");
-      }
 
       // 4. Create payment record
       const newPayment = await tx.payment.create({
@@ -94,7 +195,7 @@ export async function processPayment(input: {
           amount: remaining, // Actual amount applied
           receivedAmount,
           changeAmount,
-          reference: data.reference,
+          reference: data.reference?.trim() || undefined,
           orderId: data.orderId,
         },
       });
@@ -109,11 +210,22 @@ export async function processPayment(input: {
         },
       });
 
-      // 6. Release table
+      // 6. Update table status based on kitchen progress
+      const hasPendingKitchenItems = await tx.orderItem.findFirst({
+        where: {
+          orderId: order.id,
+          status: { notIn: ["SERVED", "CANCELLED"] },
+        },
+        select: { id: true },
+      });
+
+      const tableStatusAfterPayment: "AVAILABLE" | "OCCUPIED" =
+        hasPendingKitchenItems ? "OCCUPIED" : "AVAILABLE";
+
       if (order.tableId) {
         await tx.table.update({
           where: { id: order.tableId },
-          data: { status: "AVAILABLE" },
+          data: { status: tableStatusAfterPayment },
         });
       }
 
@@ -122,7 +234,7 @@ export async function processPayment(input: {
         await tx.shift.update({
           where: { id: order.shiftId },
           data: {
-            totalSales: { increment: Number(order.totalAmount) },
+            totalSales: { increment: remaining },
             totalOrders: { increment: 1 },
           },
         });
@@ -141,51 +253,33 @@ export async function processPayment(input: {
         }
       }
 
-      return newPayment;
+      return {
+        payment: newPayment,
+        context: {
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          branchId: order.branchId,
+          tableId: order.tableId,
+          tableStatusAfterPayment,
+        } satisfies PaymentCompletionContext,
+      };
     });
 
     revalidatePath("/dashboard/orders");
     revalidatePath("/dashboard/tables");
 
-    const order = await prisma.order.findUnique({
-      where: { id: data.orderId },
-      select: { orderNumber: true, branchId: true },
+    await handlePaymentCompletionSideEffects({
+      context: paymentResult.context,
+      userId: session.user.id,
+      auditEntityId: paymentResult.payment.id,
+      auditData: {
+        method: paymentResult.payment.method,
+        amount: Number(paymentResult.payment.amount),
+        status: paymentResult.payment.status,
+      },
+      notifyMethod: paymentResult.payment.method,
+      notifyAmount: Number(paymentResult.payment.amount),
     });
-
-    if (order) {
-      await logAudit({
-        action: "UPDATE",
-        entity: "payments",
-        entityId: payment.id,
-        newData: {
-          orderNumber: order.orderNumber,
-          method: payment.method,
-          amount: Number(payment.amount),
-          status: payment.status,
-        },
-        userId: session.user.id,
-        branchId: order.branchId,
-      });
-
-      notifyPaymentCompleted(order.branchId, {
-        orderId: data.orderId,
-        orderNumber: order.orderNumber,
-        method: payment.method,
-        amount: Number(payment.amount),
-      });
-
-      const paidOrder = await prisma.order.findUnique({
-        where: { id: data.orderId },
-        select: { tableId: true },
-      });
-
-      if (paidOrder?.tableId) {
-        notifyTableStatusChange(order.branchId, {
-          tableId: paidOrder.tableId,
-          status: "AVAILABLE",
-        });
-      }
-    }
 
     return { success: true, data: undefined };
   } catch (error) {
@@ -223,51 +317,84 @@ export async function processSplitBill(input: {
   const data = validated.data;
 
   try {
-    await prisma.$transaction(async (tx) => {
+    const splitResult = await prisma.$transaction(async (tx) => {
       // 1. Get order
       const order = await tx.order.findUnique({
         where: { id: data.orderId },
-        include: { payments: true },
+        include: {
+          payments: {
+            where: { status: "COMPLETED" },
+            select: { amount: true },
+          },
+        },
       });
       if (!order) throw new Error("Pesanan tidak ditemukan.");
+      ensureBranchAccess(session.user.branchId, order.branchId);
       if (order.status !== "OPEN") {
         throw new Error("Pesanan sudah dibayar atau dibatalkan.");
       }
 
-      // 2. Validate total covers order
-      const totalPayment = data.payments.reduce((sum, p) => sum + p.amount, 0);
-      if (totalPayment < Number(order.totalAmount)) {
+      const existingPaid = order.payments.reduce(
+        (sum, payment) => sum + Number(payment.amount),
+        0
+      );
+      const remaining = roundCurrency(Number(order.totalAmount) - existingPaid);
+
+      if (remaining <= 0) {
+        throw new Error("Pesanan ini tidak memiliki sisa tagihan.");
+      }
+
+      // 2. Validate total covers remaining bill (must be exact)
+      const totalPayment = roundCurrency(
+        data.payments.reduce((sum, payment) => sum + payment.amount, 0)
+      );
+
+      if (totalPayment < remaining) {
         throw new Error(
-          `Total pembayaran (Rp ${totalPayment.toLocaleString("id-ID")}) kurang dari tagihan (Rp ${Number(order.totalAmount).toLocaleString("id-ID")})`
+          `Total pembayaran (Rp ${totalPayment.toLocaleString("id-ID")}) kurang dari sisa tagihan (Rp ${remaining.toLocaleString("id-ID")})`
+        );
+      }
+
+      if (totalPayment > remaining) {
+        throw new Error(
+          `Total pembayaran (Rp ${totalPayment.toLocaleString("id-ID")}) melebihi sisa tagihan (Rp ${remaining.toLocaleString("id-ID")})`
         );
       }
 
       // 3. Create payment records
       let totalCashIn = 0;
       for (const payment of data.payments) {
+        const paymentAmount = roundCurrency(payment.amount);
         const receivedAmount =
           payment.method === "CASH"
-            ? payment.receivedAmount || payment.amount
-            : payment.amount;
+            ? roundCurrency(payment.receivedAmount ?? paymentAmount)
+            : paymentAmount;
+
+        if (payment.method === "CASH" && receivedAmount < paymentAmount) {
+          throw new Error(
+            `Uang diterima untuk pembayaran tunai harus minimal Rp ${paymentAmount.toLocaleString("id-ID")}`
+          );
+        }
+
         const changeAmount =
           payment.method === "CASH"
-            ? calculateChange(payment.amount, receivedAmount)
+            ? calculateChange(paymentAmount, receivedAmount)
             : 0;
 
         await tx.payment.create({
           data: {
             method: payment.method as Payment["method"],
             status: "COMPLETED",
-            amount: payment.amount,
+            amount: paymentAmount,
             receivedAmount,
             changeAmount,
-            reference: payment.reference,
+            reference: payment.reference?.trim() || undefined,
             orderId: data.orderId,
           },
         });
 
         if (payment.method === "CASH") {
-          totalCashIn += payment.amount;
+          totalCashIn += paymentAmount;
         }
       }
 
@@ -277,11 +404,22 @@ export async function processSplitBill(input: {
         data: { status: "PAID" },
       });
 
-      // 5. Release table
+      // 5. Update table status based on kitchen progress
+      const hasPendingKitchenItems = await tx.orderItem.findFirst({
+        where: {
+          orderId: order.id,
+          status: { notIn: ["SERVED", "CANCELLED"] },
+        },
+        select: { id: true },
+      });
+
+      const tableStatusAfterPayment: "AVAILABLE" | "OCCUPIED" =
+        hasPendingKitchenItems ? "OCCUPIED" : "AVAILABLE";
+
       if (order.tableId) {
         await tx.table.update({
           where: { id: order.tableId },
-          data: { status: "AVAILABLE" },
+          data: { status: tableStatusAfterPayment },
         });
       }
 
@@ -290,7 +428,7 @@ export async function processSplitBill(input: {
         await tx.shift.update({
           where: { id: order.shiftId },
           data: {
-            totalSales: { increment: Number(order.totalAmount) },
+            totalSales: { increment: remaining },
             totalOrders: { increment: 1 },
           },
         });
@@ -307,50 +445,34 @@ export async function processSplitBill(input: {
           });
         }
       }
+
+      return {
+        context: {
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          branchId: order.branchId,
+          tableId: order.tableId,
+          tableStatusAfterPayment,
+        } satisfies PaymentCompletionContext,
+        totalPayment,
+      };
     });
 
     revalidatePath("/dashboard/orders");
     revalidatePath("/dashboard/tables");
 
-    const order = await prisma.order.findUnique({
-      where: { id: data.orderId },
-      select: { orderNumber: true, branchId: true },
+    await handlePaymentCompletionSideEffects({
+      context: splitResult.context,
+      userId: session.user.id,
+      auditEntityId: data.orderId,
+      auditData: {
+        splitBill: true,
+        totalMethods: data.payments.length,
+        totalAmount: splitResult.totalPayment,
+      },
+      notifyMethod: "SPLIT",
+      notifyAmount: splitResult.totalPayment,
     });
-
-    if (order) {
-      await logAudit({
-        action: "UPDATE",
-        entity: "payments",
-        entityId: data.orderId,
-        newData: {
-          orderNumber: order.orderNumber,
-          splitBill: true,
-          totalMethods: data.payments.length,
-          totalAmount: data.payments.reduce((sum, payment) => sum + payment.amount, 0),
-        },
-        userId: session.user.id,
-        branchId: order.branchId,
-      });
-
-      notifyPaymentCompleted(order.branchId, {
-        orderId: data.orderId,
-        orderNumber: order.orderNumber,
-        method: "SPLIT",
-        amount: data.payments.reduce((sum, payment) => sum + payment.amount, 0),
-      });
-
-      const paidOrder = await prisma.order.findUnique({
-        where: { id: data.orderId },
-        select: { tableId: true },
-      });
-
-      if (paidOrder?.tableId) {
-        notifyTableStatusChange(order.branchId, {
-          tableId: paidOrder.tableId,
-          status: "AVAILABLE",
-        });
-      }
-    }
 
     return { success: true, data: undefined };
   } catch (error) {
@@ -375,15 +497,23 @@ export async function refundPayment(
     return { success: false, error: "Anda tidak memiliki akses." };
   }
 
-  try {
-    let updatedOrder: { branchId: string; tableId: string | null } | null = null;
+  const validated = refundPaymentSchema.safeParse({
+    paymentId,
+    reason,
+  });
 
-    await prisma.$transaction(async (tx) => {
+  if (!validated.success) {
+    return { success: false, error: validated.error.issues[0].message };
+  }
+
+  try {
+    const refundResult = await prisma.$transaction(async (tx) => {
       const payment = await tx.payment.findUnique({
-        where: { id: paymentId },
+        where: { id: validated.data.paymentId },
         include: { order: true },
       });
       if (!payment) throw new Error("Pembayaran tidak ditemukan.");
+      ensureBranchAccess(session.user.branchId, payment.order.branchId);
       if (payment.status !== "COMPLETED") {
         throw new Error("Hanya pembayaran COMPLETED yang bisa di-refund.");
       }
@@ -392,15 +522,30 @@ export async function refundPayment(
 
       // Refund payment
       await tx.payment.update({
-        where: { id: paymentId },
+        where: { id: validated.data.paymentId },
         data: { status: "REFUNDED" },
       });
 
-      // Re-open order if needed
+      const completedAfterRefund = await tx.payment.aggregate({
+        where: {
+          orderId: payment.orderId,
+          status: "COMPLETED",
+        },
+        _sum: {
+          amount: true,
+        },
+      });
+
+      const paidAfterRefund = Number(completedAfterRefund._sum.amount ?? 0);
+      const totalOrderAmount = Number(payment.order.totalAmount);
+      const nextOrderStatus = paidAfterRefund >= totalOrderAmount ? "PAID" : "OPEN";
+      const transitionedToOpen = orderWasPaid && nextOrderStatus === "OPEN";
+
+      // Recalculate order status after refund
       const nextOrder = await tx.order.update({
         where: { id: payment.orderId },
         data: {
-          status: orderWasPaid ? "OPEN" : payment.order.status,
+          status: nextOrderStatus,
         },
         select: {
           id: true,
@@ -411,15 +556,18 @@ export async function refundPayment(
         },
       });
 
-      updatedOrder = {
+      const nextTableStatus = nextOrderStatus === "OPEN" ? "OCCUPIED" : "AVAILABLE";
+
+      const updatedOrder = {
         branchId: nextOrder.branchId,
         tableId: nextOrder.tableId,
+        tableStatus: nextTableStatus,
       };
 
       if (nextOrder.tableId) {
         await tx.table.update({
           where: { id: nextOrder.tableId },
-          data: { status: "OCCUPIED" },
+          data: { status: nextTableStatus },
         });
       }
 
@@ -429,7 +577,7 @@ export async function refundPayment(
           where: { id: nextOrder.shiftId },
           data: {
             totalSales: { decrement: Number(payment.amount) },
-            ...(orderWasPaid ? { totalOrders: { decrement: 1 } } : {}),
+            ...(transitionedToOpen ? { totalOrders: { decrement: 1 } } : {}),
           },
         });
 
@@ -451,11 +599,11 @@ export async function refundPayment(
         data: {
           action: "REFUND",
           entity: "payments",
-          entityId: paymentId,
+          entityId: validated.data.paymentId,
           oldData: { status: "COMPLETED" },
           newData: {
             status: "REFUNDED",
-            reason,
+            reason: validated.data.reason,
             orderId: payment.orderId,
             amount: Number(payment.amount),
           },
@@ -463,16 +611,18 @@ export async function refundPayment(
           branchId: payment.order.branchId,
         },
       });
+
+      return updatedOrder;
     });
 
     revalidatePath("/dashboard/orders");
     revalidatePath("/dashboard/tables");
     revalidatePath("/dashboard/shifts");
 
-    if (updatedOrder?.tableId) {
-      notifyTableStatusChange(updatedOrder.branchId, {
-        tableId: updatedOrder.tableId,
-        status: "OCCUPIED",
+    if (refundResult.tableId) {
+      notifyTableStatusChange(refundResult.branchId, {
+        tableId: refundResult.tableId,
+        status: refundResult.tableStatus,
       });
     }
 
@@ -534,8 +684,8 @@ export async function saveOrderCustomerInfo(input: {
     await prisma.order.update({
       where: { id: data.orderId },
       data: {
-        customerName: data.customerName,
-        customerPhone: data.customerPhone,
+        customerName: data.customerName.trim(),
+        customerPhone: normalizedPhone,
       },
     });
 

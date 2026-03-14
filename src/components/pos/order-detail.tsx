@@ -899,7 +899,7 @@ export function OrderDetail({
               <SelectContent>
                 {availableTransferTables.map((table) => (
                   <SelectItem key={table.id} value={table.id}>
-                    Meja #{table.number}
+                    #{table.number}
                     {table.name ? ` — ${table.name}` : ""}
                   </SelectItem>
                 ))}

@@ -215,8 +215,8 @@ export async function createOrder(
         if (existingOrder) {
           throw new Error(
             HAS_PENDING_APPROVAL_STATUS && existingOrder.status === OrderStatus.PENDING_APPROVAL
-              ? `Meja ${table.number} memiliki pesanan QR menunggu approval (${existingOrder.orderNumber}). Approve/tolak dulu di POS.`
-              : `Meja ${table.number} sudah memiliki pesanan aktif (${existingOrder.orderNumber}). Tambahkan item ke pesanan tersebut.`
+              ? `${table.number} memiliki pesanan QR menunggu approval (${existingOrder.orderNumber}). Approve/tolak dulu di POS.`
+              : `${table.number} sudah memiliki pesanan aktif (${existingOrder.orderNumber}). Tambahkan item ke pesanan tersebut.`
           );
         }
       }
@@ -740,14 +740,17 @@ export async function updateOrderItemStatus(
           (i) => i.status === "SERVED" || i.status === "CANCELLED"
         );
         if (allServed && order.tableId) {
+          const nextTableStatus =
+            order.status === "PAID" ? "AVAILABLE" : "REQUESTING_BILL";
+
           await prisma.table.update({
             where: { id: order.tableId },
-            data: { status: "REQUESTING_BILL" },
+            data: { status: nextTableStatus },
           });
 
           notifyTableStatusChange(order.branchId, {
             tableId: order.tableId,
-            status: "REQUESTING_BILL",
+            status: nextTableStatus,
           });
         }
       }

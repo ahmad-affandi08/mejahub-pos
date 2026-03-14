@@ -99,7 +99,7 @@ export function PendingQROrders({ orders }: { orders: PendingQrOrder[] }) {
                 {order.table && (
                   <p className="flex items-center gap-1">
                     <MapPin className="h-3 w-3" />
-                    Meja {order.table.number}
+                    {order.table.number}
                     {order.table.name ? ` - ${order.table.name}` : ""}
                   </p>
                 )}
