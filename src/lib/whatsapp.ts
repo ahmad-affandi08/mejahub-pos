@@ -1,6 +1,6 @@
 import { formatCurrency } from "@/lib/utils";
 
-interface ReceiptItem {
+export interface ReceiptItem {
   name: string;
   variantName?: string | null;
   quantity: number;
@@ -8,11 +8,14 @@ interface ReceiptItem {
   modifiers?: { name: string; price: number }[];
 }
 
-interface ReceiptData {
+export interface ReceiptData {
   orderNumber: string;
   branchName: string;
+  branchAddress?: string | null;
+  branchPhone?: string | null;
   tableName: string;
   customerName: string;
+  cashierName?: string;
   items: ReceiptItem[];
   subtotal: number;
   taxRate: number;
@@ -34,9 +37,18 @@ export function formatReceiptText(receipt: ReceiptData): string {
   const lines: string[] = [];
 
   lines.push(`🧾 *${receipt.branchName}*`);
+  if (receipt.branchAddress) {
+    lines.push(receipt.branchAddress);
+  }
+  if (receipt.branchPhone) {
+    lines.push(`Telp: ${receipt.branchPhone}`);
+  }
   lines.push(`─────────────────`);
   lines.push(`No: ${receipt.orderNumber}`);
   lines.push(`Meja: ${receipt.tableName}`);
+  if (receipt.cashierName) {
+    lines.push(`Kasir: ${receipt.cashierName}`);
+  }
   lines.push(`Pelanggan: ${receipt.customerName}`);
   lines.push(
     `Tanggal: ${new Intl.DateTimeFormat("id-ID", {

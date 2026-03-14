@@ -486,7 +486,7 @@ export function OrderDetail({
                 });
 
                 if (firstAttempt.success) {
-                  toast.success("Struk berhasil dikirim via WhatsApp service.");
+                  toast.success("Nota PDF berhasil dikirim via WhatsApp service.");
                   return;
                 }
 
@@ -514,7 +514,7 @@ export function OrderDetail({
                 });
 
                 if (secondAttempt.success) {
-                  toast.success("Struk berhasil dikirim via WhatsApp service.");
+                  toast.success("Nota PDF berhasil dikirim via WhatsApp service.");
                 } else {
                   toast.error(secondAttempt.error);
                 }
@@ -522,7 +522,7 @@ export function OrderDetail({
             }}
             disabled={isPending}
           >
-            <MessageCircle className="h-4 w-4 mr-1" /> Kirim Struk WA
+            <MessageCircle className="h-4 w-4 mr-1" /> Kirim Nota PDF WA
           </Button>
         )}
       </div>

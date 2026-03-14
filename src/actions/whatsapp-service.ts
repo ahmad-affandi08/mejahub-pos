@@ -5,11 +5,12 @@ import { z } from "zod/v4";
 import prisma from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/rbac";
-import type { ActionResult } from "@/lib/utils";
-import { formatReceiptText, getPaymentMethodLabel } from "@/lib/whatsapp";
+import { formatCurrency, type ActionResult } from "@/lib/utils";
+import { getPaymentMethodLabel, type ReceiptData } from "@/lib/whatsapp";
+import { buildReceiptPdfBuffer } from "@/lib/receipt-pdf";
 import {
   getWhatsAppSessionStatus,
-  sendWhatsAppTextMessage,
+  sendWhatsAppDocumentMessage,
   startWhatsAppSession,
   stopWhatsAppSession,
   type WhatsAppConnectionStatus,
@@ -165,6 +166,11 @@ export async function sendOrderReceiptViaWhatsAppService(input: {
     include: {
       branch: true,
       table: true,
+      user: {
+        select: {
+          name: true,
+        },
+      },
       items: {
         include: {
           product: true,
@@ -209,13 +215,37 @@ export async function sendOrderReceiptViaWhatsAppService(input: {
     order.customerPhone = inputPhone;
   }
 
-  const receiptText = formatReceiptText({
+  const completedPayments = order.payments.filter(
+    (payment) => payment.status === "COMPLETED"
+  );
+  const paymentMethod =
+    completedPayments.length > 1
+      ? `Split (${completedPayments.length} metode)`
+      : completedPayments[0]
+        ? getPaymentMethodLabel(completedPayments[0].method)
+        : undefined;
+  const paidAmount =
+    completedPayments.length > 0
+      ? completedPayments.reduce(
+          (sum, payment) => sum + Number(payment.receivedAmount || payment.amount),
+          0
+        )
+      : undefined;
+  const changeAmount =
+    completedPayments.length > 0
+      ? completedPayments.reduce((sum, payment) => sum + Number(payment.changeAmount), 0)
+      : undefined;
+
+  const receiptData: ReceiptData = {
     orderNumber: order.orderNumber,
     branchName: order.branch.name,
+    branchAddress: order.branch.address,
+    branchPhone: order.branch.phone,
     tableName: order.table
       ? `#${order.table.number}${order.table.name ? ` - ${order.table.name}` : ""}`
       : "Takeaway",
     customerName: order.customerName || "Pelanggan",
+    cashierName: order.user.name,
     items: order.items
       .filter((item) => item.status !== "CANCELLED")
       .map((item) => ({
@@ -235,19 +265,23 @@ export async function sendOrderReceiptViaWhatsAppService(input: {
     serviceAmount: Number(order.serviceAmount),
     discountAmount: Number(order.discountAmount),
     totalAmount: Number(order.totalAmount),
-    paymentMethod: order.payments[0]
-      ? getPaymentMethodLabel(order.payments[0].method)
-      : undefined,
-    paidAmount: order.payments[0] ? Number(order.payments[0].receivedAmount) : undefined,
-    changeAmount: order.payments[0] ? Number(order.payments[0].changeAmount) : undefined,
+    paymentMethod,
+    paidAmount,
+    changeAmount,
     createdAt: order.createdAt,
-  });
+  };
 
   try {
-    const result = await sendWhatsAppTextMessage({
+    const receiptPdfBuffer = await buildReceiptPdfBuffer(receiptData);
+    const result = await sendWhatsAppDocumentMessage({
       branchId: order.branchId,
       phone: targetPhone,
-      text: receiptText,
+      fileName: `Nota-${order.orderNumber}.pdf`,
+      mimeType: "application/pdf",
+      document: receiptPdfBuffer,
+      caption: `🧾 Nota pembayaran ${order.orderNumber}\nTotal: ${formatCurrency(
+        Number(order.totalAmount)
+      )}`,
     });
 
     return { success: true, data: result };

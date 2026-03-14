@@ -68,9 +68,6 @@ async function getBaileysRuntime(): Promise<BaileysRuntime> {
     return baileysRuntimePromise;
   }
 
-  process.env.WS_NO_BUFFER_UTIL = "1";
-  process.env.WS_NO_UTF_8_VALIDATE = "1";
-
   baileysRuntimePromise = import("@whiskeysockets/baileys").then((module) => ({
     makeWASocket: module.default as unknown as (input: Record<string, unknown>) => WASocket,
     useMultiFileAuthState: module.useMultiFileAuthState as (
@@ -480,6 +477,38 @@ export async function sendWhatsAppTextMessage(input: {
 
   const jid = `${normalizedPhone}@s.whatsapp.net`;
   await session.sock.sendMessage(jid, { text: input.text });
+
+  return { jid };
+}
+
+export async function sendWhatsAppDocumentMessage(input: {
+  branchId: string;
+  phone: string;
+  fileName: string;
+  mimeType: string;
+  document: Buffer;
+  caption?: string;
+}): Promise<{ jid: string }> {
+  const session = getOrCreateSession(input.branchId);
+
+  if (!session.sock || session.status !== "CONNECTED") {
+    throw new Error(
+      "WhatsApp service belum terhubung. Hubungkan dulu di Pengaturan > Service WA."
+    );
+  }
+
+  const normalizedPhone = normalizePhone(input.phone);
+  if (!normalizedPhone) {
+    throw new Error("Nomor WhatsApp pelanggan tidak valid.");
+  }
+
+  const jid = `${normalizedPhone}@s.whatsapp.net`;
+  await session.sock.sendMessage(jid, {
+    document: input.document,
+    fileName: input.fileName,
+    mimetype: input.mimeType,
+    caption: input.caption,
+  });
 
   return { jid };
 }
