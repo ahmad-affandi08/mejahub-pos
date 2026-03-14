@@ -1,19 +1,31 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCartStore } from "@/stores/cart-store";
 import { ProductGrid } from "@/components/pos/product-grid";
 import { CartPanel } from "@/components/pos/cart-panel";
-import { OpenOrdersList } from "@/components/pos/open-orders-list";
+import { OpenOrdersList, OrderHistoryList } from "@/components/pos/open-orders-list";
 import { PendingQROrders } from "@/components/pos/pending-qr-orders";
 import { useSocket } from "@/hooks/use-socket";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ShoppingCart, ClipboardList, QrCode } from "lucide-react";
+import { ShoppingCart, ClipboardList, QrCode, History } from "lucide-react";
 
 interface POSClientProps {
   products: ProductWithRelations[];
   openOrders: OrderWithRelations[];
+  historyOrders: OrderWithRelations[];
+  historyFilters: {
+    orderNumber: string;
+    customerName: string;
+    date: string;
+  };
+  historyPagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
   pendingQrOrders: PendingQrOrder[];
   tables: TableData[];
   branchId: string;
@@ -120,6 +132,9 @@ export interface TableData {
 export function POSClient({
   products,
   openOrders,
+  historyOrders,
+  historyFilters,
+  historyPagination,
   pendingQrOrders,
   tables,
   branchId,
@@ -127,9 +142,33 @@ export function POSClient({
   serviceRate,
 }: POSClientProps) {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState("new-order");
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [activeTab, setActiveTab] = useState(
+    searchParams.get("htab") === "history-orders" ? "history-orders" : "new-order"
+  );
   const { setTaxRate, setServiceRate } = useCartStore();
   const { on } = useSocket(branchId);
+
+  function handleTabChange(nextTab: string) {
+    setActiveTab(nextTab);
+
+    const params = new URLSearchParams(searchParams.toString());
+    if (nextTab === "history-orders") {
+      params.set("htab", "history-orders");
+    } else {
+      params.delete("htab");
+      params.delete("hOrder");
+      params.delete("hCustomer");
+      params.delete("hDate");
+      params.delete("hPage");
+    }
+
+    const queryString = params.toString();
+    router.replace(queryString ? `${pathname}?${queryString}` : pathname, {
+      scroll: false,
+    });
+  }
 
   // Set branch tax/service rates on mount
   useEffect(() => {
@@ -158,7 +197,7 @@ export function POSClient({
         <div className="h-full min-h-0 min-w-0 overflow-hidden border-r">
           <Tabs
             value={activeTab}
-            onValueChange={setActiveTab}
+            onValueChange={handleTabChange}
             className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col"
           >
             <div className="border-b px-4 pt-2">
@@ -184,6 +223,13 @@ export function POSClient({
                   <ClipboardList className="h-5 w-5" />
                   Pesanan Aktif ({openOrders.length})
                 </TabsTrigger>
+                <TabsTrigger
+                  value="history-orders"
+                  className="h-9 gap-2.5 px-3 text-[15px] data-active:bg-secondary data-active:text-primary"
+                >
+                  <History className="h-5 w-5" />
+                  History ({historyOrders.length})
+                </TabsTrigger>
               </TabsList>
             </div>
 
@@ -203,6 +249,14 @@ export function POSClient({
 
             <TabsContent value="open-orders" className="m-0 min-h-0 w-full min-w-0 flex-1 overflow-auto p-4">
               <OpenOrdersList orders={openOrders} />
+            </TabsContent>
+
+            <TabsContent value="history-orders" className="m-0 min-h-0 w-full min-w-0 flex-1 overflow-auto p-4">
+              <OrderHistoryList
+                orders={historyOrders}
+                initialFilters={historyFilters}
+                pagination={historyPagination}
+              />
             </TabsContent>
           </Tabs>
         </div>

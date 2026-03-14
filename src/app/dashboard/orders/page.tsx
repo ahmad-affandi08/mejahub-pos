@@ -1,21 +1,44 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { getProducts } from "@/actions/product";
-import { getOrders, getPendingApprovalOrders } from "@/actions/order";
+import { getCashierOrderHistory, getOrders, getPendingApprovalOrders } from "@/actions/order";
 import prisma from "@/lib/prisma";
 import { POSClient } from "@/components/pos/pos-client";
 
-export default async function OrdersPage() {
+type SearchParams = Promise<{
+  hOrder?: string;
+  hCustomer?: string;
+  hDate?: string;
+  hPage?: string;
+}>;
+
+export default async function OrdersPage({ searchParams }: { searchParams: SearchParams }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
 
   const branchId = session.user.branchId;
   if (!branchId) redirect("/dashboard");
 
+  const params = await searchParams;
+  const historyOrderNumber = params.hOrder?.trim() ?? "";
+  const historyCustomerName = params.hCustomer?.trim() ?? "";
+  const historyDate = params.hDate?.trim() ?? "";
+  const parsedHistoryPage = Number.parseInt(params.hPage ?? "1", 10);
+  const historyPage = Number.isFinite(parsedHistoryPage) && parsedHistoryPage > 0
+    ? parsedHistoryPage
+    : 1;
+
   // Fetch data in parallel
-  const [products, orders, pendingQrOrders, tables, branch] = await Promise.all([
+  const [products, orders, historyResult, pendingQrOrders, tables, branch] = await Promise.all([
     getProducts(branchId),
     getOrders({ status: "OPEN" }),
+    getCashierOrderHistory({
+      orderNumber: historyOrderNumber,
+      customerName: historyCustomerName,
+      date: historyDate || undefined,
+      page: historyPage,
+      pageSize: 12,
+    }),
     getPendingApprovalOrders(),
     prisma.table.findMany({
       where: { branchId, isActive: true },
@@ -69,6 +92,13 @@ export default async function OrdersPage() {
       <POSClient
         products={normalizedProducts}
         openOrders={JSON.parse(JSON.stringify(orders))}
+        historyOrders={JSON.parse(JSON.stringify(historyResult.orders))}
+        historyFilters={{
+          orderNumber: historyOrderNumber,
+          customerName: historyCustomerName,
+          date: historyDate,
+        }}
+        historyPagination={historyResult.pagination}
         pendingQrOrders={JSON.parse(JSON.stringify(pendingQrOrders))}
         tables={JSON.parse(JSON.stringify(tables))}
         branchId={branchId}

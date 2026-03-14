@@ -49,6 +49,7 @@ export async function getOrders(filters?: {
   status?: string;
   tableId?: string;
   date?: string;
+  onlyMine?: boolean;
 }) {
   const session = await auth();
   if (!session?.user) throw new Error("Unauthorized");
@@ -65,6 +66,9 @@ export async function getOrders(filters?: {
   }
   if (filters?.tableId) {
     where.tableId = filters.tableId;
+  }
+  if (filters?.onlyMine) {
+    where.userId = session.user.id;
   }
   if (filters?.date) {
     const start = new Date(filters.date);
@@ -89,6 +93,92 @@ export async function getOrders(filters?: {
     },
     orderBy: { createdAt: "desc" },
   });
+}
+
+export async function getCashierOrderHistory(filters?: {
+  orderNumber?: string;
+  customerName?: string;
+  date?: string;
+  page?: number;
+  pageSize?: number;
+}) {
+  const session = await auth();
+  if (!session?.user) throw new Error("Unauthorized");
+
+  const branchId = session.user.branchId;
+  if (!branchId) {
+    return {
+      orders: [],
+      pagination: {
+        page: 1,
+        pageSize: 12,
+        total: 0,
+        totalPages: 0,
+      },
+    };
+  }
+
+  const page = Math.max(1, filters?.page ?? 1);
+  const pageSize = Math.min(50, Math.max(1, filters?.pageSize ?? 12));
+
+  const where: Prisma.OrderWhereInput = {
+    branchId,
+    userId: session.user.id,
+    status: "PAID",
+  };
+
+  const orderNumber = filters?.orderNumber?.trim();
+  if (orderNumber) {
+    where.orderNumber = {
+      contains: orderNumber,
+    };
+  }
+
+  const customerName = filters?.customerName?.trim();
+  if (customerName) {
+    where.customerName = {
+      contains: customerName,
+    };
+  }
+
+  if (filters?.date) {
+    const start = new Date(filters.date);
+    const end = new Date(filters.date);
+    end.setDate(end.getDate() + 1);
+    where.createdAt = { gte: start, lt: end };
+  }
+
+  const [total, orders] = await prisma.$transaction([
+    prisma.order.count({ where }),
+    prisma.order.findMany({
+      where,
+      include: {
+        table: true,
+        user: { select: { id: true, name: true, role: true } },
+        items: {
+          include: {
+            product: true,
+            variant: true,
+            modifiers: true,
+          },
+        },
+        payments: true,
+      },
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+  ]);
+
+  return {
+    orders,
+    pagination: {
+      page,
+      pageSize,
+      total,
+      totalPages: Math.ceil(total / pageSize),
+    },
+  };
 }
 
 export async function getPendingApprovalOrders() {
