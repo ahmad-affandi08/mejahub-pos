@@ -162,17 +162,26 @@ export function POSClient({
             className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col"
           >
             <div className="border-b px-4 pt-2">
-              <TabsList className="w-full justify-start">
-                <TabsTrigger value="new-order" className="gap-2">
-                  <ShoppingCart className="h-4 w-4" />
+              <TabsList className="h-11 w-full justify-start p-1">
+                <TabsTrigger
+                  value="new-order"
+                  className="h-9 gap-2.5 px-3 text-[15px] data-active:bg-secondary data-active:text-primary"
+                >
+                  <ShoppingCart className="h-5 w-5" />
                   Order Baru
                 </TabsTrigger>
-                <TabsTrigger value="qr-approval" className="gap-2">
-                  <QrCode className="h-4 w-4" />
+                <TabsTrigger
+                  value="qr-approval"
+                  className="h-9 gap-2.5 px-3 text-[15px] data-active:bg-secondary data-active:text-primary"
+                >
+                  <QrCode className="h-5 w-5" />
                   Menunggu Approval ({pendingQrOrders.length})
                 </TabsTrigger>
-                <TabsTrigger value="open-orders" className="gap-2">
-                  <ClipboardList className="h-4 w-4" />
+                <TabsTrigger
+                  value="open-orders"
+                  className="h-9 gap-2.5 px-3 text-[15px] data-active:bg-secondary data-active:text-primary"
+                >
+                  <ClipboardList className="h-5 w-5" />
                   Pesanan Aktif ({openOrders.length})
                 </TabsTrigger>
               </TabsList>
