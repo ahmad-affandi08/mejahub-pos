@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { initSocketServer, getIO } from "@/lib/socket-server";
+import { getIO } from "@/lib/socket-server";
 
 // Socket.io health check endpoint
 export async function GET() {

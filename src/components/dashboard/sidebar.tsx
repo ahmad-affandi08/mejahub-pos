@@ -20,7 +20,6 @@ import {
   Settings,
   ShieldCheck,
   Warehouse,
-  Plus,
   Timer,
 } from "lucide-react";
 

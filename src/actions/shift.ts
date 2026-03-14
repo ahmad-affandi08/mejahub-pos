@@ -187,7 +187,7 @@ export async function closeShift(
   }
 
   try {
-    const shift = await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx) => {
       const existing = await tx.shift.findUnique({
         where: { id: validated.data.shiftId },
         include: {
@@ -314,7 +314,7 @@ export async function addCashDrawerTransaction(
   }
 
   try {
-    const txn = await prisma.cashDrawerTransaction.create({
+    await prisma.cashDrawerTransaction.create({
       data: {
         type: validated.data.type,
         amount: validated.data.amount,

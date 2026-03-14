@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useKDSSocket } from "@/hooks/use-socket";
 import { toast } from "sonner";
 import {
@@ -86,7 +85,18 @@ export function KDSClient({ orderItems, branchId }: KDSClientProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [station, setStation] = useState<string>("ALL");
+  const [nowTs, setNowTs] = useState(() => Date.now());
   const { on } = useKDSSocket(branchId);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNowTs(Date.now());
+    }, 30_000);
+
+    return () => {
+      clearInterval(timer);
+    };
+  }, []);
 
   useEffect(() => {
     const unsubscribers = [
@@ -130,8 +140,8 @@ export function KDSClient({ orderItems, branchId }: KDSClientProps) {
     });
   }
 
-  function getElapsedTime(dateStr: string): string {
-    const diff = Date.now() - new Date(dateStr).getTime();
+  function getElapsedTime(dateStr: string, currentTs: number): string {
+    const diff = currentTs - new Date(dateStr).getTime();
     const mins = Math.floor(diff / 60000);
     if (mins < 1) return "< 1m";
     if (mins < 60) return `${mins}m`;
@@ -142,10 +152,10 @@ export function KDSClient({ orderItems, branchId }: KDSClientProps) {
     const config = statusConfig[item.status];
     const Icon = config?.icon || Clock;
     const nextStatus = statusFlow[item.status];
-    const elapsed = getElapsedTime(item.cookingStartAt || item.createdAt);
+    const elapsed = getElapsedTime(item.cookingStartAt || item.createdAt, nowTs);
     const isUrgent =
       item.status === "PENDING" &&
-      Date.now() - new Date(item.createdAt).getTime() > 15 * 60 * 1000; // >15min
+      nowTs - new Date(item.createdAt).getTime() > 15 * 60 * 1000; // >15min
 
     return (
       <Card

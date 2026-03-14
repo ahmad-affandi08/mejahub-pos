@@ -71,7 +71,9 @@ export function useSocket(branchId: string | null) {
     []
   );
 
-  return { isConnected, on, socket: socketRef.current };
+  const getSocketInstance = useCallback(() => socketRef.current, []);
+
+  return { isConnected, on, getSocketInstance };
 }
 
 /**
@@ -127,5 +129,7 @@ export function useKDSSocket(branchId: string | null) {
     []
   );
 
-  return { isConnected, on, socket: socketRef.current };
+  const getSocketInstance = useCallback(() => socketRef.current, []);
+
+  return { isConnected, on, getSocketInstance };
 }

@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
   Dialog,
@@ -63,12 +62,6 @@ export function PaymentModal({
   const [customerName, setCustomerName] = useState(initialCustomerName || "");
   const [customerPhone, setCustomerPhone] = useState(initialCustomerPhone || "");
 
-  useEffect(() => {
-    if (!open) return;
-    setCustomerName(initialCustomerName || "");
-    setCustomerPhone(initialCustomerPhone || "");
-  }, [open, initialCustomerName, initialCustomerPhone]);
-
   const received = parseFloat(receivedAmount) || 0;
   const change = method === "CASH" ? calculateChange(totalAmount, received) : 0;
   const normalizedPhone = customerPhone.replace(/\D/g, "");
@@ -77,6 +70,18 @@ export function PaymentModal({
     (method === "CASH" ? received >= totalAmount : true) && isCustomerValid;
 
   const cashSuggestions = suggestCashDenominations(totalAmount);
+
+  function handleDialogOpenChange(nextOpen: boolean) {
+    if (nextOpen) {
+      setCustomerName(initialCustomerName || "");
+      setCustomerPhone(initialCustomerPhone || "");
+      setMethod("CASH");
+      setReceivedAmount("");
+      setReference("");
+    }
+
+    onOpenChange(nextOpen);
+  }
 
   function handlePay() {
     if (!isCustomerValid) {
@@ -139,7 +144,7 @@ export function PaymentModal({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleDialogOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Pembayaran</DialogTitle>

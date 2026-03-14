@@ -77,6 +77,17 @@ function wrapText(text: string, font: PDFFont, size: number, maxWidth: number): 
   return lines.length ? lines : [""];
 }
 
+function buildDividerLine(font: PDFFont, size: number, maxWidth: number): string {
+  const dashWidth = font.widthOfTextAtSize("-", size);
+  let count = Math.max(1, Math.floor(maxWidth / dashWidth));
+
+  while (count > 1 && font.widthOfTextAtSize("-".repeat(count), size) > maxWidth) {
+    count -= 1;
+  }
+
+  return "-".repeat(count);
+}
+
 export async function buildReceiptPdfBuffer(receipt: ReceiptData): Promise<Buffer> {
   const pdf = await PDFDocument.create();
   const fontRegular = await pdf.embedFont(StandardFonts.Courier);
@@ -133,7 +144,11 @@ export async function buildReceiptPdfBuffer(receipt: ReceiptData): Promise<Buffe
   };
 
   const addDivider = () => {
-    addText("-".repeat(42), { align: "left", size: 8.5, gapAfter: 3 });
+    addText(buildDividerLine(fontRegular, 8.5, CONTENT_WIDTH), {
+      align: "left",
+      size: 8.5,
+      gapAfter: 3,
+    });
   };
 
   addText(receipt.branchName, { align: "center", bold: true, size: 11, gapAfter: 2 });
