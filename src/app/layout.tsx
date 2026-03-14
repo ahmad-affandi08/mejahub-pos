@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono, Lobster_Two } from "next/font/google";
+import { Favicon } from "@/components/ui/favicon";
 import { Toaster } from "@/components/ui/sonner";
 import { Providers } from "@/components/providers";
 import "./globals.css";
@@ -38,6 +39,7 @@ export default function RootLayout({
         className={`${inter.variable} ${jetbrainsMono.variable} ${lobsterTwo.variable} antialiased`}
       >
         <Providers>
+          <Favicon />
           {children}
           <Toaster position="top-center" />
         </Providers>
