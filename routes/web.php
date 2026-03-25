@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use Illuminate\Http\Request;
 
 Route::get('/', function () {
     if (auth()->check()) {
@@ -56,6 +57,30 @@ if (File::exists($modulesPath)) {
                     $permissionKey = $moduleSlug . '.' . $featureSlug . '.access';
 
                     $resourceRoute->middleware(['auth', 'permission:' . $permissionKey]);
+
+                    Route::post($urlSlug . '/delete', function (Request $request) use ($resourceClass) {
+                        $id = (string) $request->input('id', '');
+
+                        if (trim($id) === '') {
+                            abort(422, 'Parameter id wajib diisi.');
+                        }
+
+                        return app($resourceClass)->destroy((int) $id);
+                    })
+                        ->middleware(['auth', 'permission:' . $permissionKey])
+                        ->name($routeName . '.delete');
+
+                    Route::delete($urlSlug, function (Request $request) use ($resourceClass) {
+                        $id = (string) $request->input('id', '');
+
+                        if (trim($id) === '') {
+                            abort(422, 'Parameter id wajib diisi.');
+                        }
+
+                        return app($resourceClass)->destroy((int) $id);
+                    })
+                        ->middleware(['auth', 'permission:' . $permissionKey])
+                        ->name($routeName . '.destroy-by-body');
                 }
             }
         }

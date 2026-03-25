@@ -53,7 +53,18 @@ export default function Index({ hakAkses, userOptions, filters, flashMessage }) 
 
     const removeItem = (id) => {
         if (!window.confirm("Hapus role ini?")) return;
-        router.delete(`${endpoint}/${id}`, { preserveScroll: true });
+        const normalizedId = String(id ?? "").trim();
+
+        if (!normalizedId) {
+            window.alert("ID data tidak valid. Muat ulang halaman lalu coba lagi.");
+            return;
+        }
+
+        router.post(`${endpoint}/delete`, {
+            id: normalizedId,
+        }, {
+            preserveScroll: true,
+        });
     };
 
     return (
