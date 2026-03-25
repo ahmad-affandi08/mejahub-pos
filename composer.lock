@@ -266,13 +266,13 @@
                     "email": "schmittjoh@gmail.com"
                 }
             ],
-            "description": "PHP Doctrine Inflector is a small library that can perform string manipulations with regard to upper/lowercase and singular/plural forms of words.",
+            "description": "PHP Doctrine Inflector is a small library that can perform string mano_identitasulations with regard to upper/lowercase and singular/plural forms of words.",
             "homepage": "https://www.doctrine-project.org/projects/inflector.html",
             "keywords": [
                 "inflection",
                 "inflector",
                 "lowercase",
-                "manipulation",
+                "mano_identitasulation",
                 "php",
                 "plural",
                 "singular",
@@ -1941,7 +1941,7 @@
                 "ext-intl": "to handle IDN host with the best performance",
                 "ext-uri": "to use the PHP native URI class",
                 "jeremykendall/php-domain-parser": "to further parse the URI host and resolve its Public Suffix and Top Level Domain",
-                "league/uri-components": "to provide additional tools to manipulate URI objects components",
+                "league/uri-components": "to provide additional tools to mano_identitasulate URI objects components",
                 "league/uri-polyfill": "to backport the PHP URI extension for older versions of PHP",
                 "php-64bit": "to improve IPV4 host parsing",
                 "rowbot/url": "to handle URLs using the WHATWG URL Living Standard specification",
@@ -1969,7 +1969,7 @@
                     "homepage": "https://nyamsprod.com"
                 }
             ],
-            "description": "URI manipulation library",
+            "description": "URI mano_identitasulation library",
             "homepage": "https://uri.thephpleague.com",
             "keywords": [
                 "URN",
@@ -2435,7 +2435,7 @@
                     "homepage": "https://nette.org/contributors"
                 }
             ],
-            "description": "🛠  Nette Utils: lightweight utilities for string & array manipulation, image handling, safe JSON encoding/decoding, validation, slug or strong password generating etc.",
+            "description": "🛠  Nette Utils: lightweight utilities for string & array mano_identitasulation, image handling, safe JSON encoding/decoding, validation, slug or strong password generating etc.",
             "homepage": "https://nette.org",
             "keywords": [
                 "array",
@@ -3275,7 +3275,7 @@
                     "homepage": "https://benramsey.com"
                 }
             ],
-            "description": "A PHP library for representing and manipulating collections.",
+            "description": "A PHP library for representing and mano_identitasulating collections.",
             "keywords": [
                 "array",
                 "collection",
@@ -4336,7 +4336,7 @@
                     "homepage": "https://symfony.com/contributors"
                 }
             ],
-            "description": "Allows manipulating MIME messages",
+            "description": "Allows mano_identitasulating MIME messages",
             "homepage": "https://symfony.com",
             "keywords": [
                 "mime",

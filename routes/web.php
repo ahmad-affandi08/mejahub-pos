@@ -5,7 +5,11 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 
 Route::get('/', function () {
-    return view('welcome');
+    if (auth()->check()) {
+        return redirect('/menu/kategori-menu');
+    }
+
+    return redirect('/auth/login');
 });
 
 
@@ -30,9 +34,13 @@ if (File::exists($modulesPath)) {
 
                 $routeName = Str::kebab($moduleName) . '.' . Str::kebab($featureName);
 
-                Route::resource($urlSlug, $resourceClass)
-                    ->parameters([$urlSlug => 'id']) 
+                $resourceRoute = Route::resource($urlSlug, $resourceClass)
+                    ->parameters([$urlSlug => 'id'])
                     ->names($routeName);
+
+                if (Str::lower($moduleName) !== 'auth') {
+                    $resourceRoute->middleware('auth');
+                }
             }
         }
     }
