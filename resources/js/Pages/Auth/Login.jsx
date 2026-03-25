@@ -85,10 +85,6 @@ export default function Login({ status }) {
                                     />
                                     <span>Ingat saya</span>
                                 </label>
-
-                                <Link href="/" className="text-sm underline underline-offset-4">
-                                    Kembali
-                                </Link>
                             </div>
 
                             <Button type="submit" className="w-full" disabled={processing}>

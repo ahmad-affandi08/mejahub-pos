@@ -30,6 +30,7 @@ const navItems = [
 	{ title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
 	{ title: "Menu", href: "/menu/kategori-menu", icon: Package },
 	{ title: "HR", href: "/hr/data-pegawai", icon: Users },
+	{ title: "Hak Akses", href: "/hr/hak-akses", icon: Settings },
 	{ title: "POS", href: "/pos/pesanan-masuk", icon: CircleDollarSign },
 	{ title: "Settings", href: "/settings/profil-toko", icon: Settings },
 ];

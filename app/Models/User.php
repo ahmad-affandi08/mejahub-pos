@@ -3,8 +3,10 @@
 namespace App\Models;
 
 use App\Modules\HR\DataPegawai\DataPegawaiEntity;
+use App\Modules\HR\HakAkses\HakAksesEntity;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -51,5 +53,11 @@ class User extends Authenticatable
     public function dataPegawai(): HasOne
     {
         return $this->hasOne(DataPegawaiEntity::class, 'user_id');
+    }
+
+    public function hakAkses(): BelongsToMany
+    {
+        return $this->belongsToMany(HakAksesEntity::class, 'user_hak_akses', 'user_id', 'hak_akses_id')
+            ->withTimestamps();
     }
 }

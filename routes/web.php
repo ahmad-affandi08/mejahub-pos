@@ -39,7 +39,9 @@ if (File::exists($modulesPath)) {
                     ->names($routeName);
 
                 if (Str::lower($moduleName) !== 'auth') {
-                    $resourceRoute->middleware('auth');
+                    $permissionKey = Str::kebab($moduleName) . '.' . Str::kebab($featureName) . '.access';
+
+                    $resourceRoute->middleware(['auth', 'permission:' . $permissionKey]);
                 }
             }
         }
