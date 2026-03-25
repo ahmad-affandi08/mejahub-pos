@@ -19,7 +19,7 @@ class LoginResource extends Controller
     public function index(): Response|RedirectResponse
     {
         if (auth()->check()) {
-            return redirect('/');
+            return redirect('/dashboard/overview');
         }
 
         return Inertia::render('Auth/Login', LoginCollection::guestPayload());
@@ -40,7 +40,7 @@ class LoginResource extends Controller
             'password' => $payload['password'],
         ], $remember, $request);
 
-        return redirect('/');
+        return redirect('/dashboard/overview');
     }
 
     public function destroy(Request $request, int $id): RedirectResponse

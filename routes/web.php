@@ -6,7 +6,7 @@ use Illuminate\Support\Str;
 
 Route::get('/', function () {
     if (auth()->check()) {
-        return redirect('/menu/kategori-menu');
+        return redirect('/dashboard/overview');
     }
 
     return redirect('/auth/login');
@@ -25,21 +25,23 @@ if (File::exists($modulesPath)) {
 
         foreach ($features as $feature) {
             $featureName = basename($feature);
+            $moduleSlug = Str::kebab(Str::lower($moduleName));
+            $featureSlug = Str::kebab($featureName);
 
             $resourceClass = "App\\Modules\\{$moduleName}\\{$featureName}\\{$featureName}Resource";
 
             if (File::exists($feature . '/' . $featureName . 'Resource.php')) {
 
-                $urlSlug = Str::kebab($moduleName) . '/' . Str::kebab($featureName);
+                $urlSlug = $moduleSlug . '/' . $featureSlug;
 
-                $routeName = Str::kebab($moduleName) . '.' . Str::kebab($featureName);
+                $routeName = $moduleSlug . '.' . $featureSlug;
 
                 $resourceRoute = Route::resource($urlSlug, $resourceClass)
                     ->parameters([$urlSlug => 'id'])
                     ->names($routeName);
 
                 if (Str::lower($moduleName) !== 'auth') {
-                    $permissionKey = Str::kebab($moduleName) . '.' . Str::kebab($featureName) . '.access';
+                    $permissionKey = $moduleSlug . '.' . $featureSlug . '.access';
 
                     $resourceRoute->middleware(['auth', 'permission:' . $permissionKey]);
                 }

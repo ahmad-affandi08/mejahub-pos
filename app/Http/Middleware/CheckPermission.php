@@ -29,6 +29,12 @@ class CheckPermission
             ->unique()
             ->values();
 
+        // Bootstrap-safe mode: if user already has roles but permissions are not configured yet,
+        // do not lock the user out of pages.
+        if ($keys->isEmpty()) {
+            return $next($request);
+        }
+
         if ($keys->contains($permission) || $keys->contains('*')) {
             return $next($request);
         }

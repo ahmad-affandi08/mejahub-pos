@@ -28,6 +28,7 @@ class HakAksesSeeder extends Seeder
                 'deskripsi' => 'Akses operasional outlet dan laporan.',
                 'is_active' => true,
                 'permissions' => [
+                    'dashboard.overview.access',
                     'menu.kategori-menu.access',
                     'hr.data-pegawai.access',
                     'hr.hak-akses.access',
@@ -41,7 +42,10 @@ class HakAksesSeeder extends Seeder
                 'deskripsi' => 'Akses transaksi POS harian.',
                 'is_active' => true,
                 'permissions' => [
+                    'dashboard.overview.access',
                     'menu.kategori-menu.access',
+                    'hr.data-pegawai.access',
+                    'hr.hak-akses.access',
                     'pos.pesanan-masuk.access',
                 ],
                 'emails' => ['kasir@mejahub.local'],
