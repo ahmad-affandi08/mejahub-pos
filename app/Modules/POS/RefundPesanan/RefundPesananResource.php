@@ -72,4 +72,31 @@ class RefundPesananResource extends Controller
 			->route('pos.refund-pesanan.index')
 			->with('success', 'Refund berhasil diproses.');
 	}
+
+	public function show(Request $request, int $id): JsonResponse|RedirectResponse
+	{
+		$log = RefundPesananEntity::query()
+			->with(['pesanan.meja:id,nama', 'pesanan.items', 'kasir:id,name'])
+			->findOrFail($id);
+
+		if ($request->expectsJson()) {
+			return ApiResponder::success('Detail refund berhasil dimuat.', [
+				'refund' => [
+					'id' => $log->id,
+					'kode' => $log->kode,
+					'pesanan_id' => $log->pesanan_id,
+					'nominal' => (float) $log->nominal,
+					'metode' => $log->metode,
+					'alasan' => $log->alasan,
+					'status' => $log->status,
+					'refunded_at' => optional($log->refunded_at)->toDateTimeString(),
+				],
+				'receipt' => RefundPesananCollection::toReceipt($log),
+			]);
+		}
+
+		return redirect()
+			->route('pos.refund-pesanan.index')
+			->with('success', 'Detail refund siap ditampilkan.');
+	}
 }

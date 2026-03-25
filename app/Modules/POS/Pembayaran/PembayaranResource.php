@@ -76,4 +76,22 @@ class PembayaranResource extends Controller
 			->route('pos.pembayaran.index')
 			->with('success', 'Pembayaran berhasil diproses.');
 	}
+
+	public function show(Request $request, int $id): JsonResponse|RedirectResponse
+	{
+		$payment = PembayaranEntity::query()
+			->with(['pesanan.meja:id,nama', 'pesanan.items', 'kasir:id,name'])
+			->findOrFail($id);
+
+		if ($request->expectsJson()) {
+			return ApiResponder::success('Detail pembayaran berhasil dimuat.', [
+				'payment' => PembayaranCollection::toItem($payment),
+				'receipt' => PembayaranCollection::toReceipt($payment),
+			]);
+		}
+
+		return redirect()
+			->route('pos.pembayaran.index')
+			->with('success', 'Detail pembayaran siap ditampilkan.');
+	}
 }

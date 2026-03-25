@@ -211,7 +211,76 @@ class PosAdvancedFlowTest extends TestCase
                 'meta',
                 'errors',
             ])
-            ->assertJsonPath('data.summary.cash_total', 20000.0);
+            ->assertJsonPath('data.summary.cash_total', 20000);
+    }
+
+    public function test_pembayaran_show_returns_receipt_payload(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        ['menu_id' => $menuId, 'meja_id' => $mejaId] = $this->seedMasterData();
+        $order = $this->createOrder($menuId, $mejaId, 'paid', 1, 15000);
+
+        $payment = PembayaranEntity::query()->create([
+            'pesanan_id' => $order->id,
+            'user_id' => $user->id,
+            'kode' => 'PAY-TEST-SHOW-001',
+            'metode_bayar' => 'cash',
+            'nominal_tagihan' => 15000,
+            'nominal_dibayar' => 20000,
+            'kembalian' => 5000,
+            'status' => 'paid',
+            'waktu_bayar' => now(),
+        ]);
+
+        $response = $this->getJson('/pos/pembayaran/' . $payment->id);
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonStructure([
+                'success',
+                'message',
+                'data' => ['payment', 'receipt'],
+                'meta',
+                'errors',
+            ]);
+    }
+
+    public function test_refund_show_returns_receipt_payload(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        ['menu_id' => $menuId, 'meja_id' => $mejaId] = $this->seedMasterData();
+        $order = $this->createOrder($menuId, $mejaId, 'paid', 1, 15000);
+
+        $refundId = DB::table('pos_refund_pesanan')->insertGetId([
+            'pesanan_id' => $order->id,
+            'user_id' => $user->id,
+            'kode' => 'REF-TEST-SHOW-001',
+            'nominal' => 15000,
+            'metode' => 'cash',
+            'alasan' => 'Test show',
+            'status' => 'processed',
+            'refunded_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->getJson('/pos/refund-pesanan/' . $refundId);
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonStructure([
+                'success',
+                'message',
+                'data' => ['refund', 'receipt'],
+                'meta',
+                'errors',
+            ]);
     }
 
     private function seedMasterData(): array
