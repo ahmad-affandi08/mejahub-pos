@@ -70,7 +70,12 @@ const moduleItems = [
 	{
 		title: "POS",
 		icon: CircleDollarSign,
-		items: [],
+		items: [
+			{ title: "Buka Shift", href: "/pos/buka-shift" },
+			{ title: "Pesanan Masuk", href: "/pos/pesanan-masuk" },
+			{ title: "Pembayaran", href: "/pos/pembayaran" },
+			{ title: "Tutup Shift", href: "/pos/tutup-shift" },
+		],
 	},
 	{
 		title: "Settings",
