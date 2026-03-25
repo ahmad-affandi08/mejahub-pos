@@ -4,21 +4,20 @@ import { useMemo, useState } from "react";
 import POSLayout from "@/layouts/POSLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import POSStatusBadge from "@/components/shared/pos/POSStatusBadge";
+import POSSummaryCard from "@/components/shared/pos/POSSummaryCard";
+import { formatIDR } from "@/components/shared/pos/format";
 import Form from "@/Pages/POS/PesananMasuk/Form";
-
-const currency = new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    maximumFractionDigits: 0,
-});
 
 export default function Index({ menus, meja, orders, filters, flashMessage }) {
     const endpoint = "/pos/pesanan-masuk";
     const [search, setSearch] = useState(filters?.search ?? "");
-    const [selectedMeja, setSelectedMeja] = useState("");
-    const [namaPelanggan, setNamaPelanggan] = useState("");
-    const [catatan, setCatatan] = useState("");
-    const [cart, setCart] = useState([]);
+    const [values, setValues] = useState({
+        selectedMeja: "",
+        namaPelanggan: "",
+        catatan: "",
+        cart: [],
+    });
 
     const filteredMenus = useMemo(() => {
         if (!search.trim()) return menus;
@@ -28,64 +27,79 @@ export default function Index({ menus, meja, orders, filters, flashMessage }) {
     }, [menus, search]);
 
     const subtotal = useMemo(
-        () => cart.reduce((acc, item) => acc + (item.harga * item.qty), 0),
-        [cart]
+        () => values.cart.reduce((acc, item) => acc + (item.harga * item.qty), 0),
+        [values.cart]
     );
 
+    const handleChange = (field, value) => {
+        setValues((prev) => ({ ...prev, [field]: value }));
+    };
+
     const addToCart = (menu) => {
-        setCart((prev) => {
-            const idx = prev.findIndex((item) => item.data_menu_id === menu.id);
+        setValues((prev) => {
+            const idx = prev.cart.findIndex((item) => item.data_menu_id === menu.id);
+
             if (idx >= 0) {
-                const next = [...prev];
-                next[idx] = { ...next[idx], qty: next[idx].qty + 1 };
-                return next;
+                const nextCart = [...prev.cart];
+                nextCart[idx] = { ...nextCart[idx], qty: nextCart[idx].qty + 1 };
+                return { ...prev, cart: nextCart };
             }
 
-            return [
+            return {
                 ...prev,
-                {
-                    data_menu_id: menu.id,
-                    nama_menu: menu.nama,
-                    harga: Number(menu.harga || 0),
-                    qty: 1,
-                    catatan: "",
-                },
-            ];
+                cart: [
+                    ...prev.cart,
+                    {
+                        data_menu_id: menu.id,
+                        nama_menu: menu.nama,
+                        harga: Number(menu.harga || 0),
+                        qty: 1,
+                        catatan: "",
+                    },
+                ],
+            };
         });
     };
 
     const updateQty = (menuId, delta) => {
-        setCart((prev) => prev
-            .map((item) => item.data_menu_id === menuId
+        setValues((prev) => ({
+            ...prev,
+            cart: prev.cart.map((item) => item.data_menu_id === menuId
                 ? { ...item, qty: Math.max(1, item.qty + delta) }
                 : item
-            ));
+            ),
+        }));
     };
 
     const removeItem = (menuId) => {
-        setCart((prev) => prev.filter((item) => item.data_menu_id !== menuId));
+        setValues((prev) => ({
+            ...prev,
+            cart: prev.cart.filter((item) => item.data_menu_id !== menuId),
+        }));
     };
 
     const setItemNote = (menuId, note) => {
-        setCart((prev) => prev
-            .map((item) => item.data_menu_id === menuId
+        setValues((prev) => ({
+            ...prev,
+            cart: prev.cart.map((item) => item.data_menu_id === menuId
                 ? { ...item, catatan: note }
                 : item
-            ));
+            ),
+        }));
     };
 
     const submitOrder = () => {
-        if (!cart.length) {
+        if (!values.cart.length) {
             window.alert("Keranjang masih kosong.");
             return;
         }
 
         router.post(endpoint, {
-            data_meja_id: selectedMeja ? Number(selectedMeja) : null,
-            nama_pelanggan: namaPelanggan || null,
-            catatan: catatan || null,
+            data_meja_id: values.selectedMeja ? Number(values.selectedMeja) : null,
+            nama_pelanggan: values.namaPelanggan || null,
+            catatan: values.catatan || null,
             status: "submitted",
-            items: cart.map((item) => ({
+            items: values.cart.map((item) => ({
                 data_menu_id: item.data_menu_id,
                 qty: item.qty,
                 catatan: item.catatan || null,
@@ -93,10 +107,12 @@ export default function Index({ menus, meja, orders, filters, flashMessage }) {
         }, {
             preserveScroll: true,
             onSuccess: () => {
-                setCart([]);
-                setCatatan("");
-                setNamaPelanggan("");
-                setSelectedMeja("");
+                setValues({
+                    selectedMeja: "",
+                    namaPelanggan: "",
+                    catatan: "",
+                    cart: [],
+                });
             },
         });
     };
@@ -108,6 +124,13 @@ export default function Index({ menus, meja, orders, filters, flashMessage }) {
     return (
         <POSLayout title="Pesanan Masuk">
             <Head title="POS - Pesanan Masuk" />
+
+            <div className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                <POSSummaryCard label="Menu Aktif" value={String(filteredMenus.length)} tone="sky" />
+                <POSSummaryCard label="Item Keranjang" value={String(values.cart.length)} tone="orange" />
+                <POSSummaryCard label="Pesanan Aktif" value={String(orders.length)} tone="slate" />
+                <POSSummaryCard label="Subtotal" value={formatIDR(subtotal)} tone="emerald" />
+            </div>
 
             <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
                 <section className="rounded-3xl border border-orange-100 bg-white/95 p-4 shadow-sm md:p-6">
@@ -143,26 +166,23 @@ export default function Index({ menus, meja, orders, filters, flashMessage }) {
                                     {menu.kategori_nama || "Tanpa Kategori"}
                                 </p>
                                 <h3 className="mt-1 line-clamp-2 text-base font-semibold text-slate-900">{menu.nama}</h3>
-                                <p className="mt-3 text-sm font-semibold text-orange-700">{currency.format(menu.harga || 0)}</p>
+                                <p className="mt-3 text-sm font-semibold text-orange-700">{formatIDR(menu.harga || 0)}</p>
                             </button>
                         ))}
                     </div>
                 </section>
 
                 <Form
-                    meja={meja}
-                    cart={cart}
-                    subtotal={subtotal}
-                    selectedMeja={selectedMeja}
-                    namaPelanggan={namaPelanggan}
-                    catatan={catatan}
-                    onSelectMeja={setSelectedMeja}
-                    onChangeNamaPelanggan={setNamaPelanggan}
-                    onChangeCatatan={setCatatan}
-                    onDecreaseQty={(menuId) => updateQty(menuId, -1)}
-                    onIncreaseQty={(menuId) => updateQty(menuId, 1)}
-                    onRemoveItem={removeItem}
-                    onChangeItemNote={setItemNote}
+                    values={values}
+                    options={{ meja }}
+                    state={{ subtotal }}
+                    handlers={{
+                        onDecreaseQty: (menuId) => updateQty(menuId, -1),
+                        onIncreaseQty: (menuId) => updateQty(menuId, 1),
+                        onRemoveItem: removeItem,
+                        onChangeItemNote: setItemNote,
+                    }}
+                    onChange={handleChange}
                     onSubmit={submitOrder}
                 />
             </div>
@@ -192,11 +212,9 @@ export default function Index({ menus, meja, orders, filters, flashMessage }) {
                                     <td className="py-2">{order.meja_nama || "-"}</td>
                                     <td className="py-2">{order.nama_pelanggan || "-"}</td>
                                     <td className="py-2">
-                                        <span className="rounded-full bg-orange-100 px-2 py-1 text-xs font-medium text-orange-700">
-                                            {order.status}
-                                        </span>
+                                        <POSStatusBadge status={order.status} />
                                     </td>
-                                    <td className="py-2">{currency.format(order.total)}</td>
+                                    <td className="py-2">{formatIDR(order.total)}</td>
                                     <td className="py-2 text-right">
                                         <div className="inline-flex gap-2">
                                             <Button type="button" size="sm" variant="outline" onClick={() => updateStatus(order.id, "paid")}>Bayar</Button>

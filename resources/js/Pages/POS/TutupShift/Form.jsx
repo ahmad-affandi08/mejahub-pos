@@ -2,19 +2,17 @@ import { useMemo } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import MoneyText from "@/components/shared/pos/MoneyText";
+import POSStatusBadge from "@/components/shared/pos/POSStatusBadge";
 
-const currency = new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    maximumFractionDigits: 0,
-});
+export default function Form({ values, state, onChange, onSubmit }) {
+    const activeShift = state.activeShift;
 
-export default function Form({ activeShift, kasAktual, catatan, onChangeKasAktual, onChangeCatatan, onSubmit }) {
     const selisihPreview = useMemo(() => {
         if (!activeShift) return 0;
         const system = Number(activeShift.kas_sistem ?? activeShift.kas_awal ?? 0);
-        return Number(kasAktual || 0) - system;
-    }, [activeShift, kasAktual]);
+        return Number(values.kasAktual || 0) - system;
+    }, [activeShift, values.kasAktual]);
 
     if (!activeShift) {
         return (
@@ -28,26 +26,32 @@ export default function Form({ activeShift, kasAktual, catatan, onChangeKasAktua
         <form onSubmit={onSubmit} className="mt-4 space-y-4">
             <div className="rounded-xl bg-slate-50 p-4 text-sm">
                 <p>Kode Shift: <span className="font-semibold">{activeShift.kode}</span></p>
-                <p>Kas Awal: <span className="font-semibold">{currency.format(activeShift.kas_awal)}</span></p>
-                <p>Status: <span className="font-semibold">{activeShift.status}</span></p>
+                <p>Kas Awal: <MoneyText value={activeShift.kas_awal} className="font-semibold" /></p>
+                <p className="flex items-center gap-2">Status: <POSStatusBadge status={activeShift.status} /></p>
             </div>
 
             <div>
                 <label className="mb-1 block text-xs font-medium text-slate-500">Kas Aktual</label>
-                <Input type="number" min="0" value={kasAktual} onChange={(event) => onChangeKasAktual(event.target.value)} required />
+                <Input
+                    type="number"
+                    min="0"
+                    value={values.kasAktual}
+                    onChange={(event) => onChange("kasAktual", event.target.value)}
+                    required
+                />
             </div>
 
             <div>
                 <label className="mb-1 block text-xs font-medium text-slate-500">Catatan Tutup</label>
                 <textarea
                     className="min-h-24 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-                    value={catatan}
-                    onChange={(event) => onChangeCatatan(event.target.value)}
+                    value={values.catatan}
+                    onChange={(event) => onChange("catatan", event.target.value)}
                 />
             </div>
 
             <div className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-sm text-orange-700">
-                Selisih Preview: <span className="font-semibold">{currency.format(selisihPreview)}</span>
+                Selisih Preview: <MoneyText value={selisihPreview} className="font-semibold" />
             </div>
 
             <Button type="submit" className="w-full">Tutup Shift</Button>

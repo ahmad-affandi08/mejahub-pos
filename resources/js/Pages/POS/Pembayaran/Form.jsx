@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import MoneyText from "@/components/shared/pos/MoneyText";
 
 const methods = [
     { value: "cash", label: "Cash" },
@@ -9,22 +10,10 @@ const methods = [
     { value: "transfer", label: "Transfer" },
 ];
 
-const currency = new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    maximumFractionDigits: 0,
-});
-
 export default function Form({
-    activeShift,
-    selectedOrder,
-    nominalDibayar,
-    metodeBayar,
-    catatan,
-    kembalian,
-    onChangeMetodeBayar,
-    onChangeNominalDibayar,
-    onChangeCatatan,
+    values,
+    state,
+    onChange,
     onSubmit,
 }) {
     return (
@@ -36,8 +25,8 @@ export default function Form({
                     <label className="mb-1 block text-xs font-medium text-slate-500">Metode Bayar</label>
                     <select
                         className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm"
-                        value={metodeBayar}
-                        onChange={(event) => onChangeMetodeBayar(event.target.value)}
+                        value={values.metodeBayar}
+                        onChange={(event) => onChange("metodeBayar", event.target.value)}
                     >
                         {methods.map((item) => (
                             <option key={item.value} value={item.value}>{item.label}</option>
@@ -50,8 +39,8 @@ export default function Form({
                     <Input
                         type="number"
                         min="0"
-                        value={nominalDibayar}
-                        onChange={(event) => onChangeNominalDibayar(event.target.value)}
+                        value={values.nominalDibayar}
+                        onChange={(event) => onChange("nominalDibayar", event.target.value)}
                     />
                 </div>
 
@@ -59,18 +48,18 @@ export default function Form({
                     <label className="mb-1 block text-xs font-medium text-slate-500">Catatan</label>
                     <textarea
                         className="min-h-20 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-                        value={catatan}
-                        onChange={(event) => onChangeCatatan(event.target.value)}
+                        value={values.catatan}
+                        onChange={(event) => onChange("catatan", event.target.value)}
                     />
                 </div>
 
                 <div className="space-y-1 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
-                    <p>Total Tagihan: <span className="font-semibold">{currency.format(selectedOrder?.total || 0)}</span></p>
-                    <p>Kembalian: <span className="font-semibold">{currency.format(kembalian)}</span></p>
+                    <p>Total Tagihan: <MoneyText value={state.selectedOrder?.total || 0} className="font-semibold" /></p>
+                    <p>Kembalian: <MoneyText value={state.kembalian} className="font-semibold" /></p>
                 </div>
 
-                <Button className="w-full" onClick={onSubmit} disabled={!activeShift}>Proses Pembayaran</Button>
-                {!activeShift ? (
+                <Button className="w-full" onClick={onSubmit} disabled={!state.hasActiveShift}>Proses Pembayaran</Button>
+                {!state.hasActiveShift ? (
                     <p className="text-xs text-rose-600">Buka shift dulu sebelum proses pembayaran.</p>
                 ) : null}
             </div>

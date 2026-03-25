@@ -1,31 +1,40 @@
 import { Head, router } from "@inertiajs/react";
 import { useState } from "react";
 
+import MoneyText from "@/components/shared/pos/MoneyText";
+import POSStatusBadge from "@/components/shared/pos/POSStatusBadge";
+import POSSummaryCard from "@/components/shared/pos/POSSummaryCard";
 import POSLayout from "@/layouts/POSLayout";
 import Form from "@/Pages/POS/BukaShift/Form";
 
-const currency = new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    maximumFractionDigits: 0,
-});
-
 export default function Index({ activeShift, recentShifts, flashMessage }) {
-    const [kasAwal, setKasAwal] = useState("");
-    const [catatan, setCatatan] = useState("");
+    const [values, setValues] = useState({
+        kasAwal: "",
+        catatan: "",
+    });
+
+    const handleChange = (field, value) => {
+        setValues((prev) => ({ ...prev, [field]: value }));
+    };
 
     const submit = (event) => {
         event.preventDefault();
 
         router.post("/pos/buka-shift", {
-            kas_awal: Number(kasAwal || 0),
-            catatan_buka: catatan || null,
+            kas_awal: Number(values.kasAwal || 0),
+            catatan_buka: values.catatan || null,
         }, { preserveScroll: true });
     };
 
     return (
         <POSLayout title="Buka Shift">
             <Head title="POS - Buka Shift" />
+
+            <div className="mb-4 grid gap-2 sm:grid-cols-3">
+                <POSSummaryCard label="Shift Aktif" value={activeShift ? "Ya" : "Tidak"} tone="sky" />
+                <POSSummaryCard label="Jumlah Riwayat" value={String(recentShifts.length)} tone="slate" />
+                <POSSummaryCard label="Kas Awal Form" value={values.kasAwal ? `Rp ${values.kasAwal}` : "Rp 0"} tone="orange" />
+            </div>
 
             <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
                 <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -39,11 +48,9 @@ export default function Index({ activeShift, recentShifts, flashMessage }) {
                     ) : null}
 
                     <Form
-                        kasAwal={kasAwal}
-                        catatan={catatan}
-                        activeShift={activeShift}
-                        onChangeKasAwal={setKasAwal}
-                        onChangeCatatan={setCatatan}
+                        values={values}
+                        state={{ hasActiveShift: !!activeShift }}
+                        onChange={handleChange}
                         onSubmit={submit}
                     />
                 </section>
@@ -54,8 +61,8 @@ export default function Index({ activeShift, recentShifts, flashMessage }) {
                         {activeShift ? (
                             <div className="mt-2 space-y-1 text-sm text-slate-700">
                                 <p>Kode: <span className="font-semibold">{activeShift.kode}</span></p>
-                                <p>Kas Awal: <span className="font-semibold">{currency.format(activeShift.kas_awal)}</span></p>
-                                <p>Status: <span className="font-semibold">{activeShift.status}</span></p>
+                                <p>Kas Awal: <MoneyText value={activeShift.kas_awal} className="font-semibold" /></p>
+                                <p className="flex items-center gap-2">Status: <POSStatusBadge status={activeShift.status} /></p>
                             </div>
                         ) : (
                             <p className="mt-2 text-sm text-slate-600">Belum ada shift aktif.</p>
@@ -68,8 +75,8 @@ export default function Index({ activeShift, recentShifts, flashMessage }) {
                             {recentShifts.length ? recentShifts.map((item) => (
                                 <div key={item.id} className="rounded-xl border border-slate-200 px-3 py-2 text-sm">
                                     <p className="font-semibold text-slate-900">{item.kode}</p>
-                                    <p className="text-slate-600">Kas Awal: {currency.format(item.kas_awal)}</p>
-                                    <p className="text-slate-600">Status: {item.status}</p>
+                                    <p className="text-slate-600">Kas Awal: <MoneyText value={item.kas_awal} /></p>
+                                    <p className="mt-1"><POSStatusBadge status={item.status} /></p>
                                 </div>
                             )) : (
                                 <p className="text-sm text-slate-500">Belum ada data shift.</p>

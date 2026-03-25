@@ -1,30 +1,33 @@
 import { Head, router } from "@inertiajs/react";
 import { useMemo, useState } from "react";
 
+import MoneyText from "@/components/shared/pos/MoneyText";
+import POSStatusBadge from "@/components/shared/pos/POSStatusBadge";
+import POSSummaryCard from "@/components/shared/pos/POSSummaryCard";
 import POSLayout from "@/layouts/POSLayout";
 import Form from "@/Pages/POS/Pembayaran/Form";
 
-const currency = new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    maximumFractionDigits: 0,
-});
-
 export default function Index({ pendingOrders, activeShift, flashMessage }) {
-    const [selectedOrderId, setSelectedOrderId] = useState("");
-    const [nominalDibayar, setNominalDibayar] = useState("");
-    const [metodeBayar, setMetodeBayar] = useState("cash");
-    const [catatan, setCatatan] = useState("");
+    const [values, setValues] = useState({
+        selectedOrderId: "",
+        nominalDibayar: "",
+        metodeBayar: "cash",
+        catatan: "",
+    });
+
+    const handleChange = (field, value) => {
+        setValues((prev) => ({ ...prev, [field]: value }));
+    };
 
     const selectedOrder = useMemo(
-        () => pendingOrders.find((item) => String(item.id) === String(selectedOrderId)) ?? null,
-        [pendingOrders, selectedOrderId]
+        () => pendingOrders.find((item) => String(item.id) === String(values.selectedOrderId)) ?? null,
+        [pendingOrders, values.selectedOrderId]
     );
 
     const kembalian = useMemo(() => {
         if (!selectedOrder) return 0;
-        return Number(nominalDibayar || 0) - Number(selectedOrder.total || 0);
-    }, [selectedOrder, nominalDibayar]);
+        return Number(values.nominalDibayar || 0) - Number(selectedOrder.total || 0);
+    }, [selectedOrder, values.nominalDibayar]);
 
     const pay = () => {
         if (!selectedOrder) {
@@ -34,16 +37,18 @@ export default function Index({ pendingOrders, activeShift, flashMessage }) {
 
         router.post("/pos/pembayaran", {
             pesanan_id: selectedOrder.id,
-            metode_bayar: metodeBayar,
-            nominal_dibayar: Number(nominalDibayar || 0),
-            catatan: catatan || null,
+            metode_bayar: values.metodeBayar,
+            nominal_dibayar: Number(values.nominalDibayar || 0),
+            catatan: values.catatan || null,
         }, {
             preserveScroll: true,
             onSuccess: () => {
-                setSelectedOrderId("");
-                setNominalDibayar("");
-                setCatatan("");
-                setMetodeBayar("cash");
+                setValues({
+                    selectedOrderId: "",
+                    nominalDibayar: "",
+                    metodeBayar: "cash",
+                    catatan: "",
+                });
             },
         });
     };
@@ -52,11 +57,20 @@ export default function Index({ pendingOrders, activeShift, flashMessage }) {
         <POSLayout title="Pembayaran">
             <Head title="POS - Pembayaran" />
 
+            <div className="mb-4 grid gap-2 sm:grid-cols-3">
+                <POSSummaryCard label="Pending Bayar" value={String(pendingOrders.length)} tone="orange" />
+                <POSSummaryCard label="Shift Aktif" value={activeShift ? "Ya" : "Tidak"} tone="sky" />
+                <POSSummaryCard label="Nominal Input" value={<MoneyText value={values.nominalDibayar || 0} />} tone="emerald" />
+            </div>
+
             <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
                 <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                     <div className="mb-3 flex items-center justify-between">
                         <h2 className="text-lg font-semibold text-slate-900">Pesanan Menunggu Bayar</h2>
-                        <p className="text-xs text-slate-500">Shift: {activeShift?.kode || "Belum aktif"}</p>
+                        <div className="flex items-center gap-2 text-xs text-slate-500">
+                            <span>Shift: {activeShift?.kode || "Belum aktif"}</span>
+                            {activeShift ? <POSStatusBadge status={activeShift.status} /> : null}
+                        </div>
                     </div>
 
                     {flashMessage?.success ? (
@@ -83,16 +97,16 @@ export default function Index({ pendingOrders, activeShift, flashMessage }) {
                                                 type="radio"
                                                 name="selected_order"
                                                 value={order.id}
-                                                checked={String(selectedOrderId) === String(order.id)}
+                                                checked={String(values.selectedOrderId) === String(order.id)}
                                                 onChange={(event) => {
-                                                    setSelectedOrderId(event.target.value);
-                                                    setNominalDibayar(String(order.total));
+                                                    handleChange("selectedOrderId", event.target.value);
+                                                    handleChange("nominalDibayar", String(order.total));
                                                 }}
                                             />
                                         </td>
                                         <td className="py-2 font-medium">{order.kode}</td>
                                         <td className="py-2">{order.nama_pelanggan || "-"}</td>
-                                        <td className="py-2">{currency.format(order.total)}</td>
+                                        <td className="py-2"><MoneyText value={order.total} /></td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -101,15 +115,13 @@ export default function Index({ pendingOrders, activeShift, flashMessage }) {
                 </section>
 
                 <Form
-                    activeShift={activeShift}
-                    selectedOrder={selectedOrder}
-                    nominalDibayar={nominalDibayar}
-                    metodeBayar={metodeBayar}
-                    catatan={catatan}
-                    kembalian={kembalian}
-                    onChangeMetodeBayar={setMetodeBayar}
-                    onChangeNominalDibayar={setNominalDibayar}
-                    onChangeCatatan={setCatatan}
+                    values={values}
+                    state={{
+                        selectedOrder,
+                        kembalian,
+                        hasActiveShift: !!activeShift,
+                    }}
+                    onChange={handleChange}
                     onSubmit={pay}
                 />
             </div>
