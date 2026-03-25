@@ -3,8 +3,14 @@ import { Link, usePage } from "@inertiajs/react";
 import { Logo } from "@/components/ui/logo";
 
 export default function POSLayout({ title = "POS", children }) {
-	const { props } = usePage();
+	const { props, url } = usePage();
 	const userName = props?.auth?.user?.name ?? "Kasir";
+	const quickMenus = [
+		{ title: "Buka Shift", href: "/pos/buka-shift" },
+		{ title: "Pesanan", href: "/pos/pesanan-masuk" },
+		{ title: "Pembayaran", href: "/pos/pembayaran" },
+		{ title: "Tutup Shift", href: "/pos/tutup-shift" },
+	];
 
 	return (
 		<div className="min-h-screen bg-[radial-gradient(circle_at_top_left,#fff7ed_0%,#ffedd5_28%,#f8fafc_60%)] text-slate-900">
@@ -24,6 +30,26 @@ export default function POSLayout({ title = "POS", children }) {
 						<p className="text-xs text-slate-500">Kasir Aktif</p>
 						<p className="text-sm font-semibold text-slate-800">{userName}</p>
 					</div>
+				</div>
+
+				<div className="mx-auto flex w-full max-w-400 gap-2 overflow-x-auto px-4 pb-3 md:px-6">
+					{quickMenus.map((item) => {
+						const active = url.startsWith(item.href);
+
+						return (
+							<Link
+								key={item.href}
+								href={item.href}
+								className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] transition ${
+									active
+										? "border-orange-300 bg-orange-100 text-orange-700"
+										: "border-slate-200 bg-white text-slate-600 hover:border-orange-200 hover:text-orange-700"
+								}`}
+							>
+								{item.title}
+							</Link>
+						);
+					})}
 				</div>
 			</header>
 

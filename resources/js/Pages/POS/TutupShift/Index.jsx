@@ -1,25 +1,12 @@
 import { Head, router } from "@inertiajs/react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import POSLayout from "@/layouts/POSLayout";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-
-const currency = new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    maximumFractionDigits: 0,
-});
+import Form from "@/Pages/POS/TutupShift/Form";
 
 export default function Index({ activeShift, flashMessage }) {
     const [kasAktual, setKasAktual] = useState("");
     const [catatan, setCatatan] = useState("");
-
-    const selisihPreview = useMemo(() => {
-        if (!activeShift) return 0;
-        const system = Number(activeShift.kas_sistem ?? activeShift.kas_awal ?? 0);
-        return Number(kasAktual || 0) - system;
-    }, [activeShift, kasAktual]);
 
     const submit = (event) => {
         event.preventDefault();
@@ -49,39 +36,14 @@ export default function Index({ activeShift, flashMessage }) {
                     </p>
                 ) : null}
 
-                {!activeShift ? (
-                    <p className="mt-4 rounded-lg border border-dashed border-slate-300 px-4 py-6 text-center text-sm text-slate-500">
-                        Tidak ada shift aktif saat ini.
-                    </p>
-                ) : (
-                    <form onSubmit={submit} className="mt-4 space-y-4">
-                        <div className="rounded-xl bg-slate-50 p-4 text-sm">
-                            <p>Kode Shift: <span className="font-semibold">{activeShift.kode}</span></p>
-                            <p>Kas Awal: <span className="font-semibold">{currency.format(activeShift.kas_awal)}</span></p>
-                            <p>Status: <span className="font-semibold">{activeShift.status}</span></p>
-                        </div>
-
-                        <div>
-                            <label className="mb-1 block text-xs font-medium text-slate-500">Kas Aktual</label>
-                            <Input type="number" min="0" value={kasAktual} onChange={(event) => setKasAktual(event.target.value)} required />
-                        </div>
-
-                        <div>
-                            <label className="mb-1 block text-xs font-medium text-slate-500">Catatan Tutup</label>
-                            <textarea
-                                className="min-h-24 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-                                value={catatan}
-                                onChange={(event) => setCatatan(event.target.value)}
-                            />
-                        </div>
-
-                        <div className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-sm text-orange-700">
-                            Selisih Preview: <span className="font-semibold">{currency.format(selisihPreview)}</span>
-                        </div>
-
-                        <Button type="submit" className="w-full">Tutup Shift</Button>
-                    </form>
-                )}
+                <Form
+                    activeShift={activeShift}
+                    kasAktual={kasAktual}
+                    catatan={catatan}
+                    onChangeKasAktual={setKasAktual}
+                    onChangeCatatan={setCatatan}
+                    onSubmit={submit}
+                />
             </div>
         </POSLayout>
     );
