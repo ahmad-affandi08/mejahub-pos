@@ -3,6 +3,8 @@ import { useMemo, useState } from "react";
 
 import DashboardLayout from "@/layouts/DashboardLayout";
 import Form from "@/Pages/Meja/ReservasiMeja/Form";
+import POSStatusBadge from "@/components/shared/pos/POSStatusBadge";
+import TableToolbar from "@/components/shared/table/TableToolbar";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -12,7 +14,6 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import {
     Table,
     TableBody,
@@ -42,17 +43,6 @@ export default function Index({ reservasiMeja, mejaOptions, statusOptions, filte
     const [editingItem, setEditingItem] = useState(null);
 
     const hasData = (reservasiMeja?.data ?? []).length > 0;
-
-    const badgeClass = useMemo(
-        () => ({
-            pending: "bg-amber-100 text-amber-700",
-            confirmed: "bg-blue-100 text-blue-700",
-            seated: "bg-emerald-100 text-emerald-700",
-            cancelled: "bg-rose-100 text-rose-700",
-            done: "bg-slate-200 text-slate-700",
-        }),
-        []
-    );
 
     const submitSearch = (event) => {
         event.preventDefault();
@@ -112,16 +102,12 @@ export default function Index({ reservasiMeja, mejaOptions, statusOptions, filte
                 </section>
 
                 <section className="rounded-3xl border bg-white p-4 shadow-sm md:p-6">
-                    <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                        <form onSubmit={submitSearch} className="flex w-full max-w-md gap-2">
-                            <Input name="search" defaultValue={searchValue} placeholder="Cari nama pelanggan, kode, atau no hp" />
-                            <Button variant="outline" type="submit">Cari</Button>
-                        </form>
-
-                        {flashMessage?.success ? (
-                            <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{flashMessage.success}</p>
-                        ) : null}
-                    </div>
+                    <TableToolbar
+                        searchValue={searchValue}
+                        searchPlaceholder="Cari nama pelanggan, kode, atau no hp"
+                        onSubmit={submitSearch}
+                        flashMessage={flashMessage?.success}
+                    />
 
                     <div className="w-full overflow-x-auto">
                         <Table>
@@ -149,9 +135,7 @@ export default function Index({ reservasiMeja, mejaOptions, statusOptions, filte
                                             <TableCell>{formatDateTime(item.waktu_reservasi)}</TableCell>
                                             <TableCell>{item.jumlah_tamu}</TableCell>
                                             <TableCell>
-                                                <span className={`rounded-full px-2 py-1 text-xs font-medium ${badgeClass[item.status] || "bg-slate-100 text-slate-700"}`}>
-                                                    {statusLabel(item.status)}
-                                                </span>
+                                                <POSStatusBadge status={item.status} label={statusLabel(item.status)} />
                                             </TableCell>
                                             <TableCell className="text-right">
                                                 <div className="flex items-center justify-end gap-2">

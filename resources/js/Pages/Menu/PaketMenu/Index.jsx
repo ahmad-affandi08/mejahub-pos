@@ -3,6 +3,9 @@ import { useMemo, useState } from "react";
 
 import DashboardLayout from "@/layouts/DashboardLayout";
 import Form from "@/Pages/Menu/PaketMenu/Form";
+import POSStatusBadge from "@/components/shared/pos/POSStatusBadge";
+import { formatIDR } from "@/components/shared/pos/format";
+import TableToolbar from "@/components/shared/table/TableToolbar";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -12,7 +15,6 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import {
     Table,
     TableBody,
@@ -30,14 +32,6 @@ export default function Index({ paketMenu, kategoriOptions, menuOptions, filters
     const [editingItem, setEditingItem] = useState(null);
 
     const hasData = (paketMenu?.data ?? []).length > 0;
-
-    const badgeClass = useMemo(
-        () => ({
-            aktif: "bg-emerald-100 text-emerald-700",
-            nonaktif: "bg-rose-100 text-rose-700",
-        }),
-        []
-    );
 
     const submitSearch = (event) => {
         event.preventDefault();
@@ -104,16 +98,12 @@ export default function Index({ paketMenu, kategoriOptions, menuOptions, filters
                 </section>
 
                 <section className="rounded-3xl border bg-white p-4 shadow-sm md:p-6">
-                    <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                        <form onSubmit={submitSearch} className="flex w-full max-w-md gap-2">
-                            <Input name="search" defaultValue={searchValue} placeholder="Cari nama atau kode paket" />
-                            <Button variant="outline" type="submit">Cari</Button>
-                        </form>
-
-                        {flashMessage?.success ? (
-                            <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{flashMessage.success}</p>
-                        ) : null}
-                    </div>
+                    <TableToolbar
+                        searchValue={searchValue}
+                        searchPlaceholder="Cari nama atau kode paket"
+                        onSubmit={submitSearch}
+                        flashMessage={flashMessage?.success}
+                    />
 
                     <div className="w-full overflow-x-auto">
                         <Table>
@@ -136,11 +126,9 @@ export default function Index({ paketMenu, kategoriOptions, menuOptions, filters
                                             <TableCell>{item.kode || "-"}</TableCell>
                                             <TableCell className="font-medium">{item.nama}</TableCell>
                                             <TableCell className="max-w-xs whitespace-normal break-all">{item.item_summary || "-"}</TableCell>
-                                            <TableCell>Rp {Number(item.harga_paket).toLocaleString("id-ID")}</TableCell>
+                                            <TableCell>{formatIDR(item.harga_paket)}</TableCell>
                                             <TableCell>
-                                                <span className={`rounded-full px-2 py-1 text-xs font-medium ${item.is_active ? badgeClass.aktif : badgeClass.nonaktif}`}>
-                                                    {item.is_active ? "Aktif" : "Nonaktif"}
-                                                </span>
+                                                <POSStatusBadge status={item.is_active ? "aktif" : "nonaktif"} label={item.is_active ? "Aktif" : "Nonaktif"} />
                                             </TableCell>
                                             <TableCell className="text-right">
                                                 <div className="flex items-center justify-end gap-2">
