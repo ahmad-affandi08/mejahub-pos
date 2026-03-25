@@ -43,7 +43,7 @@ class LoginResource extends Controller
         return redirect('/dashboard/overview');
     }
 
-    public function destroy(Request $request, int $id): RedirectResponse
+    public function destroy(Request $request, ?int $id = null): RedirectResponse
     {
         $this->service->logout($request);
 

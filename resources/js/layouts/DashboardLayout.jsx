@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import {
 	CircleDollarSign,
 	ChevronDown,
+	Grid3X3,
 	LayoutDashboard,
 	Package,
 	Settings,
@@ -47,6 +48,15 @@ const moduleItems = [
 			{ title: "Varian Menu", href: "/menu/varian-menu" },
 			{ title: "Modifier Menu", href: "/menu/modifier-menu" },
 			{ title: "Paket Menu", href: "/menu/paket-menu" },
+		],
+	},
+	{
+		title: "Meja",
+		icon: Grid3X3,
+		items: [
+			{ title: "Area Meja", href: "/meja/area-meja" },
+			{ title: "Data Meja", href: "/meja/data-meja" },
+			{ title: "Reservasi Meja", href: "/meja/reservasi-meja" },
 		],
 	},
 	{
@@ -138,7 +148,7 @@ export default function DashboardLayout({ title = "Dashboard", children }) {
 					<SidebarContent className="bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_48%),linear-gradient(180deg,rgba(255,255,255,0.03)_0%,rgba(255,255,255,0)_100%)]">
 						<SidebarGroup>
 							<SidebarGroupLabel className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-sidebar-foreground/65">
-								Navigasi
+								MENU
 							</SidebarGroupLabel>
 							<SidebarGroupContent>
 								<SidebarMenu className="px-2">
@@ -210,7 +220,7 @@ export default function DashboardLayout({ title = "Dashboard", children }) {
 								<Button
 									variant="secondary"
 									className="h-10 w-full justify-center rounded-xl bg-white/90 text-slate-900 hover:bg-white"
-									onClick={() => router.delete("/auth/login/1")}
+									onClick={() => router.get("/auth/logout")}
 								>
 									Logout
 								</Button>

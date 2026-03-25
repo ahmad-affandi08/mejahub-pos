@@ -13,7 +13,7 @@ class CheckPermission
         $user = $request->user();
 
         if (!$user) {
-            return redirect('/auth/login');
+            return redirect('/auth/login', 303);
         }
 
         $roles = $user->hakAkses()->where('is_active', true)->with('permissions')->get();

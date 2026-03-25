@@ -12,6 +12,10 @@ Route::get('/', function () {
     return redirect('/auth/login');
 });
 
+Route::get('/login', function () {
+    return redirect('/auth/login');
+})->name('login');
+
 
 $modulesPath = app_path('Modules');
 
@@ -39,6 +43,14 @@ if (File::exists($modulesPath)) {
                 $resourceRoute = Route::resource($urlSlug, $resourceClass)
                     ->parameters([$urlSlug => 'id'])
                     ->names($routeName);
+
+                if (Str::lower($moduleName) === 'auth' && method_exists($resourceClass, 'destroy')) {
+                    Route::delete($urlSlug, [$resourceClass, 'destroy'])
+                        ->name($routeName . '.logout');
+
+                    Route::get($moduleSlug . '/logout', [$resourceClass, 'destroy'])
+                        ->name($moduleSlug . '.logout');
+                }
 
                 if (Str::lower($moduleName) !== 'auth') {
                     $permissionKey = $moduleSlug . '.' . $featureSlug . '.access';
