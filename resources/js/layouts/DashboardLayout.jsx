@@ -41,7 +41,13 @@ const moduleItems = [
 	{
 		title: "Menu",
 		icon: Package,
-		items: [{ title: "Kategori Menu", href: "/menu/kategori-menu" }],
+		items: [
+			{ title: "Kategori Menu", href: "/menu/kategori-menu" },
+			{ title: "Data Menu", href: "/menu/data-menu" },
+			{ title: "Varian Menu", href: "/menu/varian-menu" },
+			{ title: "Modifier Menu", href: "/menu/modifier-menu" },
+			{ title: "Paket Menu", href: "/menu/paket-menu" },
+		],
 	},
 	{
 		title: "HR",
@@ -104,16 +110,23 @@ export default function DashboardLayout({ title = "Dashboard", children }) {
 	return (
 		<TooltipProvider>
 			<SidebarProvider className="overflow-x-hidden">
-				<Sidebar collapsible="icon">
-					<SidebarHeader>
+				<Sidebar
+					collapsible="icon"
+					className="border-r border-white/10"
+				>
+					<SidebarHeader className="border-b border-white/10 p-3">
 						<SidebarMenu>
 							<SidebarMenuItem>
-								<SidebarMenuButton asChild size="lg">
+								<SidebarMenuButton
+									asChild
+									size="lg"
+									className="h-14 rounded-xl bg-white/5 px-3 hover:bg-white/10"
+								>
 									<Link href="/">
 										<Logo
 											className="w-full"
-											textClassName="text-4xl text-sidebar-foreground"
-											iconClassName="h-4 w-4"
+											textClassName="text-3xl text-sidebar-foreground"
+											iconClassName="h-4 w-4 translate-y-[1px]"
 											accentClassName="text-sidebar-primary"
 										/>
 									</Link>
@@ -122,11 +135,13 @@ export default function DashboardLayout({ title = "Dashboard", children }) {
 						</SidebarMenu>
 					</SidebarHeader>
 
-					<SidebarContent>
+					<SidebarContent className="bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_48%),linear-gradient(180deg,rgba(255,255,255,0.03)_0%,rgba(255,255,255,0)_100%)]">
 						<SidebarGroup>
-							<SidebarGroupLabel>Navigasi</SidebarGroupLabel>
+							<SidebarGroupLabel className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-sidebar-foreground/65">
+								Navigasi
+							</SidebarGroupLabel>
 							<SidebarGroupContent>
-								<SidebarMenu>
+								<SidebarMenu className="px-2">
 									{moduleItems.map((module) => {
 										if (!module.items.length) {
 											return null;
@@ -143,23 +158,27 @@ export default function DashboardLayout({ title = "Dashboard", children }) {
 													tooltip={module.title}
 													isActive={isModuleActive}
 													onClick={() => toggleModule(module.title)}
+													className="rounded-xl px-3 py-2.5 data-[active=true]:bg-white/14 data-[active=true]:text-white hover:bg-white/8"
 											>
 													<>
-														<module.icon />
-														<span>{module.title}</span>
+														<span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-white/10">
+															<module.icon className="h-4 w-4" />
+														</span>
+														<span className="font-medium">{module.title}</span>
 														<ChevronDown
-															className={`ml-auto transition-transform ${isOpen ? "rotate-180" : ""}`}
+															className={`ml-auto h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`}
 														/>
 													</>
 											</SidebarMenuButton>
 
 												{isOpen ? (
-													<SidebarMenuSub>
+													<SidebarMenuSub className="mt-1 ml-2 space-y-1 border-l border-white/10 pl-3">
 														{module.items.map((sub) => (
 															<SidebarMenuSubItem key={sub.href}>
 																<SidebarMenuSubButton
 																	asChild
 																	isActive={url.startsWith(sub.href)}
+																	className="rounded-lg px-2.5 py-2 text-sidebar-foreground/90 data-[active=true]:bg-white/12 data-[active=true]:text-white"
 																>
 																	<Link href={sub.href}>
 																		<span>{sub.title}</span>
@@ -177,18 +196,20 @@ export default function DashboardLayout({ title = "Dashboard", children }) {
 						</SidebarGroup>
 					</SidebarContent>
 
-					<SidebarFooter>
-						<SidebarMenu>
+					<SidebarFooter className="border-t border-white/10 bg-black/10 p-3">
+						<SidebarMenu className="gap-2">
 							<SidebarMenuItem>
-								<SidebarMenuButton>
-									<Users />
-									<span>{userName}</span>
+								<SidebarMenuButton className="h-11 rounded-xl bg-white/6 px-3 hover:bg-white/12">
+									<span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-sidebar-primary/85 text-black">
+										<Users className="h-4 w-4" />
+									</span>
+									<span className="font-medium text-sidebar-foreground">{userName}</span>
 								</SidebarMenuButton>
 							</SidebarMenuItem>
 							<SidebarMenuItem>
 								<Button
-									variant="ghost"
-									className="w-full justify-start"
+									variant="secondary"
+									className="h-10 w-full justify-center rounded-xl bg-white/90 text-slate-900 hover:bg-white"
 									onClick={() => router.delete("/auth/login/1")}
 								>
 									Logout
@@ -201,7 +222,7 @@ export default function DashboardLayout({ title = "Dashboard", children }) {
 				</Sidebar>
 
 				<SidebarInset className="min-w-0 overflow-x-hidden">
-					<header className="flex h-14 items-center gap-2 border-b px-4">
+					<header className="flex h-14 items-center gap-2 border-b bg-white/70 px-4 backdrop-blur-sm">
 						<SidebarTrigger />
 						<h1 className="text-sm font-medium">{title}</h1>
 					</header>

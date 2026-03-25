@@ -30,6 +30,10 @@ class HakAksesSeeder extends Seeder
                 'permissions' => [
                     'dashboard.overview.access',
                     'menu.kategori-menu.access',
+                    'menu.data-menu.access',
+                    'menu.varian-menu.access',
+                    'menu.modifier-menu.access',
+                    'menu.paket-menu.access',
                     'hr.data-pegawai.access',
                     'hr.hak-akses.access',
                     'pos.pesanan-masuk.access',
@@ -44,6 +48,10 @@ class HakAksesSeeder extends Seeder
                 'permissions' => [
                     'dashboard.overview.access',
                     'menu.kategori-menu.access',
+                    'menu.data-menu.access',
+                    'menu.varian-menu.access',
+                    'menu.modifier-menu.access',
+                    'menu.paket-menu.access',
                     'hr.data-pegawai.access',
                     'hr.hak-akses.access',
                     'pos.pesanan-masuk.access',

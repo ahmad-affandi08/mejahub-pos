@@ -1,30 +1,31 @@
 <?php
 
-namespace App\Modules\Menu\VarianMenu;
+namespace App\Modules\Menu\PaketMenu;
 
 use App\Modules\Menu\DataMenu\DataMenuEntity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\SoftDeletes;
 
-class VarianMenuEntity extends Model
+class PaketMenuItemEntity extends Model
 {
     use HasFactory;
-    use SoftDeletes;
 
-    protected $table = 'varian_menu';
+    protected $table = 'paket_menu_item';
 
     protected $guarded = [];
 
     protected $casts = [
-        'harga_tambahan' => 'decimal:2',
-        'is_active' => 'boolean',
+        'qty' => 'decimal:2',
     ];
+
+    public function paketMenu(): BelongsTo
+    {
+        return $this->belongsTo(PaketMenuEntity::class, 'paket_menu_id');
+    }
 
     public function dataMenu(): BelongsTo
     {
         return $this->belongsTo(DataMenuEntity::class, 'data_menu_id');
     }
 }
-

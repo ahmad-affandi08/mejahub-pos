@@ -33,7 +33,7 @@ return new class extends Migration
             $table->text('deskripsi')->nullable();
             $table->decimal('harga', 14, 2)->default(0);
             $table->boolean('is_active')->default(true);
-            $table->string('gambar_url')->nullable();
+            $table->string('gambar')->nullable();
             $table->timestamps();
             $table->softDeletes();
 
