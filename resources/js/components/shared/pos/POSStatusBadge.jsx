@@ -14,6 +14,10 @@ const statusClassMap = {
     seated: "bg-emerald-100 text-emerald-700",
     cancelled: "bg-rose-100 text-rose-700",
     done: "bg-slate-200 text-slate-700",
+    merged: "bg-violet-100 text-violet-700",
+    voided: "bg-rose-100 text-rose-700",
+    processed: "bg-indigo-100 text-indigo-700",
+    refunded: "bg-teal-100 text-teal-700",
 };
 
 export default function POSStatusBadge({ status, label }) {

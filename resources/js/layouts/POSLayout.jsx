@@ -8,6 +8,10 @@ export default function POSLayout({ title = "POS", children }) {
 	const quickMenus = [
 		{ title: "Buka Shift", href: "/pos/buka-shift" },
 		{ title: "Pesanan", href: "/pos/pesanan-masuk" },
+		{ title: "Split Bill", href: "/pos/split-bill" },
+		{ title: "Gabung Meja", href: "/pos/gabung-meja" },
+		{ title: "Void", href: "/pos/void-pesanan" },
+		{ title: "Refund", href: "/pos/refund-pesanan" },
 		{ title: "Pembayaran", href: "/pos/pembayaran" },
 		{ title: "Tutup Shift", href: "/pos/tutup-shift" },
 	];

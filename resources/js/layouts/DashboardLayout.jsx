@@ -73,6 +73,10 @@ const moduleItems = [
 		items: [
 			{ title: "Buka Shift", href: "/pos/buka-shift" },
 			{ title: "Pesanan Masuk", href: "/pos/pesanan-masuk" },
+			{ title: "Split Bill", href: "/pos/split-bill" },
+			{ title: "Gabung Meja", href: "/pos/gabung-meja" },
+			{ title: "Void Pesanan", href: "/pos/void-pesanan" },
+			{ title: "Refund Pesanan", href: "/pos/refund-pesanan" },
 			{ title: "Pembayaran", href: "/pos/pembayaran" },
 			{ title: "Tutup Shift", href: "/pos/tutup-shift" },
 		],
