@@ -1,0 +1,39 @@
+<?php
+
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
+
+Route::get('/', function () {
+    return view('welcome');
+});
+
+
+$modulesPath = app_path('Modules');
+
+if (File::exists($modulesPath)) {
+    $modules = File::directories($modulesPath);
+
+    foreach ($modules as $module) {
+        $moduleName = basename($module);
+
+        $features = File::directories($module);
+
+        foreach ($features as $feature) {
+            $featureName = basename($feature);
+
+            $resourceClass = "App\\Modules\\{$moduleName}\\{$featureName}\\{$featureName}Resource";
+
+            if (File::exists($feature . '/' . $featureName . 'Resource.php')) {
+
+                $urlSlug = Str::kebab($moduleName) . '/' . Str::kebab($featureName);
+
+                $routeName = Str::kebab($moduleName) . '.' . Str::kebab($featureName);
+
+                Route::resource($urlSlug, $resourceClass)
+                    ->parameters([$urlSlug => 'id']) 
+                    ->names($routeName);
+            }
+        }
+    }
+}
