@@ -7,7 +7,54 @@ import POSSummaryCard from "@/components/shared/pos/POSSummaryCard";
 import POSLayout from "@/layouts/POSLayout";
 import Form from "@/Pages/POS/Pembayaran/Form";
 
-export default function Index({ pendingOrders, activeShift, flashMessage }) {
+const formatCurrency = (value) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(Number(value || 0));
+
+function printReceipt(receipt) {
+    if (!receipt) return;
+
+    const popup = window.open("", "_blank", "width=420,height=760");
+
+    if (!popup) {
+        window.alert("Popup diblokir browser. Izinkan popup untuk cetak struk.");
+        return;
+    }
+
+    const itemsHtml = (receipt.items || []).map((item) => `
+        <tr>
+            <td>${item.nama_menu}</td>
+            <td style="text-align:center;">${item.qty}</td>
+            <td style="text-align:right;">${formatCurrency(item.subtotal)}</td>
+        </tr>
+    `).join("");
+
+    popup.document.write(`
+        <html>
+        <head><title>Struk ${receipt.kode_transaksi}</title></head>
+        <body style="font-family:monospace;padding:16px;">
+            <h3 style="margin:0 0 6px;">MejaHub POS</h3>
+            <p style="margin:0 0 12px;">Struk Pembayaran</p>
+            <p style="margin:0;">Kode: ${receipt.kode_transaksi}</p>
+            <p style="margin:0;">Waktu: ${receipt.waktu || "-"}</p>
+            <p style="margin:0;">Kasir: ${receipt.kasir || "-"}</p>
+            <p style="margin:0;">Pesanan: ${receipt.pesanan_kode || "-"}</p>
+            <hr />
+            <table style="width:100%;border-collapse:collapse;" cellpadding="4">
+                <thead><tr><th align="left">Item</th><th>Qty</th><th align="right">Subtotal</th></tr></thead>
+                <tbody>${itemsHtml}</tbody>
+            </table>
+            <hr />
+            <p style="margin:0;">Tagihan: ${formatCurrency(receipt.nominal_tagihan)}</p>
+            <p style="margin:0;">Dibayar: ${formatCurrency(receipt.nominal_dibayar)}</p>
+            <p style="margin:0;">Kembalian: ${formatCurrency(receipt.kembalian)}</p>
+        </body>
+        </html>
+    `);
+    popup.document.close();
+    popup.focus();
+    popup.print();
+}
+
+export default function Index({ pendingOrders, activeShift, recentPayments = [], flashMessage }) {
     const [values, setValues] = useState({
         selectedOrderId: "",
         nominalDibayar: "",
@@ -28,6 +75,13 @@ export default function Index({ pendingOrders, activeShift, flashMessage }) {
         if (!selectedOrder) return 0;
         return Number(values.nominalDibayar || 0) - Number(selectedOrder.total || 0);
     }, [selectedOrder, values.nominalDibayar]);
+
+    const [selectedReceiptId, setSelectedReceiptId] = useState(recentPayments[0]?.id ?? null);
+
+    const selectedReceipt = useMemo(
+        () => recentPayments.find((item) => item.id === selectedReceiptId) ?? recentPayments[0] ?? null,
+        [recentPayments, selectedReceiptId]
+    );
 
     const pay = () => {
         if (!selectedOrder) {
@@ -125,6 +179,77 @@ export default function Index({ pendingOrders, activeShift, flashMessage }) {
                     onSubmit={pay}
                 />
             </div>
+
+            <section className="mt-4 grid gap-4 lg:grid-cols-[1.2fr_1fr]">
+                <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <div className="mb-3 flex items-center justify-between">
+                        <h2 className="text-lg font-semibold text-slate-900">Riwayat Pembayaran</h2>
+                        <span className="text-xs text-slate-500">Struk tersedia untuk preview/cetak</span>
+                    </div>
+
+                    <div className="max-h-[38vh] overflow-auto pr-1">
+                        <table className="w-full min-w-180 text-sm">
+                            <thead>
+                                <tr className="border-b text-left text-xs uppercase tracking-wide text-slate-500">
+                                    <th className="py-2">Preview</th>
+                                    <th className="py-2">Kode</th>
+                                    <th className="py-2">Pesanan</th>
+                                    <th className="py-2">Metode</th>
+                                    <th className="py-2">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {recentPayments.map((item) => (
+                                    <tr key={item.id} className="border-b last:border-b-0">
+                                        <td className="py-2">
+                                            <input
+                                                type="radio"
+                                                checked={selectedReceipt?.id === item.id}
+                                                onChange={() => setSelectedReceiptId(item.id)}
+                                            />
+                                        </td>
+                                        <td className="py-2 font-medium">{item.kode}</td>
+                                        <td className="py-2">{item.pesanan_kode || "-"}</td>
+                                        <td className="py-2">{item.metode_bayar}</td>
+                                        <td className="py-2"><MoneyText value={item.nominal_tagihan} /></td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </article>
+
+                <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <h3 className="text-base font-semibold text-slate-900">Preview Struk</h3>
+                    {selectedReceipt ? (
+                        <div className="mt-3 space-y-2 text-sm">
+                            <p>Kode: <span className="font-semibold">{selectedReceipt.kode}</span></p>
+                            <p>Kasir: <span className="font-semibold">{selectedReceipt.kasir_nama || "-"}</span></p>
+                            <p>Pesanan: <span className="font-semibold">{selectedReceipt.pesanan_kode || "-"}</span></p>
+                            <p>Meja: <span className="font-semibold">{selectedReceipt.meja_nama || "-"}</span></p>
+                            <p>Total: <MoneyText value={selectedReceipt.nominal_tagihan} className="font-semibold" /></p>
+                            <button
+                                type="button"
+                                onClick={() => printReceipt({
+                                    ...selectedReceipt,
+                                    kode_transaksi: selectedReceipt.kode,
+                                    waktu: selectedReceipt.waktu_bayar,
+                                    kasir: selectedReceipt.kasir_nama,
+                                    nominal_tagihan: selectedReceipt.nominal_tagihan,
+                                    nominal_dibayar: selectedReceipt.nominal_dibayar,
+                                    kembalian: selectedReceipt.kembalian,
+                                    items: selectedReceipt.items ?? [],
+                                })}
+                                className="mt-2 inline-flex rounded-md border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-50"
+                            >
+                                Cetak Struk
+                            </button>
+                        </div>
+                    ) : (
+                        <p className="mt-3 text-sm text-slate-500">Belum ada pembayaran untuk dipreview.</p>
+                    )}
+                </article>
+            </section>
         </POSLayout>
     );
 }

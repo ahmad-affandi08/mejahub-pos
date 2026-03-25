@@ -3,6 +3,7 @@
 namespace App\Modules\POS\RefundPesanan;
 
 use App\Http\Controllers\Controller;
+use App\Support\ApiResponder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -22,9 +23,10 @@ class RefundPesananResource extends Controller
 		$logs = $this->service->recentLogs();
 
 		if ($request->expectsJson()) {
-			return response()->json([
+			return ApiResponder::success('Data refund berhasil dimuat.', [
 				'orders' => RefundPesananCollection::orders($orders),
 				'logs' => RefundPesananCollection::logs($logs),
+			], [
 				'filters' => ['search' => $search],
 			]);
 		}
@@ -57,13 +59,13 @@ class RefundPesananResource extends Controller
 		);
 
 		if ($request->expectsJson()) {
-			return response()->json([
-				'message' => 'Refund berhasil diproses.',
-				'data' => [
+			return ApiResponder::success('Refund berhasil diproses.', [
+				'refund' => [
 					'id' => $log->id,
 					'kode' => $log->kode,
 				],
-			], 201);
+				'receipt' => RefundPesananCollection::toReceipt($log),
+			], [], 201);
 		}
 
 		return redirect()

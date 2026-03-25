@@ -9,6 +9,15 @@ use Illuminate\Support\Str;
 
 class PembayaranService
 {
+	public function recentPayments(int $limit = 20)
+	{
+		return PembayaranEntity::query()
+			->with(['pesanan.meja:id,nama', 'pesanan.items', 'kasir:id,name'])
+			->latest('id')
+			->limit($limit)
+			->get();
+	}
+
 	public function pendingOrders(string $search = '')
 	{
 		return PesananMasukEntity::query()

@@ -3,6 +3,7 @@
 namespace App\Modules\POS\BukaShift;
 
 use App\Http\Controllers\Controller;
+use App\Support\ApiResponder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -21,7 +22,7 @@ class BukaShiftResource extends Controller
 		$recentShifts = $this->service->recentShifts();
 
 		if ($request->expectsJson()) {
-			return response()->json([
+			return ApiResponder::success('Data buka shift berhasil dimuat.', [
 				'active_shift' => $activeShift ? BukaShiftCollection::toItem($activeShift) : null,
 				'recent_shifts' => $recentShifts->map(fn (BukaShiftEntity $item) => BukaShiftCollection::toItem($item))->all(),
 			]);
@@ -42,7 +43,7 @@ class BukaShiftResource extends Controller
 			$message = 'Masih ada shift aktif. Tutup shift sebelumnya terlebih dahulu.';
 
 			if ($request->expectsJson()) {
-				return response()->json(['message' => $message], 422);
+				return ApiResponder::error($message);
 			}
 
 			return back()->withErrors(['kas_awal' => $message]);
@@ -56,10 +57,9 @@ class BukaShiftResource extends Controller
 		$shift = $this->service->openShift($payload, auth()->id());
 
 		if ($request->expectsJson()) {
-			return response()->json([
-				'message' => 'Shift berhasil dibuka.',
-				'data' => BukaShiftCollection::toItem($shift),
-			], 201);
+			return ApiResponder::success('Shift berhasil dibuka.', [
+				'shift' => BukaShiftCollection::toItem($shift),
+			], [], 201);
 		}
 
 		return redirect()

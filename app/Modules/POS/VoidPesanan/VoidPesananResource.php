@@ -3,6 +3,7 @@
 namespace App\Modules\POS\VoidPesanan;
 
 use App\Http\Controllers\Controller;
+use App\Support\ApiResponder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -22,9 +23,10 @@ class VoidPesananResource extends Controller
 		$logs = $this->service->recentLogs();
 
 		if ($request->expectsJson()) {
-			return response()->json([
+			return ApiResponder::success('Data void pesanan berhasil dimuat.', [
 				'orders' => VoidPesananCollection::orders($orders),
 				'logs' => VoidPesananCollection::logs($logs),
+			], [
 				'filters' => ['search' => $search],
 			]);
 		}
@@ -53,13 +55,12 @@ class VoidPesananResource extends Controller
 		);
 
 		if ($request->expectsJson()) {
-			return response()->json([
-				'message' => 'Pesanan berhasil di-void.',
-				'data' => [
+			return ApiResponder::success('Pesanan berhasil di-void.', [
+				'void' => [
 					'id' => $log->id,
 					'kode' => $log->kode,
 				],
-			], 201);
+			], [], 201);
 		}
 
 		return redirect()

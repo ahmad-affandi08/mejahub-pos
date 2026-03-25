@@ -3,6 +3,7 @@
 namespace App\Modules\POS\GabungMeja;
 
 use App\Http\Controllers\Controller;
+use App\Support\ApiResponder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -21,7 +22,7 @@ class GabungMejaResource extends Controller
 		$logs = $this->service->recentLogs();
 
 		if ($request->expectsJson()) {
-			return response()->json([
+			return ApiResponder::success('Data gabung meja berhasil dimuat.', [
 				'orders' => GabungMejaCollection::orders($orders),
 				'logs' => GabungMejaCollection::logs($logs),
 			]);
@@ -53,12 +54,11 @@ class GabungMejaResource extends Controller
 		);
 
 		if ($request->expectsJson()) {
-			return response()->json([
-				'message' => 'Gabung meja berhasil diproses.',
-				'data' => [
+			return ApiResponder::success('Gabung meja berhasil diproses.', [
+				'gabung_meja' => [
 					'id' => $log->id,
 				],
-			], 201);
+			], [], 201);
 		}
 
 		return redirect()

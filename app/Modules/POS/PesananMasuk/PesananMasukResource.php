@@ -3,6 +3,7 @@
 namespace App\Modules\POS\PesananMasuk;
 
 use App\Http\Controllers\Controller;
+use App\Support\ApiResponder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -21,8 +22,7 @@ class PesananMasukResource extends Controller
 		$payload = $this->service->getReferenceData($search);
 
 		if ($request->expectsJson()) {
-			return response()->json([
-				'data' => $payload,
+			return ApiResponder::success('Data pesanan masuk berhasil dimuat.', $payload, [
 				'filters' => ['search' => $search],
 			]);
 		}
@@ -57,10 +57,9 @@ class PesananMasukResource extends Controller
 		$order = $this->service->createOrder($payload, auth()->id());
 
 		if ($request->expectsJson()) {
-			return response()->json([
-				'message' => 'Pesanan berhasil dibuat.',
-				'data' => PesananMasukCollection::toItem($order),
-			], 201);
+			return ApiResponder::success('Pesanan berhasil dibuat.', [
+				'order' => PesananMasukCollection::toItem($order),
+			], [], 201);
 		}
 
 		return redirect()
@@ -77,9 +76,8 @@ class PesananMasukResource extends Controller
 		$order = $this->service->updateStatus($id, $payload['status']);
 
 		if ($request->expectsJson()) {
-			return response()->json([
-				'message' => 'Status pesanan diperbarui.',
-				'data' => PesananMasukCollection::toItem($order),
+			return ApiResponder::success('Status pesanan diperbarui.', [
+				'order' => PesananMasukCollection::toItem($order),
 			]);
 		}
 
@@ -94,9 +92,7 @@ class PesananMasukResource extends Controller
 		$order->delete();
 
 		if (request()->expectsJson()) {
-			return response()->json([
-				'message' => 'Pesanan dihapus.',
-			]);
+			return ApiResponder::success('Pesanan dihapus.');
 		}
 
 		return redirect()

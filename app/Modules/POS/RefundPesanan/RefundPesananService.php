@@ -27,6 +27,7 @@ class RefundPesananService
 	public function recentLogs(): Collection
 	{
 		return RefundPesananEntity::query()
+			->with(['pesanan.meja:id,nama', 'pesanan.items', 'kasir:id,name'])
 			->latest('id')
 			->limit(20)
 			->get();
@@ -64,7 +65,7 @@ class RefundPesananService
 				'catatan' => trim((string) ($order->catatan . ' | Refund ' . $refundNominal . ': ' . $alasan)),
 			]);
 
-			return $log;
+			return $log->refresh()->load(['pesanan.meja:id,nama', 'pesanan.items', 'kasir:id,name']);
 		});
 	}
 

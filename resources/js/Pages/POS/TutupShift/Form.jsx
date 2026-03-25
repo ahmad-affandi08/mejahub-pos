@@ -7,12 +7,13 @@ import POSStatusBadge from "@/components/shared/pos/POSStatusBadge";
 
 export default function Form({ values, state, onChange, onSubmit }) {
     const activeShift = state.activeShift;
+    const summary = state.summary;
 
     const selisihPreview = useMemo(() => {
         if (!activeShift) return 0;
-        const system = Number(activeShift.kas_sistem ?? activeShift.kas_awal ?? 0);
+        const system = Number(summary?.expected_drawer ?? activeShift.kas_sistem ?? activeShift.kas_awal ?? 0);
         return Number(values.kasAktual || 0) - system;
-    }, [activeShift, values.kasAktual]);
+    }, [activeShift, summary?.expected_drawer, values.kasAktual]);
 
     if (!activeShift) {
         return (
@@ -27,6 +28,8 @@ export default function Form({ values, state, onChange, onSubmit }) {
             <div className="rounded-xl bg-slate-50 p-4 text-sm">
                 <p>Kode Shift: <span className="font-semibold">{activeShift.kode}</span></p>
                 <p>Kas Awal: <MoneyText value={activeShift.kas_awal} className="font-semibold" /></p>
+                <p>Cash Masuk: <MoneyText value={summary?.cash_total || 0} className="font-semibold" /></p>
+                <p>Non-Cash: <MoneyText value={summary?.non_cash_total || 0} className="font-semibold" /></p>
                 <p className="flex items-center gap-2">Status: <POSStatusBadge status={activeShift.status} /></p>
             </div>
 

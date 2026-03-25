@@ -28,11 +28,37 @@ class RefundPesananCollection
 			'id' => $log->id,
 			'kode' => $log->kode,
 			'pesanan_id' => $log->pesanan_id,
+			'pesanan_kode' => $log->pesanan?->kode,
+			'nama_pelanggan' => $log->pesanan?->nama_pelanggan,
+			'meja_nama' => $log->pesanan?->meja?->nama,
+			'kasir_nama' => $log->kasir?->name,
 			'nominal' => (float) $log->nominal,
 			'metode' => $log->metode,
 			'alasan' => $log->alasan,
 			'status' => $log->status,
 			'refunded_at' => optional($log->refunded_at)->toDateTimeString(),
 		])->values()->all();
+	}
+
+	public static function toReceipt(RefundPesananEntity $log): array
+	{
+		return [
+			'tipe' => 'refund',
+			'kode_transaksi' => $log->kode,
+			'waktu' => optional($log->refunded_at)->toDateTimeString(),
+			'kasir' => $log->kasir?->name,
+			'pesanan_kode' => $log->pesanan?->kode,
+			'nama_pelanggan' => $log->pesanan?->nama_pelanggan,
+			'meja' => $log->pesanan?->meja?->nama,
+			'items' => $log->pesanan?->items?->map(fn ($item) => [
+				'nama_menu' => $item->nama_menu,
+				'qty' => (int) $item->qty,
+				'harga_satuan' => (float) $item->harga_satuan,
+				'subtotal' => (float) $item->subtotal,
+			])->values()->all() ?? [],
+			'metode' => $log->metode,
+			'nominal_refund' => (float) $log->nominal,
+			'alasan' => $log->alasan,
+		];
 	}
 }

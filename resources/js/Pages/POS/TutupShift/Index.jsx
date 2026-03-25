@@ -1,11 +1,12 @@
 import { Head, router } from "@inertiajs/react";
 import { useState } from "react";
 
+import MoneyText from "@/components/shared/pos/MoneyText";
 import POSSummaryCard from "@/components/shared/pos/POSSummaryCard";
 import POSLayout from "@/layouts/POSLayout";
 import Form from "@/Pages/POS/TutupShift/Form";
 
-export default function Index({ activeShift, flashMessage }) {
+export default function Index({ activeShift, summary, flashMessage }) {
     const [values, setValues] = useState({
         kasAktual: "",
         catatan: "",
@@ -36,7 +37,13 @@ export default function Index({ activeShift, flashMessage }) {
             <div className="mx-auto mb-4 grid max-w-3xl gap-2 sm:grid-cols-3">
                 <POSSummaryCard label="Shift Aktif" value={activeShift ? "Ya" : "Tidak"} tone="sky" />
                 <POSSummaryCard label="Input Kas Aktual" value={values.kasAktual ? `Rp ${values.kasAktual}` : "Rp 0"} tone="orange" />
-                <POSSummaryCard label="Mode" value="Closing" tone="slate" />
+                <POSSummaryCard label="Transaksi Shift" value={String(summary?.transaksi_total ?? 0)} tone="slate" />
+            </div>
+
+            <div className="mx-auto mb-4 grid max-w-3xl gap-2 sm:grid-cols-3">
+                <POSSummaryCard label="Cash" value={<MoneyText value={summary?.cash_total || 0} />} tone="emerald" />
+                <POSSummaryCard label="Non-Cash" value={<MoneyText value={summary?.non_cash_total || 0} />} tone="sky" />
+                <POSSummaryCard label="Expected Drawer" value={<MoneyText value={summary?.expected_drawer || 0} />} tone="orange" />
             </div>
 
             <div className="mx-auto max-w-3xl rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -51,7 +58,7 @@ export default function Index({ activeShift, flashMessage }) {
 
                 <Form
                     values={values}
-                    state={{ activeShift }}
+                    state={{ activeShift, summary }}
                     onChange={handleChange}
                     onSubmit={submit}
                 />

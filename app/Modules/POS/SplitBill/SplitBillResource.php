@@ -3,6 +3,7 @@
 namespace App\Modules\POS\SplitBill;
 
 use App\Http\Controllers\Controller;
+use App\Support\ApiResponder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -21,7 +22,7 @@ class SplitBillResource extends Controller
 		$logs = $this->service->recentLogs();
 
 		if ($request->expectsJson()) {
-			return response()->json([
+			return ApiResponder::success('Data split bill berhasil dimuat.', [
 				'orders' => SplitBillCollection::orders($orders),
 				'logs' => SplitBillCollection::logs($logs),
 			]);
@@ -54,12 +55,11 @@ class SplitBillResource extends Controller
 		);
 
 		if ($request->expectsJson()) {
-			return response()->json([
-				'message' => 'Split bill berhasil diproses.',
-				'data' => [
+			return ApiResponder::success('Split bill berhasil diproses.', [
+				'split_bill' => [
 					'id' => $log->id,
 				],
-			], 201);
+			], [], 201);
 		}
 
 		return redirect()
