@@ -59,6 +59,7 @@ class PenggajianService
         $skipExisting = (bool) ($payload['skip_existing'] ?? true);
         $includeTerlambatPenalty = (bool) ($payload['include_terlambat_penalty'] ?? false);
         $gajiPokokDefault = (float) ($payload['gaji_pokok_default'] ?? 0);
+        $gajiPokokPerPegawai = $this->normalizeGajiPokokPerPegawai($payload['gaji_pokok_per_pegawai'] ?? []);
         $gajiPokokPerJabatan = $this->normalizeGajiPokokPerJabatan($payload['gaji_pokok_per_jabatan'] ?? []);
 
         $pegawaiIds = collect($payload['pegawai_ids'] ?? [])
@@ -93,7 +94,13 @@ class PenggajianService
                 $potonganTambahan += (float) ($payload['potongan_per_terlambat'] ?? 0) * $rekap['jumlah_terlambat'];
             }
 
-            $gajiPokok = $this->resolveGajiPokokPegawai($pegawai->jabatan, $gajiPokokPerJabatan, $gajiPokokDefault);
+            $gajiPokok = $this->resolveGajiPokokPegawai(
+                (int) $pegawai->id,
+                $pegawai->jabatan,
+                $gajiPokokPerPegawai,
+                $gajiPokokPerJabatan,
+                $gajiPokokDefault,
+            );
 
             $basePayload = [
                 'kode' => $this->generateKode($payload['kode_prefix'] ?? null, $periode, (int) $pegawai->id),
@@ -265,12 +272,33 @@ class PenggajianService
         return $normalized;
     }
 
-    private function resolveGajiPokokPegawai(?string $jabatan, array $map, float $default): float
+    private function normalizeGajiPokokPerPegawai(array $map): array
     {
+        $normalized = [];
+
+        foreach ($map as $pegawaiId => $nominal) {
+            $key = (int) $pegawaiId;
+
+            if ($key <= 0) {
+                continue;
+            }
+
+            $normalized[$key] = (float) ($nominal ?? 0);
+        }
+
+        return $normalized;
+    }
+
+    private function resolveGajiPokokPegawai(int $pegawaiId, ?string $jabatan, array $pegawaiMap, array $jabatanMap, float $default): float
+    {
+        if (array_key_exists($pegawaiId, $pegawaiMap)) {
+            return (float) $pegawaiMap[$pegawaiId];
+        }
+
         $jabatanKey = mb_strtolower(trim((string) ($jabatan ?? '')));
 
-        if ($jabatanKey !== '' && array_key_exists($jabatanKey, $map)) {
-            return (float) $map[$jabatanKey];
+        if ($jabatanKey !== '' && array_key_exists($jabatanKey, $jabatanMap)) {
+            return (float) $jabatanMap[$jabatanKey];
         }
 
         return $default;

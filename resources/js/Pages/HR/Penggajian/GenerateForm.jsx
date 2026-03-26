@@ -15,7 +15,7 @@ const dayOptions = [
     { value: 7, label: "Minggu" },
 ];
 
-export default function GenerateForm({ endpoint, pegawaiOptions, onSuccess, onCancel }) {
+export default function GenerateForm({ endpoint, pegawaiOptions, gajiPokokTemplatePerPegawai, onSuccess, onCancel }) {
     const jabatanOptions = Array.from(
         new Set(
             (pegawaiOptions ?? [])
@@ -31,6 +31,7 @@ export default function GenerateForm({ endpoint, pegawaiOptions, onSuccess, onCa
         tanggal_pembayaran: "",
         hari_kerja: [1, 2, 3, 4, 5, 6],
         gaji_pokok_default: 0,
+        gaji_pokok_per_pegawai: gajiPokokTemplatePerPegawai ?? {},
         gaji_pokok_per_jabatan: {},
         tunjangan_default: 0,
         lembur_default: 0,
@@ -81,6 +82,17 @@ export default function GenerateForm({ endpoint, pegawaiOptions, onSuccess, onCa
         setData("gaji_pokok_per_jabatan", {
             ...data.gaji_pokok_per_jabatan,
             [jabatan]: Number(value || 0),
+        });
+    };
+
+    const pegawaiForSetting = data.pegawai_ids.length > 0
+        ? (pegawaiOptions ?? []).filter((pegawai) => data.pegawai_ids.includes(pegawai.id))
+        : (pegawaiOptions ?? []);
+
+    const setGajiPegawai = (pegawaiId, value) => {
+        setData("gaji_pokok_per_pegawai", {
+            ...data.gaji_pokok_per_pegawai,
+            [pegawaiId]: Number(value || 0),
         });
     };
 
@@ -146,8 +158,32 @@ export default function GenerateForm({ endpoint, pegawaiOptions, onSuccess, onCa
             </div>
 
             <div className="space-y-1.5">
+                <label className="text-sm font-medium">Gaji Pokok per Pegawai (Template Pengaturan HR)</label>
+                <p className="text-xs text-muted-foreground">Otomatis terisi dari Pengaturan Gaji. Bisa diubah sementara untuk generate ini.</p>
+                <div className="max-h-52 space-y-2 overflow-y-auto rounded-lg border p-2">
+                    {pegawaiForSetting.map((pegawai) => (
+                        <div key={pegawai.id} className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_160px] md:items-center">
+                            <div className="text-xs text-slate-700">
+                                <span className="font-medium">{pegawai.nama}</span>
+                                {pegawai.jabatan ? ` (${pegawai.jabatan})` : ""}
+                            </div>
+                            <Input
+                                type="number"
+                                min={0}
+                                step="0.01"
+                                value={data.gaji_pokok_per_pegawai?.[pegawai.id] ?? ""}
+                                onChange={(event) => setGajiPegawai(pegawai.id, event.target.value)}
+                                placeholder={`Default: ${data.gaji_pokok_default}`}
+                            />
+                        </div>
+                    ))}
+                </div>
+                {errors.gaji_pokok_per_pegawai ? <p className="text-xs text-destructive">{errors.gaji_pokok_per_pegawai}</p> : null}
+            </div>
+
+            <div className="space-y-1.5">
                 <label className="text-sm font-medium">Gaji Pokok per Jabatan (Opsional)</label>
-                <p className="text-xs text-muted-foreground">Isi kalau tiap jabatan punya gaji pokok berbeda. Jika kosong, sistem pakai Gaji Pokok Default.</p>
+                <p className="text-xs text-muted-foreground">Fallback jika pegawai belum punya mapping per-karyawan.</p>
                 <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                     {jabatanOptions.map((jabatan) => (
                         <div key={jabatan} className="space-y-1">

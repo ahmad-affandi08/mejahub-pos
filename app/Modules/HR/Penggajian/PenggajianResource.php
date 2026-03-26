@@ -4,6 +4,7 @@ namespace App\Modules\HR\Penggajian;
 
 use App\Http\Controllers\Controller;
 use App\Modules\HR\DataPegawai\DataPegawaiEntity;
+use App\Modules\HR\PengaturanGaji\PengaturanGajiService;
 use App\Modules\HR\Penggajian\PenggajianCollection;
 use App\Modules\HR\Penggajian\PenggajianService;
 use Illuminate\Http\RedirectResponse;
@@ -13,7 +14,10 @@ use Inertia\Response;
 
 class PenggajianResource extends Controller
 {
-    public function __construct(private readonly PenggajianService $service)
+    public function __construct(
+        private readonly PenggajianService $service,
+        private readonly PengaturanGajiService $pengaturanGajiService,
+    )
     {
     }
 
@@ -32,6 +36,7 @@ class PenggajianResource extends Controller
                 ->where('is_active', true)
                 ->orderBy('nama')
                 ->get(),
+            'gajiPokokTemplatePerPegawai' => $this->pengaturanGajiService->getActiveMapByPegawaiId(),
             'filters' => [
                 'search' => $search,
                 'per_page' => $perPage,
@@ -54,6 +59,8 @@ class PenggajianResource extends Controller
                 'hari_kerja' => ['required', 'array', 'min:1'],
                 'hari_kerja.*' => ['integer', 'between:1,7'],
                 'gaji_pokok_default' => ['required', 'numeric', 'min:0'],
+                'gaji_pokok_per_pegawai' => ['nullable', 'array'],
+                'gaji_pokok_per_pegawai.*' => ['nullable', 'numeric', 'min:0'],
                 'gaji_pokok_per_jabatan' => ['nullable', 'array'],
                 'gaji_pokok_per_jabatan.*' => ['nullable', 'numeric', 'min:0'],
                 'tunjangan_default' => ['nullable', 'numeric', 'min:0'],

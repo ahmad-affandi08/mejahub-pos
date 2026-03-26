@@ -25,7 +25,7 @@ import DashboardLayout from "@/layouts/DashboardLayout";
 import Form from "@/Pages/HR/Penggajian/Form";
 import GenerateForm from "@/Pages/HR/Penggajian/GenerateForm";
 
-export default function Index({ penggajian, pegawaiOptions, filters, flashMessage }) {
+export default function Index({ penggajian, pegawaiOptions, gajiPokokTemplatePerPegawai, filters, flashMessage }) {
     const endpoint = "/hr/penggajian";
     const searchValue = filters?.search ?? "";
 
@@ -71,7 +71,7 @@ export default function Index({ penggajian, pegawaiOptions, filters, flashMessag
                                 <DialogTrigger asChild>
                                     <Button variant="outline">Generate Otomatis</Button>
                                 </DialogTrigger>
-                                <DialogContent className="sm:max-w-2xl">
+                                <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
                                     <DialogHeader>
                                         <DialogTitle>Generate Penggajian Otomatis</DialogTitle>
                                         <DialogDescription>Generate payroll terintegrasi dari rekap absensi karyawan per periode.</DialogDescription>
@@ -79,6 +79,7 @@ export default function Index({ penggajian, pegawaiOptions, filters, flashMessag
                                     <GenerateForm
                                         endpoint={endpoint}
                                         pegawaiOptions={pegawaiOptions}
+                                        gajiPokokTemplatePerPegawai={gajiPokokTemplatePerPegawai}
                                         onSuccess={() => setOpenGenerate(false)}
                                         onCancel={() => setOpenGenerate(false)}
                                     />
