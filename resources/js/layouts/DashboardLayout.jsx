@@ -83,8 +83,27 @@ const moduleItems = [
 			{ title: "Penerimaan Barang", href: "/inventory/penerimaan-barang" },
 			{ title: "Opname Stok", href: "/inventory/opname-stok" },
 			{ title: "Transfer Stok", href: "/inventory/transfer-stok" },
+			{ title: "Mutasi Stok", href: "/inventory/mutasi-stok" },
 			{ title: "Manajemen Waste", href: "/inventory/manajemen-waste" },
 			{ title: "Resep BOM", href: "/inventory/resep-b-o-m" },
+		],
+	},
+	{
+		title: "CRM",
+		icon: Users,
+		items: [
+			{ title: "Data Pelanggan", href: "/crm/data-pelanggan" },
+			{ title: "Membership", href: "/crm/membership" },
+			{ title: "Poin Loyalty", href: "/crm/poin-loyalty" },
+		],
+	},
+	{
+		title: "Kitchen",
+		icon: Grid3X3,
+		items: [
+			{ title: "Tiket Dapur", href: "/kitchen/tiket-dapur" },
+			{ title: "Status Masak", href: "/kitchen/status-masak" },
+			{ title: "KDS", href: "/kitchen/k-d-s" },
 		],
 	},
 	{
@@ -115,6 +134,8 @@ const moduleItems = [
 		icon: Grid3X3,
 		items: [
 			{ title: "Laporan Penjualan", href: "/report/laporan-penjualan" },
+			{ title: "Laporan Shift", href: "/report/laporan-shift" },
+			{ title: "Laporan Pajak", href: "/report/laporan-pajak" },
 			{ title: "Laporan Stok", href: "/report/laporan-stok" },
 		],
 	},
