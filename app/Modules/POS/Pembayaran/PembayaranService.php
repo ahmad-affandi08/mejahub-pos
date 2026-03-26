@@ -2,14 +2,20 @@
 
 namespace App\Modules\POS\Pembayaran;
 
+use App\Modules\Inventory\ResepBOM\ResepBOMConsumptionService;
 use App\Modules\POS\BukaShift\BukaShiftEntity;
 use App\Modules\POS\PesananMasuk\PesananMasukCollection;
 use App\Modules\POS\PesananMasuk\PesananMasukEntity;
 use App\Support\PosDomainException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class PembayaranService
 {
+	public function __construct(private readonly ResepBOMConsumptionService $resepBOMConsumptionService)
+	{
+	}
+
 	public function receiptHistory(string $search = '', int $perPage = 20)
 	{
 		return PembayaranEntity::query()
@@ -64,41 +70,47 @@ class PembayaranService
 
 	public function payOrder(array $payload, ?int $userId = null): PembayaranEntity
 	{
-		$order = PesananMasukEntity::query()->findOrFail((int) $payload['pesanan_id']);
+		return DB::transaction(function () use ($payload, $userId) {
+			$order = PesananMasukEntity::query()
+				->lockForUpdate()
+				->findOrFail((int) $payload['pesanan_id']);
 
-		if ($order->status !== 'submitted') {
-			throw new PosDomainException('Pesanan tidak dalam status menunggu pembayaran.');
-		}
+			if ($order->status !== 'submitted') {
+				throw new PosDomainException('Pesanan tidak dalam status menunggu pembayaran.');
+			}
 
-		$nominalTagihan = (float) $order->total;
-		$nominalDibayar = (float) $payload['nominal_dibayar'];
+			$nominalTagihan = (float) $order->total;
+			$nominalDibayar = (float) $payload['nominal_dibayar'];
 
-		if ($nominalDibayar < $nominalTagihan) {
-			throw new PosDomainException('Nominal dibayar kurang dari total tagihan.');
-		}
+			if ($nominalDibayar < $nominalTagihan) {
+				throw new PosDomainException('Nominal dibayar kurang dari total tagihan.');
+			}
 
-		$shift = $this->activeShift($userId);
+			$shift = $this->activeShift($userId);
 
-		$payment = PembayaranEntity::query()->create([
-			'pesanan_id' => $order->id,
-			'shift_id' => $shift?->id,
-			'user_id' => $userId,
-			'kode' => $this->generateKode(),
-			'metode_bayar' => $payload['metode_bayar'] ?? 'cash',
-			'nominal_tagihan' => $nominalTagihan,
-			'nominal_dibayar' => $nominalDibayar,
-			'kembalian' => $nominalDibayar - $nominalTagihan,
-			'status' => 'paid',
-			'catatan' => $payload['catatan'] ?? null,
-			'waktu_bayar' => now(),
-		]);
+			$payment = PembayaranEntity::query()->create([
+				'pesanan_id' => $order->id,
+				'shift_id' => $shift?->id,
+				'user_id' => $userId,
+				'kode' => $this->generateKode(),
+				'metode_bayar' => $payload['metode_bayar'] ?? 'cash',
+				'nominal_tagihan' => $nominalTagihan,
+				'nominal_dibayar' => $nominalDibayar,
+				'kembalian' => $nominalDibayar - $nominalTagihan,
+				'status' => 'paid',
+				'catatan' => $payload['catatan'] ?? null,
+				'waktu_bayar' => now(),
+			]);
 
-		$order->update([
-			'status' => 'paid',
-			'waktu_bayar' => now(),
-		]);
+			$order->update([
+				'status' => 'paid',
+				'waktu_bayar' => now(),
+			]);
 
-		return $payment->refresh()->load('pesanan:id,kode');
+			$this->resepBOMConsumptionService->consumeForOrder($order->refresh()->load('items'), $userId);
+
+			return $payment->refresh()->load('pesanan:id,kode');
+		});
 	}
 
 	public function toOrderPayload($orders): array

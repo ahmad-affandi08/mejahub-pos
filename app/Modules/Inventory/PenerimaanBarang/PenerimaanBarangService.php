@@ -3,6 +3,7 @@
 namespace App\Modules\Inventory\PenerimaanBarang;
 
 use App\Modules\Inventory\BahanBaku\BahanBakuEntity;
+use App\Modules\Inventory\MutasiStok\MutasiStokService;
 use App\Modules\Inventory\PurchaseOrder\PurchaseOrderEntity;
 use App\Modules\Inventory\PurchaseOrder\PurchaseOrderItemEntity;
 use App\Support\PosDomainException;
@@ -13,6 +14,10 @@ use Illuminate\Support\Str;
 
 class PenerimaanBarangService
 {
+	public function __construct(private readonly MutasiStokService $mutasiStokService)
+	{
+	}
+
 	public function paginate(string $search = '', int $perPage = 10): LengthAwarePaginator
 	{
 		return PenerimaanBarangEntity::query()
@@ -57,7 +62,7 @@ class PenerimaanBarangService
 				'catatan' => $payload['catatan'] ?? null,
 			]);
 
-			$total = $this->syncItemsAndStock($receipt, $items);
+			$total = $this->syncItemsAndStock($receipt, $items, $userId);
 			$receipt->update(['total' => $total]);
 
 			$this->syncPurchaseOrderReceiptState($receipt->purchase_order_id);
@@ -75,8 +80,24 @@ class PenerimaanBarangService
 				$bahan = BahanBakuEntity::query()->find($item->bahan_baku_id);
 				if ($bahan) {
 					$stokSaatIni = (float) $bahan->stok_saat_ini;
+					$stokSesudah = max(0, $stokSaatIni - (float) $item->qty_diterima);
 					$bahan->update([
-						'stok_saat_ini' => max(0, $stokSaatIni - (float) $item->qty_diterima),
+						'stok_saat_ini' => $stokSesudah,
+					]);
+
+					$hargaSatuan = (float) $item->harga_satuan;
+					$this->mutasiStokService->record([
+						'bahan_baku_id' => $bahan->id,
+						'reference_type' => 'PENERIMAAN_BARANG_DELETE',
+						'reference_id' => $receipt->id,
+						'reference_code' => $receipt->kode,
+						'direction' => 'out',
+						'qty' => (float) $item->qty_diterima,
+						'stok_sebelum' => $stokSaatIni,
+						'stok_sesudah' => $stokSesudah,
+						'nilai_satuan' => $hargaSatuan,
+						'nilai_total' => $hargaSatuan * (float) $item->qty_diterima,
+						'catatan' => 'Reversal penerimaan barang dihapus',
 					]);
 				}
 
@@ -98,7 +119,7 @@ class PenerimaanBarangService
 		});
 	}
 
-	private function syncItemsAndStock(PenerimaanBarangEntity $receipt, Collection $items): float
+	private function syncItemsAndStock(PenerimaanBarangEntity $receipt, Collection $items, ?int $userId = null): float
 	{
 		$total = 0;
 
@@ -122,9 +143,26 @@ class PenerimaanBarangService
 			]);
 
 			$bahan = BahanBakuEntity::query()->findOrFail((int) $item['bahan_baku_id']);
+			$stokSebelum = (float) $bahan->stok_saat_ini;
+			$stokSesudah = $stokSebelum + $qtyDiterima;
 			$bahan->update([
-				'stok_saat_ini' => (float) $bahan->stok_saat_ini + $qtyDiterima,
+				'stok_saat_ini' => $stokSesudah,
 				'harga_beli_terakhir' => $hargaSatuan,
+			]);
+
+			$this->mutasiStokService->record([
+				'bahan_baku_id' => $bahan->id,
+				'user_id' => $userId,
+				'reference_type' => 'PENERIMAAN_BARANG',
+				'reference_id' => $receipt->id,
+				'reference_code' => $receipt->kode,
+				'direction' => 'in',
+				'qty' => $qtyDiterima,
+				'stok_sebelum' => $stokSebelum,
+				'stok_sesudah' => $stokSesudah,
+				'nilai_satuan' => $hargaSatuan,
+				'nilai_total' => $subtotal,
+				'catatan' => 'Penerimaan barang ' . $receipt->kode,
 			]);
 
 			if ($poItemId) {

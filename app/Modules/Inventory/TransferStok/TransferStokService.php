@@ -3,6 +3,7 @@
 namespace App\Modules\Inventory\TransferStok;
 
 use App\Modules\Inventory\BahanBaku\BahanBakuEntity;
+use App\Modules\Inventory\MutasiStok\MutasiStokService;
 use App\Support\PosDomainException;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -10,6 +11,10 @@ use Illuminate\Support\Str;
 
 class TransferStokService
 {
+	public function __construct(private readonly MutasiStokService $mutasiStokService)
+	{
+	}
+
 	public function paginate(string $search = '', int $perPage = 10): LengthAwarePaginator
 	{
 		return TransferStokEntity::query()
@@ -54,7 +59,7 @@ class TransferStokService
 				$kode = $this->generateCode();
 			}
 
-			return TransferStokEntity::query()->create([
+			$record = TransferStokEntity::query()->create([
 				'bahan_baku_id' => $bahan->id,
 				'user_id' => $userId,
 				'kode' => $kode,
@@ -64,14 +69,56 @@ class TransferStokService
 				'qty_transfer' => $qty,
 				'catatan' => $payload['catatan'] ?? null,
 				'status' => $payload['status'] ?? 'posted',
-			])->load('bahanBaku:id,nama');
+			]);
+
+			$this->mutasiStokService->record([
+				'bahan_baku_id' => $bahan->id,
+				'user_id' => $userId,
+				'reference_type' => 'TRANSFER_STOK',
+				'reference_id' => $record->id,
+				'reference_code' => $record->kode,
+				'direction' => 'transfer',
+				'qty' => $qty,
+				'stok_sebelum' => (float) $bahan->stok_saat_ini,
+				'stok_sesudah' => (float) $bahan->stok_saat_ini,
+				'nilai_satuan' => (float) $bahan->harga_beli_terakhir,
+				'nilai_total' => $qty * (float) $bahan->harga_beli_terakhir,
+				'lokasi_asal' => $lokasiAsal,
+				'lokasi_tujuan' => $lokasiTujuan,
+				'catatan' => 'Transfer stok antar lokasi',
+			]);
+
+			return $record->load('bahanBaku:id,nama');
 		});
 	}
 
 	public function delete(int $id): void
 	{
-		$record = TransferStokEntity::query()->findOrFail($id);
-		$record->delete();
+		DB::transaction(function () use ($id) {
+			$record = TransferStokEntity::query()->findOrFail($id);
+			$bahan = BahanBakuEntity::query()->find($record->bahan_baku_id);
+
+			if ($bahan) {
+				$this->mutasiStokService->record([
+					'bahan_baku_id' => $bahan->id,
+					'user_id' => $record->user_id,
+					'reference_type' => 'TRANSFER_STOK_DELETE',
+					'reference_id' => $record->id,
+					'reference_code' => $record->kode,
+					'direction' => 'transfer_reversal',
+					'qty' => (float) $record->qty_transfer,
+					'stok_sebelum' => (float) $bahan->stok_saat_ini,
+					'stok_sesudah' => (float) $bahan->stok_saat_ini,
+					'nilai_satuan' => (float) $bahan->harga_beli_terakhir,
+					'nilai_total' => (float) $record->qty_transfer * (float) $bahan->harga_beli_terakhir,
+					'lokasi_asal' => $record->lokasi_asal,
+					'lokasi_tujuan' => $record->lokasi_tujuan,
+					'catatan' => 'Reversal transfer stok dihapus',
+				]);
+			}
+
+			$record->delete();
+		});
 	}
 
 	private function generateCode(): string

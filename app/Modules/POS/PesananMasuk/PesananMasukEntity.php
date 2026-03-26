@@ -28,6 +28,7 @@ class PesananMasukEntity extends Model
         'total' => 'decimal:2',
         'waktu_pesan' => 'datetime',
         'waktu_bayar' => 'datetime',
+        'bom_consumed_at' => 'datetime',
     ];
 
     public function meja(): BelongsTo

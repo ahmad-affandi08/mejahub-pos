@@ -8,6 +8,7 @@ use App\Modules\POS\Pembayaran\PembayaranEntity;
 use App\Modules\POS\PesananMasuk\PesananMasukEntity;
 use App\Modules\POS\PesananMasuk\PesananMasukItemEntity;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
@@ -351,6 +352,126 @@ class PosAdvancedFlowTest extends TestCase
                 'errors',
             ])
             ->assertJsonPath('meta.pagination.per_page', 1);
+    }
+
+    public function test_pembayaran_consumes_bom_and_writes_stock_mutation_ledger(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        ['menu_id' => $menuId, 'meja_id' => $mejaId] = $this->seedMasterData();
+
+        $bahanBakuId = DB::table('inventory_bahan_baku')->insertGetId([
+            'kode' => 'BB-TEST-' . random_int(100, 999),
+            'nama' => 'Ayam Fillet Test',
+            'satuan' => 'kg',
+            'harga_beli_terakhir' => 50000,
+            'stok_minimum' => 2,
+            'stok_saat_ini' => 10,
+            'is_active' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('inventory_resep_bom')->insert([
+            'data_menu_id' => $menuId,
+            'bahan_baku_id' => $bahanBakuId,
+            'kode' => 'BOM-TEST-' . random_int(100, 999),
+            'qty_kebutuhan' => 2,
+            'satuan' => 'kg',
+            'referensi_porsi' => 1,
+            'is_active' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $order = $this->createOrder($menuId, $mejaId, 'submitted', 2, 12000);
+
+        $response = $this->postJson('/pos/pembayaran', [
+            'pesanan_id' => $order->id,
+            'metode_bayar' => 'cash',
+            'nominal_dibayar' => 30000,
+        ]);
+
+        $response->assertCreated()->assertJsonPath('success', true);
+
+        $this->assertDatabaseHas('pos_pesanan', [
+            'id' => $order->id,
+            'status' => 'paid',
+        ]);
+
+        $this->assertNotNull(
+            DB::table('pos_pesanan')->where('id', $order->id)->value('bom_consumed_at')
+        );
+
+        $this->assertSame(
+            6.0,
+            (float) DB::table('inventory_bahan_baku')->where('id', $bahanBakuId)->value('stok_saat_ini')
+        );
+
+        $this->assertDatabaseHas('inventory_mutasi_stok', [
+            'bahan_baku_id' => $bahanBakuId,
+            'reference_type' => 'POS_PAYMENT_BOM',
+            'reference_id' => $order->id,
+            'direction' => 'out',
+            'qty' => 4,
+        ]);
+    }
+
+    public function test_laporan_stok_index_api_returns_summary_low_stock_and_mutation_data(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        $bahanBakuId = DB::table('inventory_bahan_baku')->insertGetId([
+            'kode' => 'BB-LPR-' . random_int(100, 999),
+            'nama' => 'Tomat Test',
+            'satuan' => 'kg',
+            'harga_beli_terakhir' => 12000,
+            'stok_minimum' => 5,
+            'stok_saat_ini' => 3,
+            'is_active' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('inventory_mutasi_stok')->insert([
+            'bahan_baku_id' => $bahanBakuId,
+            'user_id' => $user->id,
+            'reference_type' => 'WASTE',
+            'reference_id' => 999,
+            'reference_code' => 'WST-TST-001',
+            'direction' => 'out',
+            'qty' => 1,
+            'stok_sebelum' => 4,
+            'stok_sesudah' => 3,
+            'nilai_satuan' => 12000,
+            'nilai_total' => 12000,
+            'catatan' => 'Waste test',
+            'occurred_at' => Carbon::now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->getJson('/report/laporan-stok?low_stock_only=1');
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonStructure([
+                'success',
+                'message',
+                'data' => [
+                    'summary' => ['total_items', 'low_stock_items', 'out_of_stock_items', 'total_stock_value'],
+                    'low_stocks',
+                    'mutations' => ['data', 'meta'],
+                ],
+                'meta' => ['filters'],
+                'errors',
+            ]);
+
+        $this->assertGreaterThanOrEqual(1, count($response->json('data.low_stocks', [])));
+        $this->assertGreaterThanOrEqual(1, count($response->json('data.mutations.data', [])));
     }
 
     private function seedMasterData(): array

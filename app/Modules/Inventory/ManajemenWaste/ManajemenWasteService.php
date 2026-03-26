@@ -3,6 +3,7 @@
 namespace App\Modules\Inventory\ManajemenWaste;
 
 use App\Modules\Inventory\BahanBaku\BahanBakuEntity;
+use App\Modules\Inventory\MutasiStok\MutasiStokService;
 use App\Support\PosDomainException;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -10,6 +11,10 @@ use Illuminate\Support\Str;
 
 class ManajemenWasteService
 {
+	public function __construct(private readonly MutasiStokService $mutasiStokService)
+	{
+	}
+
 	public function paginate(string $search = '', int $perPage = 10): LengthAwarePaginator
 	{
 		return ManajemenWasteEntity::query()
@@ -64,6 +69,21 @@ class ManajemenWasteService
 
 			$bahan->update(['stok_saat_ini' => $stokSetelah]);
 
+			$this->mutasiStokService->record([
+				'bahan_baku_id' => $bahan->id,
+				'user_id' => $userId,
+				'reference_type' => 'WASTE',
+				'reference_id' => $record->id,
+				'reference_code' => $record->kode,
+				'direction' => 'out',
+				'qty' => $qtyWaste,
+				'stok_sebelum' => $stokSebelum,
+				'stok_sesudah' => $stokSetelah,
+				'nilai_satuan' => (float) $bahan->harga_beli_terakhir,
+				'nilai_total' => $qtyWaste * (float) $bahan->harga_beli_terakhir,
+				'catatan' => 'Waste ' . $record->kategori_waste,
+			]);
+
 			return $record->load('bahanBaku:id,nama');
 		});
 	}
@@ -75,8 +95,25 @@ class ManajemenWasteService
 			$bahan = BahanBakuEntity::query()->find($record->bahan_baku_id);
 
 			if ($bahan) {
+				$stokSebelum = (float) $bahan->stok_saat_ini;
+				$stokSesudah = $stokSebelum + (float) $record->qty_waste;
 				$bahan->update([
-					'stok_saat_ini' => (float) $bahan->stok_saat_ini + (float) $record->qty_waste,
+					'stok_saat_ini' => $stokSesudah,
+				]);
+
+				$this->mutasiStokService->record([
+					'bahan_baku_id' => $bahan->id,
+					'user_id' => $record->user_id,
+					'reference_type' => 'WASTE_DELETE',
+					'reference_id' => $record->id,
+					'reference_code' => $record->kode,
+					'direction' => 'in',
+					'qty' => (float) $record->qty_waste,
+					'stok_sebelum' => $stokSebelum,
+					'stok_sesudah' => $stokSesudah,
+					'nilai_satuan' => (float) $bahan->harga_beli_terakhir,
+					'nilai_total' => (float) $record->qty_waste * (float) $bahan->harga_beli_terakhir,
+					'catatan' => 'Reversal waste dihapus',
 				]);
 			}
 

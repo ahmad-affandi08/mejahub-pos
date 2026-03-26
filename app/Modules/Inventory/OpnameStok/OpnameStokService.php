@@ -3,6 +3,7 @@
 namespace App\Modules\Inventory\OpnameStok;
 
 use App\Modules\Inventory\BahanBaku\BahanBakuEntity;
+use App\Modules\Inventory\MutasiStok\MutasiStokService;
 use App\Support\PosDomainException;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -10,6 +11,10 @@ use Illuminate\Support\Str;
 
 class OpnameStokService
 {
+	public function __construct(private readonly MutasiStokService $mutasiStokService)
+	{
+	}
+
 	public function paginate(string $search = '', int $perPage = 10): LengthAwarePaginator
 	{
 		return OpnameStokEntity::query()
@@ -53,6 +58,21 @@ class OpnameStokService
 
 			$bahan->update(['stok_saat_ini' => $stokFisik]);
 
+			$this->mutasiStokService->record([
+				'bahan_baku_id' => $bahan->id,
+				'user_id' => $userId,
+				'reference_type' => 'OPNAME_STOK',
+				'reference_id' => $opname->id,
+				'reference_code' => $opname->kode,
+				'direction' => $selisih >= 0 ? 'adjustment_in' : 'adjustment_out',
+				'qty' => abs($selisih),
+				'stok_sebelum' => $stokSistem,
+				'stok_sesudah' => $stokFisik,
+				'nilai_satuan' => (float) $bahan->harga_beli_terakhir,
+				'nilai_total' => abs($selisih) * (float) $bahan->harga_beli_terakhir,
+				'catatan' => 'Opname stok ' . $opname->kode,
+			]);
+
 			return $opname->load('bahanBaku:id,nama');
 		});
 	}
@@ -69,6 +89,23 @@ class OpnameStokService
 
 			$bahan->update([
 				'stok_saat_ini' => (float) $opname->stok_sistem,
+			]);
+
+			$stokSistem = (float) $opname->stok_sistem;
+			$stokFisik = (float) $opname->stok_fisik;
+			$this->mutasiStokService->record([
+				'bahan_baku_id' => $bahan->id,
+				'user_id' => $opname->user_id,
+				'reference_type' => 'OPNAME_STOK_DELETE',
+				'reference_id' => $opname->id,
+				'reference_code' => $opname->kode,
+				'direction' => $stokSistem >= $stokFisik ? 'adjustment_in' : 'adjustment_out',
+				'qty' => abs($stokSistem - $stokFisik),
+				'stok_sebelum' => $stokFisik,
+				'stok_sesudah' => $stokSistem,
+				'nilai_satuan' => (float) $bahan->harga_beli_terakhir,
+				'nilai_total' => abs($stokSistem - $stokFisik) * (float) $bahan->harga_beli_terakhir,
+				'catatan' => 'Reversal opname stok dihapus',
 			]);
 
 			$opname->delete();
