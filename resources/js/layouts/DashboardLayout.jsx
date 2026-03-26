@@ -104,7 +104,10 @@ const moduleItems = [
 	{
 		title: "Report",
 		icon: Grid3X3,
-		items: [{ title: "Laporan Stok", href: "/report/laporan-stok" }],
+		items: [
+			{ title: "Laporan Penjualan", href: "/report/laporan-penjualan" },
+			{ title: "Laporan Stok", href: "/report/laporan-stok" },
+		],
 	},
 	{
 		title: "Settings",
