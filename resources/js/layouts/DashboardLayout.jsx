@@ -69,6 +69,7 @@ const moduleItems = [
 			{ title: "Jadwal Shift", href: "/hr/jadwal-shift" },
 			{ title: "Absensi", href: "/hr/absensi" },
 			{ title: "Komisi", href: "/hr/komisi" },
+			{ title: "Penggajian", href: "/hr/penggajian" },
 		],
 	},
 	{
