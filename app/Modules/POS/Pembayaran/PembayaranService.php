@@ -82,14 +82,11 @@ class PembayaranService
 			}
 
 			$nominalTagihan = (float) $order->total;
-			$nominalDibayar = (float) $payload['nominal_dibayar'];
+			[$metodeBayar, $nominalDibayar, $paymentDetails] = $this->resolvePaymentPayload($payload);
 
 			if ($nominalDibayar < $nominalTagihan) {
 				throw new PosDomainException('Nominal dibayar kurang dari total tagihan.');
 			}
-
-			$metodeBayar = trim((string) ($payload['metode_bayar'] ?? ''));
-			$this->assertMetodePembayaranAktif($metodeBayar);
 
 			$shift = $this->activeShift($userId);
 
@@ -99,6 +96,7 @@ class PembayaranService
 				'user_id' => $userId,
 				'kode' => $this->generateKode(),
 				'metode_bayar' => $metodeBayar,
+				'payment_details' => $paymentDetails,
 				'nominal_tagihan' => $nominalTagihan,
 				'nominal_dibayar' => $nominalDibayar,
 				'kembalian' => $nominalDibayar - $nominalTagihan,
@@ -116,6 +114,36 @@ class PembayaranService
 
 			return $payment->refresh()->load('pesanan:id,kode');
 		});
+	}
+
+	private function resolvePaymentPayload(array $payload): array
+	{
+		$details = collect($payload['payment_details'] ?? [])
+			->map(function ($item) {
+				$metode = trim((string) ($item['metode_bayar'] ?? ''));
+				$nominal = (float) ($item['nominal'] ?? 0);
+
+				return [
+					'metode_bayar' => $metode,
+					'nominal' => $nominal,
+				];
+			})
+			->filter(fn (array $item) => $item['metode_bayar'] !== '' && $item['nominal'] > 0)
+			->values();
+
+		if ($details->isNotEmpty()) {
+			$details->each(fn (array $item) => $this->assertMetodePembayaranAktif($item['metode_bayar']));
+
+			$nominalDibayar = (float) $details->sum('nominal');
+			$metodeBayar = $details->count() > 1 ? 'split' : (string) $details[0]['metode_bayar'];
+
+			return [$metodeBayar, $nominalDibayar, $details->all()];
+		}
+
+		$metodeBayar = trim((string) ($payload['metode_bayar'] ?? ''));
+		$this->assertMetodePembayaranAktif($metodeBayar);
+
+		return [$metodeBayar, (float) ($payload['nominal_dibayar'] ?? 0), []];
 	}
 
 	public function paymentConfiguration(): array

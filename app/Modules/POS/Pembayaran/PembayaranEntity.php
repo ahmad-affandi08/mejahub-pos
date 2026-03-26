@@ -23,6 +23,7 @@ class PembayaranEntity extends Model
         'nominal_tagihan' => 'decimal:2',
         'nominal_dibayar' => 'decimal:2',
         'kembalian' => 'decimal:2',
+        'payment_details' => 'array',
         'waktu_bayar' => 'datetime',
     ];
 

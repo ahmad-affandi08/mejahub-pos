@@ -27,6 +27,10 @@ function printReceipt(receipt, printerName = null) {
         </tr>
     `).join("");
 
+    const paymentDetailHtml = (receipt.payment_details || []).map((detail) => `
+        <p style="margin:0;">${detail.metode_bayar}: ${formatCurrency(detail.nominal)}</p>
+    `).join("");
+
     popup.document.write(`
         <html>
         <head><title>Struk ${receipt.kode_transaksi}</title></head>
@@ -47,6 +51,7 @@ function printReceipt(receipt, printerName = null) {
             <p style="margin:0;">Tagihan: ${formatCurrency(receipt.nominal_tagihan)}</p>
             <p style="margin:0;">Dibayar: ${formatCurrency(receipt.nominal_dibayar)}</p>
             <p style="margin:0;">Kembalian: ${formatCurrency(receipt.kembalian)}</p>
+            ${paymentDetailHtml ? `<hr /><p style="margin:0 0 6px;">Rincian Pembayaran:</p>${paymentDetailHtml}` : ""}
         </body>
         </html>
     `);
@@ -65,6 +70,8 @@ export default function Index({ pendingOrders, activeShift, recentPayments = [],
         selectedOrderId: "",
         nominalDibayar: "",
         metodeBayar: defaultMethod,
+        isSplitPayment: false,
+        paymentDetails: [],
         autoPrint: Boolean(paymentConfig?.auto_print_default),
         printerId: defaultPrinterId,
         catatan: "",
@@ -81,8 +88,11 @@ export default function Index({ pendingOrders, activeShift, recentPayments = [],
 
     const kembalian = useMemo(() => {
         if (!selectedOrder) return 0;
-        return Number(values.nominalDibayar || 0) - Number(selectedOrder.total || 0);
-    }, [selectedOrder, values.nominalDibayar]);
+        const splitTotal = (values.paymentDetails || []).reduce((sum, item) => sum + Number(item.nominal || 0), 0);
+        const paid = values.isSplitPayment ? splitTotal : Number(values.nominalDibayar || 0);
+
+        return paid - Number(selectedOrder.total || 0);
+    }, [selectedOrder, values.isSplitPayment, values.nominalDibayar, values.paymentDetails]);
 
     const [selectedReceiptId, setSelectedReceiptId] = useState(recentPayments[0]?.id ?? null);
 
@@ -97,10 +107,33 @@ export default function Index({ pendingOrders, activeShift, recentPayments = [],
             return;
         }
 
+        if (values.isSplitPayment) {
+            const details = (values.paymentDetails || []).filter((item) => item.metode_bayar && Number(item.nominal || 0) > 0);
+
+            if (details.length === 0) {
+                window.alert("Isi minimal satu rincian split payment.");
+                return;
+            }
+
+            const totalSplit = details.reduce((sum, item) => sum + Number(item.nominal || 0), 0);
+
+            if (totalSplit < Number(selectedOrder.total || 0)) {
+                window.alert("Total split payment kurang dari total tagihan.");
+                return;
+            }
+        } else if (Number(values.nominalDibayar || 0) < Number(selectedOrder.total || 0)) {
+            window.alert("Nominal dibayar kurang dari total tagihan.");
+            return;
+        }
+
         router.post("/pos/pembayaran", {
             pesanan_id: selectedOrder.id,
-            metode_bayar: values.metodeBayar,
-            nominal_dibayar: Number(values.nominalDibayar || 0),
+            metode_bayar: values.isSplitPayment ? null : values.metodeBayar,
+            nominal_dibayar: values.isSplitPayment ? null : Number(values.nominalDibayar || 0),
+            payment_details: values.isSplitPayment ? (values.paymentDetails || []).map((item) => ({
+                metode_bayar: item.metode_bayar,
+                nominal: Number(item.nominal || 0),
+            })) : [],
             catatan: values.catatan || null,
         }, {
             preserveScroll: true,
@@ -121,6 +154,8 @@ export default function Index({ pendingOrders, activeShift, recentPayments = [],
                     selectedOrderId: "",
                     nominalDibayar: "",
                     metodeBayar: defaultMethod,
+                    isSplitPayment: false,
+                    paymentDetails: [],
                     autoPrint: Boolean(paymentConfig?.auto_print_default),
                     printerId: defaultPrinterId,
                     catatan: "",
@@ -177,6 +212,9 @@ export default function Index({ pendingOrders, activeShift, recentPayments = [],
                                                 onChange={(event) => {
                                                     handleChange("selectedOrderId", event.target.value);
                                                     handleChange("nominalDibayar", String(order.total));
+                                                    if (values.isSplitPayment && (!values.paymentDetails || values.paymentDetails.length === 0)) {
+                                                        handleChange("paymentDetails", [{ metode_bayar: defaultMethod, nominal: String(order.total) }]);
+                                                    }
                                                 }}
                                             />
                                         </td>
@@ -264,6 +302,7 @@ export default function Index({ pendingOrders, activeShift, recentPayments = [],
                                     nominal_tagihan: selectedReceipt.nominal_tagihan,
                                     nominal_dibayar: selectedReceipt.nominal_dibayar,
                                     kembalian: selectedReceipt.kembalian,
+                                    payment_details: selectedReceipt.payment_details,
                                     items: selectedReceipt.items ?? [],
                                 })}
                                 className="mt-2 inline-flex rounded-md border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-50"

@@ -15,6 +15,10 @@ class PembayaranCollection
 			'meja_nama' => $payment->pesanan?->meja?->nama,
 			'kasir_nama' => $payment->kasir?->name,
 			'metode_bayar' => $payment->metode_bayar,
+			'payment_details' => collect($payment->payment_details ?? [])->map(fn ($item) => [
+				'metode_bayar' => $item['metode_bayar'] ?? null,
+				'nominal' => (float) ($item['nominal'] ?? 0),
+			])->values()->all(),
 			'nominal_tagihan' => (float) $payment->nominal_tagihan,
 			'nominal_dibayar' => (float) $payment->nominal_dibayar,
 			'kembalian' => (float) $payment->kembalian,
@@ -46,6 +50,10 @@ class PembayaranCollection
 				'subtotal' => (float) $item->subtotal,
 			])->values()->all() ?? [],
 			'metode' => $payment->metode_bayar,
+			'payment_details' => collect($payment->payment_details ?? [])->map(fn ($item) => [
+				'metode_bayar' => $item['metode_bayar'] ?? null,
+				'nominal' => (float) ($item['nominal'] ?? 0),
+			])->values()->all(),
 			'nominal_tagihan' => (float) $payment->nominal_tagihan,
 			'nominal_dibayar' => (float) $payment->nominal_dibayar,
 			'kembalian' => (float) $payment->kembalian,
@@ -61,6 +69,10 @@ class PembayaranCollection
 			'shift_id' => $payment->shift_id,
 			'user_id' => $payment->user_id,
 			'metode_bayar' => $payment->metode_bayar,
+			'payment_details' => collect($payment->payment_details ?? [])->map(fn ($item) => [
+				'metode_bayar' => $item['metode_bayar'] ?? null,
+				'nominal' => (float) ($item['nominal'] ?? 0),
+			])->values()->all(),
 			'nominal_tagihan' => (float) $payment->nominal_tagihan,
 			'nominal_dibayar' => (float) $payment->nominal_dibayar,
 			'kembalian' => (float) $payment->kembalian,

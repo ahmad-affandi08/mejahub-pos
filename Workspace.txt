@@ -1,0 +1,20 @@
+1. POS Pembayaran (disarankan lanjut dulu)
+Multi-metode bayar per transaksi (cash + QRIS + transfer + split payment).
+Validasi nominal bayar, kembalian, dan pembulatan.
+Reprint bukti bayar + histori pembayaran per order.
+Tutup kasir/shift closing (saldo awal, kas masuk/keluar, selisih).
+
+2. Laporan (biar owner bisa kontrol)
+Laporan harian/mingguan/bulanan: omzet, jumlah transaksi, item terlaris.
+Laporan per metode pembayaran.
+Laporan payroll vs pendapatan (sinkron HR + POS).
+
+3. Finance integration
+Jurnal otomatis dari transaksi POS dan penggajian.
+Kategori biaya operasional + approval flow sederhana.
+Rekonsiliasi kas/bank.
+
+4. Hardening sistem
+Hak akses detail per aksi penting (void, refund, delete permanen).
+Audit log aktivitas user.
+Test skenario kritikal (penggajian generate, pembayaran, recycle bin).

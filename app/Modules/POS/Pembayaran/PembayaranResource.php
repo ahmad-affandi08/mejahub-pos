@@ -75,8 +75,11 @@ class PembayaranResource extends Controller
 	{
 		$payload = $request->validate([
 			'pesanan_id' => ['required', 'integer', 'exists:pos_pesanan,id'],
-			'metode_bayar' => ['required', 'string', 'max:30'],
-			'nominal_dibayar' => ['required', 'numeric', 'min:0'],
+			'metode_bayar' => ['nullable', 'string', 'max:30'],
+			'nominal_dibayar' => ['nullable', 'numeric', 'min:0'],
+			'payment_details' => ['nullable', 'array', 'min:1'],
+			'payment_details.*.metode_bayar' => ['required_with:payment_details', 'string', 'max:30'],
+			'payment_details.*.nominal' => ['required_with:payment_details', 'numeric', 'min:0'],
 			'catatan' => ['nullable', 'string'],
 		]);
 
