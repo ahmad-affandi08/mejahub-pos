@@ -136,8 +136,8 @@ export default function Index({ hakAkses, userOptions, filters, flashMessage }) 
                                     <TableRow key={item.id}>
                                         <TableCell>{item.kode}</TableCell>
                                         <TableCell className="font-medium">{item.nama}</TableCell>
-                                        <TableCell className="break-words whitespace-normal">{item.permissions.join(", ") || "-"}</TableCell>
-                                        <TableCell className="break-words whitespace-normal">{item.users.map((u) => u.name).join(", ") || "-"}</TableCell>
+                                        <TableCell className="wrap-break-word whitespace-normal">{item.permissions.join(", ") || "-"}</TableCell>
+                                        <TableCell className="wrap-break-word whitespace-normal">{item.users.map((u) => u.name).join(", ") || "-"}</TableCell>
                                         <TableCell>
                                             <span
                                                 className={`rounded-full px-2 py-1 text-xs font-medium ${

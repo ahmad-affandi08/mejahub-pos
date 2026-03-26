@@ -15,7 +15,7 @@ function toDatetimeLocal(value) {
 }
 
 export default function Form({ mode, endpoint, initialValues, mejaOptions, statusOptions, onSuccess, onCancel }) {
-    const { data, setData, post, put, processing, errors, reset } = useForm({
+    const { data, setData, post, transform, processing, errors, reset } = useForm({
         data_meja_id: initialValues?.data_meja_id ?? "",
         kode: initialValues?.kode ?? "",
         nama_pelanggan: initialValues?.nama_pelanggan ?? "",
@@ -38,10 +38,12 @@ export default function Form({ mode, endpoint, initialValues, mejaOptions, statu
         };
 
         if (mode === "edit" && initialValues?.id) {
-            put(`${endpoint}/${initialValues.id}`, options);
+            transform((payload) => ({ ...payload, _method: "put" }));
+            post(`${endpoint}/${initialValues.id}`, options);
             return;
         }
 
+        transform((payload) => payload);
         post(endpoint, options);
     };
 

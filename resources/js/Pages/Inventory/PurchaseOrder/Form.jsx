@@ -12,7 +12,7 @@ const emptyItem = {
 };
 
 export default function Form({ mode, endpoint, initialValues, supplierOptions, bahanBakuOptions, onSuccess, onCancel }) {
-    const { data, setData, post, put, processing, errors, reset } = useForm({
+    const { data, setData, post, transform, processing, errors, reset } = useForm({
         supplier_id: initialValues?.supplier_id ?? "",
         kode: initialValues?.kode ?? "",
         tanggal_po: initialValues?.tanggal_po ?? "",
@@ -40,10 +40,12 @@ export default function Form({ mode, endpoint, initialValues, supplierOptions, b
         };
 
         if (mode === "edit" && initialValues?.id) {
-            put(`${endpoint}/${initialValues.id}`, options);
+            transform((payload) => ({ ...payload, _method: "put" }));
+            post(`${endpoint}/${initialValues.id}`, options);
             return;
         }
 
+        transform((payload) => payload);
         post(endpoint, options);
     };
 

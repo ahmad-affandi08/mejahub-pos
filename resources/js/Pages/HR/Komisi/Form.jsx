@@ -13,7 +13,7 @@ const statusOptions = [
 ];
 
 export default function Form({ mode, endpoint, initialValues, pegawaiOptions, onSuccess, onCancel }) {
-    const { data, setData, post, put, processing, errors } = useForm({
+    const { data, setData, post, transform, processing, errors } = useForm({
         kode: initialValues?.kode ?? "",
         pegawai_id: initialValues?.pegawai_id ?? "",
         periode: initialValues?.periode ?? "",
@@ -36,10 +36,12 @@ export default function Form({ mode, endpoint, initialValues, pegawaiOptions, on
         };
 
         if (mode === "edit" && initialValues?.id) {
-            put(`${endpoint}/${initialValues.id}`, options);
+            transform((payload) => ({ ...payload, _method: "put" }));
+            post(`${endpoint}/${initialValues.id}`, options);
             return;
         }
 
+        transform((payload) => payload);
         post(endpoint, options);
     };
 

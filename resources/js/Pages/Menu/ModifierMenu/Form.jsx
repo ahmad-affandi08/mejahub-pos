@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 export default function Form({ mode, endpoint, initialValues, onSuccess, onCancel }) {
     const initialOpsi = (initialValues?.opsi ?? []).join(", ");
 
-    const { data, setData, post, put, processing, errors, reset, transform } = useForm({
+    const { data, setData, post, transform, processing, errors, reset } = useForm({
         kode: initialValues?.kode ?? "",
         nama: initialValues?.nama ?? "",
         deskripsi: initialValues?.deskripsi ?? "",
@@ -39,10 +39,12 @@ export default function Form({ mode, endpoint, initialValues, onSuccess, onCance
         };
 
         if (mode === "edit" && initialValues?.id) {
-            put(`${endpoint}/${initialValues.id}`, options);
+            transform((payload) => ({ ...payload, _method: "put" }));
+            post(`${endpoint}/${initialValues.id}`, options);
             return;
         }
 
+        transform((payload) => payload);
         post(endpoint, options);
     };
 
