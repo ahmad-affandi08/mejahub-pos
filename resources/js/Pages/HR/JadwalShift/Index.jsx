@@ -72,9 +72,9 @@ export default function Index({ jadwalShift, pegawaiOptions, shiftOptions, filte
                                 <DialogContent className="sm:max-w-2xl">
                                     <DialogHeader>
                                         <DialogTitle>Generate Jadwal Shift</DialogTitle>
-                                        <DialogDescription>Buat jadwal otomatis untuk banyak pegawai sekaligus.</DialogDescription>
+                                        <DialogDescription>Buat jadwal otomatis untuk banyak pegawai berdasarkan jabatan, tanggal, dan hari kerja.</DialogDescription>
                                     </DialogHeader>
-                                    <GenerateForm endpoint={endpoint} pegawaiOptions={pegawaiOptions} shiftOptions={shiftOptions} onSuccess={() => setOpenGenerate(false)} onCancel={() => setOpenGenerate(false)} />
+                                    <GenerateForm endpoint={endpoint} pegawaiOptions={pegawaiOptions} onSuccess={() => setOpenGenerate(false)} onCancel={() => setOpenGenerate(false)} />
                                 </DialogContent>
                             </Dialog>
 

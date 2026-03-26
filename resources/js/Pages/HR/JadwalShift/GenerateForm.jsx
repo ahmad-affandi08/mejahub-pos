@@ -15,10 +15,9 @@ const dayOptions = [
     { value: 7, label: "Minggu" },
 ];
 
-export default function GenerateForm({ endpoint, pegawaiOptions, shiftOptions, onSuccess, onCancel }) {
+export default function GenerateForm({ endpoint, pegawaiOptions, onSuccess, onCancel }) {
     const { data, setData, post, processing, errors } = useForm({
         generate_mode: true,
-        shift_id: "",
         pegawai_ids: [],
         tanggal_mulai: "",
         tanggal_selesai: "",
@@ -60,15 +59,8 @@ export default function GenerateForm({ endpoint, pegawaiOptions, shiftOptions, o
 
     return (
         <form onSubmit={submit} className="space-y-4">
-            <div className="space-y-1.5">
-                <label className="text-sm font-medium">Shift</label>
-                <select className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm" value={data.shift_id} onChange={(event) => setData("shift_id", event.target.value)} required>
-                    <option value="">Pilih shift</option>
-                    {shiftOptions.map((item) => (
-                        <option key={item.id} value={item.id}>{item.nama} ({item.jam_masuk} - {item.jam_keluar})</option>
-                    ))}
-                </select>
-                {errors.shift_id ? <p className="text-xs text-destructive">{errors.shift_id}</p> : null}
+            <div className="rounded-xl border border-cyan-200 bg-cyan-50 px-3 py-2 text-xs text-cyan-800">
+                Shift akan dipilih otomatis oleh sistem berdasarkan jabatan dan jumlah karyawan terpilih.
             </div>
 
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -103,7 +95,7 @@ export default function GenerateForm({ endpoint, pegawaiOptions, shiftOptions, o
                     {pegawaiOptions.map((pegawai) => (
                         <label key={pegawai.id} className="flex items-center gap-2 text-sm">
                             <input type="checkbox" checked={data.pegawai_ids.includes(pegawai.id)} onChange={() => togglePegawai(pegawai.id)} />
-                            <span>{pegawai.nama}</span>
+                            <span>{pegawai.nama} {pegawai.jabatan ? `(${pegawai.jabatan})` : ""}</span>
                         </label>
                     ))}
                 </div>

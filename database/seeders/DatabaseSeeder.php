@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
             UsersSeeder::class,
             HakAksesSeeder::class,
             DataPegawaiSeeder::class,
+            PengaturanShiftSeeder::class,
             SettingsSeeder::class,
         ]);
     }

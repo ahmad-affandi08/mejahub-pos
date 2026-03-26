@@ -2,8 +2,11 @@
 
 namespace App\Modules\HR\JadwalShift;
 
+use App\Modules\HR\DataPegawai\DataPegawaiEntity;
+use App\Modules\HR\PengaturanShift\PengaturanShiftEntity;
 use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 class JadwalShiftService
@@ -63,8 +66,16 @@ class JadwalShiftService
         $endDate = Carbon::parse($payload['tanggal_selesai'])->startOfDay();
         $days = $this->normalizeWeekdays($payload['hari_kerja'] ?? []);
         $pegawaiIds = collect($payload['pegawai_ids'] ?? [])->map(fn ($id) => (int) $id)->filter()->values();
+        $pegawaiByJabatan = $this->buildPegawaiGroupByJabatan($pegawaiIds);
+        $shiftIds = $this->getActiveShiftIds();
+
+        if ($pegawaiByJabatan->isEmpty() || empty($shiftIds) || empty($days)) {
+            return 0;
+        }
+
         $skipExisting = (bool) ($payload['skip_existing'] ?? true);
         $created = 0;
+        $dayOffset = 0;
 
         for ($date = $startDate->copy(); $date->lte($endDate); $date->addDay()) {
             $weekday = (int) $date->dayOfWeekIso;
@@ -73,39 +84,75 @@ class JadwalShiftService
                 continue;
             }
 
-            foreach ($pegawaiIds as $pegawaiId) {
-                $exists = JadwalShiftEntity::query()
-                    ->where('pegawai_id', $pegawaiId)
-                    ->whereDate('tanggal', $date->toDateString())
-                    ->exists();
+            foreach ($pegawaiByJabatan as $pegawaiInJabatan) {
+                $totalPegawai = $pegawaiInJabatan->count();
 
-                if ($exists && $skipExisting) {
-                    continue;
-                }
+                foreach ($pegawaiInJabatan->values() as $index => $pegawaiId) {
+                    $pegawaiIndex = ($index + $dayOffset) % $totalPegawai;
+                    $pegawaiId = (int) $pegawaiInJabatan[$pegawaiIndex];
+                    $shiftId = (int) $shiftIds[($index + $dayOffset) % count($shiftIds)];
 
-                if ($exists && !$skipExisting) {
-                    JadwalShiftEntity::query()
+                    $exists = JadwalShiftEntity::query()
                         ->where('pegawai_id', $pegawaiId)
                         ->whereDate('tanggal', $date->toDateString())
-                        ->delete();
+                        ->exists();
+
+                    if ($exists && $skipExisting) {
+                        continue;
+                    }
+
+                    if ($exists && !$skipExisting) {
+                        JadwalShiftEntity::query()
+                            ->where('pegawai_id', $pegawaiId)
+                            ->whereDate('tanggal', $date->toDateString())
+                            ->delete();
+                    }
+
+                    JadwalShiftEntity::query()->create([
+                        'kode' => $this->generateCode($payload['kode_prefix'] ?? null, $date->toDateString(), $pegawaiId),
+                        'pegawai_id' => $pegawaiId,
+                        'shift_id' => $shiftId,
+                        'tanggal' => $date->toDateString(),
+                        'status' => $payload['status'] ?? 'published',
+                        'sumber_jadwal' => 'generate',
+                        'catatan' => $payload['catatan'] ?? null,
+                        'is_active' => true,
+                    ]);
+
+                    $created++;
                 }
-
-                JadwalShiftEntity::query()->create([
-                    'kode' => $this->generateCode($payload['kode_prefix'] ?? null, $date->toDateString(), $pegawaiId),
-                    'pegawai_id' => $pegawaiId,
-                    'shift_id' => (int) $payload['shift_id'],
-                    'tanggal' => $date->toDateString(),
-                    'status' => $payload['status'] ?? 'published',
-                    'sumber_jadwal' => 'generate',
-                    'catatan' => $payload['catatan'] ?? null,
-                    'is_active' => true,
-                ]);
-
-                $created++;
             }
+
+            $dayOffset++;
         }
 
         return $created;
+    }
+
+    private function buildPegawaiGroupByJabatan(Collection $pegawaiIds): Collection
+    {
+        return DataPegawaiEntity::query()
+            ->select(['id', 'jabatan'])
+            ->whereIn('id', $pegawaiIds->all())
+            ->where('is_active', true)
+            ->orderBy('jabatan')
+            ->orderBy('nama')
+            ->get()
+            ->groupBy(fn ($item) => trim((string) ($item->jabatan ?: 'Tanpa Jabatan')))
+            ->map(fn ($group) => $group->pluck('id')->values());
+    }
+
+    private function getActiveShiftIds(): array
+    {
+        return PengaturanShiftEntity::query()
+            ->select(['id'])
+            ->where('is_active', true)
+            ->orderBy('jam_masuk')
+            ->orderBy('nama')
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
     }
 
     private function normalizePayload(array $payload, bool $isGenerate): array

@@ -4,12 +4,31 @@ import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 
+const TIME_OPTIONS = Array.from({ length: 48 }, (_, index) => {
+    const hour = Math.floor(index / 2);
+    const minute = index % 2 === 0 ? "00" : "30";
+    const value = `${String(hour).padStart(2, "0")}:${minute}`;
+
+    return {
+        value,
+        label: value,
+    };
+});
+
+const normalizeTimeValue = (value) => {
+    if (!value) {
+        return "";
+    }
+
+    return String(value).slice(0, 5);
+};
+
 export default function Form({ mode, endpoint, initialValues, onSuccess, onCancel }) {
     const { data, setData, post, transform, processing, errors } = useForm({
         kode: initialValues?.kode ?? "",
         nama: initialValues?.nama ?? "",
-        jam_masuk: initialValues?.jam_masuk ?? "",
-        jam_keluar: initialValues?.jam_keluar ?? "",
+        jam_masuk: normalizeTimeValue(initialValues?.jam_masuk),
+        jam_keluar: normalizeTimeValue(initialValues?.jam_keluar),
         toleransi_telat_menit: initialValues?.toleransi_telat_menit ?? 0,
         toleransi_pulang_cepat_menit: initialValues?.toleransi_pulang_cepat_menit ?? 0,
         lintas_hari: initialValues?.lintas_hari ?? false,
@@ -57,12 +76,22 @@ export default function Form({ mode, endpoint, initialValues, onSuccess, onCance
             <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                 <div className="space-y-1.5">
                     <label className="text-sm font-medium">Jam Masuk</label>
-                    <Input type="time" value={data.jam_masuk} onChange={(event) => setData("jam_masuk", event.target.value)} required />
+                    <select className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm" value={data.jam_masuk} onChange={(event) => setData("jam_masuk", event.target.value)} required>
+                        <option value="" disabled>Pilih jam masuk (00-23)</option>
+                        {TIME_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                    </select>
                     {errors.jam_masuk ? <p className="text-xs text-destructive">{errors.jam_masuk}</p> : null}
                 </div>
                 <div className="space-y-1.5">
                     <label className="text-sm font-medium">Jam Keluar</label>
-                    <Input type="time" value={data.jam_keluar} onChange={(event) => setData("jam_keluar", event.target.value)} required />
+                    <select className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm" value={data.jam_keluar} onChange={(event) => setData("jam_keluar", event.target.value)} required>
+                        <option value="" disabled>Pilih jam keluar (00-23)</option>
+                        {TIME_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                    </select>
                     {errors.jam_keluar ? <p className="text-xs text-destructive">{errors.jam_keluar}</p> : null}
                 </div>
                 <div className="space-y-1.5">

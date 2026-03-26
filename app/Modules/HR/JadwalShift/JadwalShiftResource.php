@@ -26,7 +26,7 @@ class JadwalShiftResource extends Controller
 
         return Inertia::render('HR/JadwalShift/Index', [
             'jadwalShift' => JadwalShiftCollection::toIndex($paginator),
-            'pegawaiOptions' => DataPegawaiEntity::query()->select(['id', 'nama'])->orderBy('nama')->get(),
+            'pegawaiOptions' => DataPegawaiEntity::query()->select(['id', 'nama', 'jabatan'])->where('is_active', true)->orderBy('nama')->get(),
             'shiftOptions' => PengaturanShiftEntity::query()->select(['id', 'nama', 'jam_masuk', 'jam_keluar'])->where('is_active', true)->orderBy('nama')->get(),
             'filters' => [
                 'search' => $search,
@@ -46,7 +46,6 @@ class JadwalShiftResource extends Controller
         if ($isGenerate) {
             $payload = $request->validate([
                 'generate_mode' => ['required', 'boolean'],
-                'shift_id' => ['required', 'integer', 'exists:pengaturan_shift,id'],
                 'pegawai_ids' => ['required', 'array', 'min:1'],
                 'pegawai_ids.*' => ['integer', 'exists:data_pegawai,id'],
                 'tanggal_mulai' => ['required', 'date'],
