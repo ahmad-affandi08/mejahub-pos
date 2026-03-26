@@ -65,6 +65,8 @@ const moduleItems = [
 		items: [
 			{ title: "Data Pegawai", href: "/hr/data-pegawai" },
 			{ title: "Hak Akses", href: "/hr/hak-akses" },
+			{ title: "Pengaturan Shift", href: "/hr/pengaturan-shift" },
+			{ title: "Jadwal Shift", href: "/hr/jadwal-shift" },
 			{ title: "Absensi", href: "/hr/absensi" },
 			{ title: "Komisi", href: "/hr/komisi" },
 		],

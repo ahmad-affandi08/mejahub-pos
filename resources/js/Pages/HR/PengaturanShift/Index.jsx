@@ -1,0 +1,152 @@
+import { Head, router } from "@inertiajs/react";
+import { useState } from "react";
+
+import POSStatusBadge from "@/components/shared/pos/POSStatusBadge";
+import TableToolbar from "@/components/shared/table/TableToolbar";
+import { Button } from "@/components/ui/button";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
+import DashboardLayout from "@/layouts/DashboardLayout";
+import Form from "@/Pages/HR/PengaturanShift/Form";
+
+export default function Index({ shiftSettings, filters, flashMessage }) {
+    const endpoint = "/hr/pengaturan-shift";
+    const searchValue = filters?.search ?? "";
+
+    const [openCreate, setOpenCreate] = useState(false);
+    const [editingItem, setEditingItem] = useState(null);
+
+    const hasData = (shiftSettings?.data ?? []).length > 0;
+
+    const submitSearch = (event) => {
+        event.preventDefault();
+        const formData = new FormData(event.currentTarget);
+        const search = (formData.get("search") || "").toString();
+
+        router.get(endpoint, { search }, { preserveState: true, replace: true });
+    };
+
+    const goPage = (page) => {
+        router.get(endpoint, { search: searchValue, page }, { preserveState: true });
+    };
+
+    const removeItem = (id) => {
+        if (!window.confirm("Hapus pengaturan shift ini?")) return;
+        router.post(`${endpoint}/delete`, { id: String(id) }, { preserveScroll: true });
+    };
+
+    return (
+        <DashboardLayout title="Pengaturan Shift">
+            <Head title="Pengaturan Shift" />
+
+            <div className="space-y-6">
+                <section className="rounded-3xl border bg-white p-6 shadow-sm md:p-8">
+                    <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                        <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700">HR Penjadwalan</p>
+                            <h1 className="text-2xl font-semibold text-slate-900 md:text-3xl">Pengaturan Shift</h1>
+                            <p className="mt-1 text-sm text-slate-600">Atur jam kerja, toleransi, geofence, dan kebijakan verifikasi wajah.</p>
+                        </div>
+
+                        <Dialog open={openCreate} onOpenChange={setOpenCreate}>
+                            <DialogTrigger asChild>
+                                <Button>Tambah Shift</Button>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-2xl">
+                                <DialogHeader>
+                                    <DialogTitle>Tambah Pengaturan Shift</DialogTitle>
+                                    <DialogDescription>Definisikan shift kerja untuk kebutuhan penjadwalan dan absensi mobile.</DialogDescription>
+                                </DialogHeader>
+                                <Form mode="create" endpoint={endpoint} initialValues={null} onSuccess={() => setOpenCreate(false)} onCancel={() => setOpenCreate(false)} />
+                            </DialogContent>
+                        </Dialog>
+                    </div>
+                </section>
+
+                <section className="rounded-3xl border bg-white p-4 shadow-sm md:p-6">
+                    <TableToolbar
+                        searchValue={searchValue}
+                        searchPlaceholder="Cari nama atau kode shift"
+                        onSubmit={submitSearch}
+                        flashMessage={flashMessage?.success}
+                    />
+
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Kode</TableHead>
+                                <TableHead>Shift</TableHead>
+                                <TableHead>Jam</TableHead>
+                                <TableHead>Geofence</TableHead>
+                                <TableHead>Wajah</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead className="text-right">Aksi</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {hasData ? (
+                                shiftSettings.data.map((item) => (
+                                    <TableRow key={item.id}>
+                                        <TableCell>{item.kode || "-"}</TableCell>
+                                        <TableCell className="font-medium">{item.nama}</TableCell>
+                                        <TableCell>{item.jam_masuk} - {item.jam_keluar}</TableCell>
+                                        <TableCell>{item.require_location_validation ? `${item.radius_meter} m` : "Nonaktif"}</TableCell>
+                                        <TableCell>
+                                            <POSStatusBadge status={item.require_face_verification ? "aktif" : "nonaktif"} label={item.require_face_verification ? "Wajib" : "Opsional"} />
+                                        </TableCell>
+                                        <TableCell>
+                                            <POSStatusBadge status={item.is_active ? "aktif" : "nonaktif"} label={item.is_active ? "Aktif" : "Nonaktif"} />
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <div className="flex items-center justify-end gap-2">
+                                                <Dialog open={editingItem?.id === item.id} onOpenChange={(open) => setEditingItem(open ? item : null)}>
+                                                    <DialogTrigger asChild>
+                                                        <Button variant="outline" size="sm">Edit</Button>
+                                                    </DialogTrigger>
+                                                    <DialogContent className="sm:max-w-2xl">
+                                                        <DialogHeader>
+                                                            <DialogTitle>Edit Pengaturan Shift</DialogTitle>
+                                                            <DialogDescription>Perbarui konfigurasi shift dan validasi absensi.</DialogDescription>
+                                                        </DialogHeader>
+                                                        <Form mode="edit" endpoint={endpoint} initialValues={item} onSuccess={() => setEditingItem(null)} onCancel={() => setEditingItem(null)} />
+                                                    </DialogContent>
+                                                </Dialog>
+                                                <Button variant="destructive" size="sm" onClick={() => removeItem(item.id)}>Hapus</Button>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            ) : (
+                                <TableRow>
+                                    <TableCell colSpan={7} className="py-12 text-center text-sm text-muted-foreground">Belum ada pengaturan shift.</TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+
+                    <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
+                        <span>Halaman {shiftSettings.meta.current_page} dari {shiftSettings.meta.last_page} | Total {shiftSettings.meta.total} data</span>
+                        <div className="flex gap-2">
+                            <Button variant="outline" size="sm" disabled={shiftSettings.meta.current_page <= 1} onClick={() => goPage(shiftSettings.meta.current_page - 1)}>Sebelumnya</Button>
+                            <Button variant="outline" size="sm" disabled={shiftSettings.meta.current_page >= shiftSettings.meta.last_page} onClick={() => goPage(shiftSettings.meta.current_page + 1)}>Berikutnya</Button>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </DashboardLayout>
+    );
+}

@@ -1,28 +1,26 @@
 <?php
 
-namespace App\Modules\HR\Absensi;
+namespace App\Modules\HR\JadwalShift;
 
 use App\Modules\HR\DataPegawai\DataPegawaiEntity;
-use App\Modules\HR\JadwalShift\JadwalShiftEntity;
 use App\Modules\HR\PengaturanShift\PengaturanShiftEntity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class AbsensiEntity extends Model
+class JadwalShiftEntity extends Model
 {
     use HasFactory;
     use SoftDeletes;
 
-    protected $table = 'absensi';
+    protected $table = 'jadwal_shift';
 
     protected $guarded = [];
 
     protected $casts = [
         'tanggal' => 'date',
         'is_active' => 'boolean',
-        'dalam_radius' => 'boolean',
     ];
 
     public function pegawai(): BelongsTo
@@ -34,10 +32,4 @@ class AbsensiEntity extends Model
     {
         return $this->belongsTo(PengaturanShiftEntity::class, 'shift_id');
     }
-
-    public function jadwalShift(): BelongsTo
-    {
-        return $this->belongsTo(JadwalShiftEntity::class, 'jadwal_shift_id');
-    }
 }
-

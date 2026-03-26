@@ -1,0 +1,138 @@
+import { useForm } from "@inertiajs/react";
+
+import { Button } from "@/components/ui/button";
+import { DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+
+const dayOptions = [
+    { value: 1, label: "Senin" },
+    { value: 2, label: "Selasa" },
+    { value: 3, label: "Rabu" },
+    { value: 4, label: "Kamis" },
+    { value: 5, label: "Jumat" },
+    { value: 6, label: "Sabtu" },
+    { value: 7, label: "Minggu" },
+];
+
+export default function GenerateForm({ endpoint, pegawaiOptions, shiftOptions, onSuccess, onCancel }) {
+    const { data, setData, post, processing, errors } = useForm({
+        generate_mode: true,
+        shift_id: "",
+        pegawai_ids: [],
+        tanggal_mulai: "",
+        tanggal_selesai: "",
+        hari_kerja: [1, 2, 3, 4, 5],
+        status: "published",
+        kode_prefix: "JDL",
+        catatan: "",
+        skip_existing: true,
+    });
+
+    const togglePegawai = (pegawaiId) => {
+        const current = data.pegawai_ids;
+        if (current.includes(pegawaiId)) {
+            setData("pegawai_ids", current.filter((id) => id !== pegawaiId));
+            return;
+        }
+
+        setData("pegawai_ids", [...current, pegawaiId]);
+    };
+
+    const toggleDay = (day) => {
+        const current = data.hari_kerja;
+        if (current.includes(day)) {
+            setData("hari_kerja", current.filter((id) => id !== day));
+            return;
+        }
+
+        setData("hari_kerja", [...current, day]);
+    };
+
+    const submit = (event) => {
+        event.preventDefault();
+
+        post(endpoint, {
+            preserveScroll: true,
+            onSuccess: () => onSuccess?.(),
+        });
+    };
+
+    return (
+        <form onSubmit={submit} className="space-y-4">
+            <div className="space-y-1.5">
+                <label className="text-sm font-medium">Shift</label>
+                <select className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm" value={data.shift_id} onChange={(event) => setData("shift_id", event.target.value)} required>
+                    <option value="">Pilih shift</option>
+                    {shiftOptions.map((item) => (
+                        <option key={item.id} value={item.id}>{item.nama} ({item.jam_masuk} - {item.jam_keluar})</option>
+                    ))}
+                </select>
+                {errors.shift_id ? <p className="text-xs text-destructive">{errors.shift_id}</p> : null}
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Tanggal Mulai</label>
+                    <Input type="date" value={data.tanggal_mulai} onChange={(event) => setData("tanggal_mulai", event.target.value)} required />
+                    {errors.tanggal_mulai ? <p className="text-xs text-destructive">{errors.tanggal_mulai}</p> : null}
+                </div>
+                <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Tanggal Selesai</label>
+                    <Input type="date" value={data.tanggal_selesai} onChange={(event) => setData("tanggal_selesai", event.target.value)} required />
+                    {errors.tanggal_selesai ? <p className="text-xs text-destructive">{errors.tanggal_selesai}</p> : null}
+                </div>
+            </div>
+
+            <div className="space-y-1.5">
+                <label className="text-sm font-medium">Hari Kerja</label>
+                <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                    {dayOptions.map((day) => (
+                        <label key={day.value} className="flex items-center gap-2 rounded-lg border px-2 py-1.5 text-sm">
+                            <input type="checkbox" checked={data.hari_kerja.includes(day.value)} onChange={() => toggleDay(day.value)} />
+                            <span>{day.label}</span>
+                        </label>
+                    ))}
+                </div>
+                {errors.hari_kerja ? <p className="text-xs text-destructive">{errors.hari_kerja}</p> : null}
+            </div>
+
+            <div className="space-y-1.5">
+                <label className="text-sm font-medium">Pilih Pegawai</label>
+                <div className="max-h-40 space-y-2 overflow-y-auto rounded-lg border p-2">
+                    {pegawaiOptions.map((pegawai) => (
+                        <label key={pegawai.id} className="flex items-center gap-2 text-sm">
+                            <input type="checkbox" checked={data.pegawai_ids.includes(pegawai.id)} onChange={() => togglePegawai(pegawai.id)} />
+                            <span>{pegawai.nama}</span>
+                        </label>
+                    ))}
+                </div>
+                {errors.pegawai_ids ? <p className="text-xs text-destructive">{errors.pegawai_ids}</p> : null}
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Prefix Kode</label>
+                    <Input value={data.kode_prefix} onChange={(event) => setData("kode_prefix", event.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Skip Jadwal Existing</label>
+                    <select className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm" value={data.skip_existing ? "1" : "0"} onChange={(event) => setData("skip_existing", event.target.value === "1")}>
+                        <option value="1">Ya</option>
+                        <option value="0">Tidak (replace)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div className="space-y-1.5">
+                <label className="text-sm font-medium">Catatan</label>
+                <Textarea value={data.catatan} onChange={(event) => setData("catatan", event.target.value)} rows={2} />
+            </div>
+
+            <DialogFooter>
+                <Button type="button" variant="outline" onClick={onCancel}>Batal</Button>
+                <Button type="submit" disabled={processing}>{processing ? "Generate..." : "Generate Jadwal"}</Button>
+            </DialogFooter>
+        </form>
+    );
+}
