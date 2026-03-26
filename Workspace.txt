@@ -1,0 +1,46 @@
+Prioritas 1 (Gap Fitur Besar)
+Lengkapi modul CRM yang masih skeleton.
+Resource kosong: DataPelangganResource.php, MembershipResource.php, PoinLoyaltyResource.php
+Service/Collection juga kosong di folder yang sama.
+Dampak: route ada, tapi endpoint belum punya behavior nyata.
+Lengkapi modul Kitchen yang masih skeleton.
+Contoh: TiketDapurResource.php, StatusMasakService.php, KDSCollection.php
+Lengkapi Report Laporan Shift dan Laporan Pajak.
+Contoh kosong: LaporanShiftService.php, LaporanPajakService.php
+Tambahkan schema migration untuk domain yang belum punya tabel.
+Dari audit, tabel CRM dan Kitchen belum ada migration create table.
+Tabel report materialized/logging khusus juga belum terlihat.
+Referensi struktur migration saat ini: 2026_03_26_000024_create_finance_tables.php
+
+Prioritas 2 (Konsistensi Arsitektur ADR)
+Rapikan feature yang belum memenuhi quartet ADR lengkap.
+Mutasi stok belum lengkap (kurang Resource dan Collection): folder MutasiStok
+Recycle Bin punya deviasi (Entity tidak ada): folder RecycleBin
+Tambahkan frontend pages untuk feature backend yang sudah ada tapi belum ada UI.
+Dari perbandingan folder backend vs pages, yang belum ada UI: CRM, Kitchen, Report Shift, Report Pajak, Inventory MutasiStok.
+Referensi pages existing: Pages
+Sinkronkan sidebar menu dengan scope PRD.
+Saat ini sidebar belum expose CRM, Kitchen, Report Shift, Report Pajak, dan Mutasi Stok.
+Referensi: DashboardLayout.jsx
+
+Prioritas 3 (Reliability dan Quality Gate)
+Perbaiki environment test agar test benar-benar jalan.
+Saat saya jalankan test, mayoritas skip karena pdo_sqlite tidak tersedia.
+Konfigurasi saat ini mengarah ke sqlite in-memory: phpunit.xml
+Dampak: regresi bisa lolos tanpa terdeteksi.
+Tambah test automation untuk modul yang sudah kompleks.
+Finance transition/idempotency
+Report penjualan export
+Inventory mutation consistency
+Permission access control per module
+Buat baseline CI sederhana.
+Minimum: composer test, migration check, build frontend.
+
+Prioritas 4 (Product Readiness)
+README masih template Laravel, belum jadi runbook proyek.
+Referensi: README.md
+Perlu isi: setup env, seed, role/permission default, command operasional, alur deploy.
+Hardening operasional.
+Audit trail aksi approval/reject
+Lock periode closing finance
+Error monitoring dan backup strategy
