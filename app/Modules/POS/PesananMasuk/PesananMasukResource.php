@@ -31,6 +31,7 @@ class PesananMasukResource extends Controller
 			'menus' => $payload['menus'],
 			'meja' => $payload['meja'],
 			'orders' => $payload['orders'],
+			'taxConfig' => $payload['tax_config'],
 			'filters' => ['search' => $search],
 			'flashMessage' => [
 				'success' => $request->session()->get('success'),

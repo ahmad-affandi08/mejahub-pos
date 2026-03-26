@@ -4,6 +4,7 @@ namespace App\Modules\POS\PesananMasuk;
 
 use App\Modules\Meja\DataMeja\DataMejaEntity;
 use App\Modules\Menu\DataMenu\DataMenuEntity;
+use App\Modules\Settings\KonfigurasiPajak\KonfigurasiPajakEntity;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -55,6 +56,7 @@ class PesananMasukService
 			'menus' => $menus,
 			'meja' => $meja,
 			'orders' => PesananMasukCollection::toIndex($activeOrders),
+			'tax_config' => $this->getDefaultTaxConfig(),
 		];
 	}
 
@@ -94,8 +96,10 @@ class PesananMasukService
 
 			$subtotal = (float) $lineItems->sum('subtotal');
 			$diskon = (float) ($payload['diskon'] ?? 0);
-			$pajak = (float) ($payload['pajak'] ?? 0);
 			$serviceCharge = (float) ($payload['service_charge'] ?? 0);
+			$pajak = array_key_exists('pajak', $payload)
+				? (float) ($payload['pajak'] ?? 0)
+				: $this->resolveAutoTax($subtotal, $serviceCharge);
 
 			$order = PesananMasukEntity::query()->create([
 				'kode' => $this->generateKode(),
@@ -135,5 +139,55 @@ class PesananMasukService
 	private function generateKode(): string
 	{
 		return 'ORD-' . now()->format('Ymd-His') . '-' . Str::upper(Str::random(4));
+	}
+
+	private function getDefaultTaxConfig(): ?array
+	{
+		$tax = KonfigurasiPajakEntity::query()
+			->where('is_active', true)
+			->orderByDesc('is_default')
+			->orderBy('urutan')
+			->first();
+
+		if (!$tax) {
+			return null;
+		}
+
+		return [
+			'id' => $tax->id,
+			'kode' => $tax->kode,
+			'nama' => $tax->nama,
+			'jenis' => $tax->jenis,
+			'nilai' => (float) $tax->nilai,
+			'applies_to' => $tax->applies_to,
+			'is_inclusive' => (bool) $tax->is_inclusive,
+		];
+	}
+
+	private function resolveAutoTax(float $subtotal, float $serviceCharge): float
+	{
+		$tax = KonfigurasiPajakEntity::query()
+			->where('is_active', true)
+			->orderByDesc('is_default')
+			->orderBy('urutan')
+			->first();
+
+		if (!$tax) {
+			return 0;
+		}
+
+		$basis = match ($tax->applies_to) {
+			'subtotal' => $subtotal,
+			'service_charge' => $serviceCharge,
+			default => $subtotal + $serviceCharge,
+		};
+
+		$nilai = (float) $tax->nilai;
+
+		if ($tax->jenis === 'percentage') {
+			return round(($basis * $nilai) / 100, 2);
+		}
+
+		return round($nilai, 2);
 	}
 }

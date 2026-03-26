@@ -6,6 +6,7 @@ export default function Form({
     values,
     options,
     state,
+    taxState,
     handlers,
     onChange,
     onSubmit,
@@ -83,6 +84,16 @@ export default function Form({
                 <div className="flex items-center justify-between text-sm">
                     <span className="text-slate-500">Subtotal</span>
                     <MoneyText value={state.subtotal} className="font-semibold" />
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-500">
+                        Pajak {taxState?.taxConfig?.nama ? `(${taxState.taxConfig.nama})` : ""}
+                    </span>
+                    <MoneyText value={taxState?.pajak || 0} className="font-semibold" />
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-900 font-semibold">Total</span>
+                    <MoneyText value={taxState?.totalTagihan || state.subtotal} className="font-semibold text-slate-900" />
                 </div>
                 <Button className="w-full" onClick={onSubmit}>Simpan Pesanan</Button>
             </div>

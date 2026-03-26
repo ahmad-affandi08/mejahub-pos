@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use Database\Seeders\SettingsSeeder;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -18,6 +19,7 @@ class DatabaseSeeder extends Seeder
             UsersSeeder::class,
             HakAksesSeeder::class,
             DataPegawaiSeeder::class,
+            SettingsSeeder::class,
         ]);
     }
 }

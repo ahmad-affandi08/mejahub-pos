@@ -24,6 +24,7 @@ class PembayaranResource extends Controller
 		$pendingOrders = $this->service->pendingOrders($search);
 		$activeShift = $this->service->activeShift(auth()->id());
 		$receiptHistory = $this->service->receiptHistory($search, $perPage);
+		$paymentConfig = $this->service->paymentConfiguration();
 		$recentPayments = $receiptHistory->getCollection();
 		$paymentPayload = $recentPayments->map(fn (PembayaranEntity $item) => PembayaranCollection::toListItem($item))->all();
 
@@ -35,6 +36,7 @@ class PembayaranResource extends Controller
 					'kode' => $activeShift->kode,
 					'status' => $activeShift->status,
 				] : null,
+				'payment_config' => $paymentConfig,
 				'recent_payments' => $paymentPayload,
 			], [
 				'filters' => ['search' => $search, 'per_page' => $perPage],
@@ -54,6 +56,7 @@ class PembayaranResource extends Controller
 				'kode' => $activeShift->kode,
 				'status' => $activeShift->status,
 			] : null,
+			'paymentConfig' => $paymentConfig,
 			'recentPayments' => $paymentPayload,
 			'filters' => ['search' => $search, 'per_page' => $perPage],
 			'pagination' => [
@@ -72,7 +75,7 @@ class PembayaranResource extends Controller
 	{
 		$payload = $request->validate([
 			'pesanan_id' => ['required', 'integer', 'exists:pos_pesanan,id'],
-			'metode_bayar' => ['required', 'string', 'in:cash,qris,debit,credit,transfer'],
+			'metode_bayar' => ['required', 'string', 'max:30'],
 			'nominal_dibayar' => ['required', 'numeric', 'min:0'],
 			'catatan' => ['nullable', 'string'],
 		]);

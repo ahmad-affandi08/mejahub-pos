@@ -9,7 +9,7 @@ import Form from "@/Pages/POS/Pembayaran/Form";
 
 const formatCurrency = (value) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(Number(value || 0));
 
-function printReceipt(receipt) {
+function printReceipt(receipt, printerName = null) {
     if (!receipt) return;
 
     const popup = window.open("", "_blank", "width=420,height=760");
@@ -36,6 +36,7 @@ function printReceipt(receipt) {
             <p style="margin:0;">Kode: ${receipt.kode_transaksi}</p>
             <p style="margin:0;">Waktu: ${receipt.waktu || "-"}</p>
             <p style="margin:0;">Kasir: ${receipt.kasir || "-"}</p>
+            <p style="margin:0;">Printer: ${printerName || "Default"}</p>
             <p style="margin:0;">Pesanan: ${receipt.pesanan_kode || "-"}</p>
             <hr />
             <table style="width:100%;border-collapse:collapse;" cellpadding="4">
@@ -54,11 +55,18 @@ function printReceipt(receipt) {
     popup.print();
 }
 
-export default function Index({ pendingOrders, activeShift, recentPayments = [], flashMessage }) {
+export default function Index({ pendingOrders, activeShift, recentPayments = [], flashMessage, paymentConfig }) {
+    const methods = paymentConfig?.methods ?? [];
+    const printers = paymentConfig?.printers ?? [];
+    const defaultMethod = paymentConfig?.default_method_code ?? methods[0]?.kode ?? "";
+    const defaultPrinterId = paymentConfig?.default_printer_id ? String(paymentConfig.default_printer_id) : "";
+
     const [values, setValues] = useState({
         selectedOrderId: "",
         nominalDibayar: "",
-        metodeBayar: "cash",
+        metodeBayar: defaultMethod,
+        autoPrint: Boolean(paymentConfig?.auto_print_default),
+        printerId: defaultPrinterId,
         catatan: "",
     });
 
@@ -96,11 +104,25 @@ export default function Index({ pendingOrders, activeShift, recentPayments = [],
             catatan: values.catatan || null,
         }, {
             preserveScroll: true,
-            onSuccess: () => {
+            onSuccess: (page) => {
+                const latestPayment = page?.props?.recentPayments?.[0] ?? null;
+                const selectedPrinter = printers.find((item) => String(item.id) === String(values.printerId)) ?? printers[0] ?? null;
+
+                if (values.autoPrint && latestPayment) {
+                    printReceipt({
+                        ...latestPayment,
+                        kode_transaksi: latestPayment.kode,
+                        waktu: latestPayment.waktu_bayar,
+                        kasir: latestPayment.kasir_nama,
+                    }, selectedPrinter?.nama || null);
+                }
+
                 setValues({
                     selectedOrderId: "",
                     nominalDibayar: "",
-                    metodeBayar: "cash",
+                    metodeBayar: defaultMethod,
+                    autoPrint: Boolean(paymentConfig?.auto_print_default),
+                    printerId: defaultPrinterId,
                     catatan: "",
                 });
             },
@@ -174,6 +196,10 @@ export default function Index({ pendingOrders, activeShift, recentPayments = [],
                         selectedOrder,
                         kembalian,
                         hasActiveShift: !!activeShift,
+                    }}
+                    options={{
+                        methods,
+                        printers,
                     }}
                     onChange={handleChange}
                     onSubmit={pay}

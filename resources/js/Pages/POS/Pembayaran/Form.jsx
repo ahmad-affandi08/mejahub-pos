@@ -2,17 +2,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import MoneyText from "@/components/shared/pos/MoneyText";
 
-const methods = [
-    { value: "cash", label: "Cash" },
-    { value: "qris", label: "QRIS" },
-    { value: "debit", label: "Debit" },
-    { value: "credit", label: "Credit Card" },
-    { value: "transfer", label: "Transfer" },
-];
-
 export default function Form({
     values,
     state,
+    options,
     onChange,
     onSubmit,
 }) {
@@ -28,10 +21,38 @@ export default function Form({
                         value={values.metodeBayar}
                         onChange={(event) => onChange("metodeBayar", event.target.value)}
                     >
-                        {methods.map((item) => (
-                            <option key={item.value} value={item.value}>{item.label}</option>
+                        {options.methods.map((item) => (
+                            <option key={item.kode} value={item.kode}>{item.nama}</option>
                         ))}
                     </select>
+                </div>
+
+                <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                    <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-500">Auto Print</label>
+                        <select
+                            className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm"
+                            value={values.autoPrint ? "1" : "0"}
+                            onChange={(event) => onChange("autoPrint", event.target.value === "1")}
+                        >
+                            <option value="1">Aktif</option>
+                            <option value="0">Nonaktif</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-500">Printer</label>
+                        <select
+                            className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm"
+                            value={values.printerId || ""}
+                            onChange={(event) => onChange("printerId", event.target.value)}
+                            disabled={!options.printers.length}
+                        >
+                            <option value="">Pilih printer</option>
+                            {options.printers.map((printer) => (
+                                <option key={printer.id} value={String(printer.id)}>{printer.nama}</option>
+                            ))}
+                        </select>
+                    </div>
                 </div>
 
                 <div>
@@ -58,9 +79,12 @@ export default function Form({
                     <p>Kembalian: <MoneyText value={state.kembalian} className="font-semibold" /></p>
                 </div>
 
-                <Button className="w-full" onClick={onSubmit} disabled={!state.hasActiveShift}>Proses Pembayaran</Button>
+                <Button className="w-full" onClick={onSubmit} disabled={!state.hasActiveShift || !options.methods.length}>Proses Pembayaran</Button>
                 {!state.hasActiveShift ? (
                     <p className="text-xs text-rose-600">Buka shift dulu sebelum proses pembayaran.</p>
+                ) : null}
+                {!options.methods.length ? (
+                    <p className="text-xs text-rose-600">Belum ada metode pembayaran aktif di Settings.</p>
                 ) : null}
             </div>
         </aside>

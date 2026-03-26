@@ -6,6 +6,8 @@ use App\Modules\Inventory\ResepBOM\ResepBOMConsumptionService;
 use App\Modules\POS\BukaShift\BukaShiftEntity;
 use App\Modules\POS\PesananMasuk\PesananMasukCollection;
 use App\Modules\POS\PesananMasuk\PesananMasukEntity;
+use App\Modules\Settings\MetodePembayaran\MetodePembayaranEntity;
+use App\Modules\Settings\PrinterSilent\PrinterSilentEntity;
 use App\Support\PosDomainException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -86,6 +88,9 @@ class PembayaranService
 				throw new PosDomainException('Nominal dibayar kurang dari total tagihan.');
 			}
 
+			$metodeBayar = trim((string) ($payload['metode_bayar'] ?? ''));
+			$this->assertMetodePembayaranAktif($metodeBayar);
+
 			$shift = $this->activeShift($userId);
 
 			$payment = PembayaranEntity::query()->create([
@@ -93,7 +98,7 @@ class PembayaranService
 				'shift_id' => $shift?->id,
 				'user_id' => $userId,
 				'kode' => $this->generateKode(),
-				'metode_bayar' => $payload['metode_bayar'] ?? 'cash',
+				'metode_bayar' => $metodeBayar,
 				'nominal_tagihan' => $nominalTagihan,
 				'nominal_dibayar' => $nominalDibayar,
 				'kembalian' => $nominalDibayar - $nominalTagihan,
@@ -113,6 +118,57 @@ class PembayaranService
 		});
 	}
 
+	public function paymentConfiguration(): array
+	{
+		$methods = MetodePembayaranEntity::query()
+			->where('is_active', true)
+			->orderByDesc('is_default')
+			->orderBy('urutan')
+			->orderBy('nama')
+			->get()
+			->map(fn (MetodePembayaranEntity $item) => [
+				'kode' => $item->kode,
+				'nama' => $item->nama,
+				'tipe' => $item->tipe,
+				'is_default' => (bool) $item->is_default,
+				'requires_reference' => (bool) $item->requires_reference,
+			])
+			->values()
+			->all();
+
+		$printers = PrinterSilentEntity::query()
+			->where('is_active', true)
+			->where('auto_print_payment', true)
+			->orderByDesc('is_default')
+			->orderBy('nama')
+			->get()
+			->map(fn (PrinterSilentEntity $item) => [
+				'id' => $item->id,
+				'kode' => $item->kode,
+				'nama' => $item->nama,
+				'tipe_printer' => $item->tipe_printer,
+				'connection_type' => $item->connection_type,
+				'ip_address' => $item->ip_address,
+				'port' => $item->port,
+				'device_name' => $item->device_name,
+				'is_default' => (bool) $item->is_default,
+				'copies' => (int) $item->copies,
+			])
+			->values()
+			->all();
+
+		$defaultMethod = collect($methods)->firstWhere('is_default', true);
+		$defaultPrinter = collect($printers)->firstWhere('is_default', true);
+
+		return [
+			'methods' => $methods,
+			'printers' => $printers,
+			'default_method_code' => $defaultMethod['kode'] ?? ($methods[0]['kode'] ?? 'cash'),
+			'default_printer_id' => $defaultPrinter['id'] ?? ($printers[0]['id'] ?? null),
+			'auto_print_default' => $defaultPrinter !== null,
+		];
+	}
+
 	public function toOrderPayload($orders): array
 	{
 		return $orders
@@ -124,5 +180,21 @@ class PembayaranService
 	private function generateKode(): string
 	{
 		return 'PAY-' . now()->format('Ymd-His') . '-' . Str::upper(Str::random(4));
+	}
+
+	private function assertMetodePembayaranAktif(string $metodeBayar): void
+	{
+		if ($metodeBayar === '') {
+			throw new PosDomainException('Metode pembayaran wajib dipilih.');
+		}
+
+		$exists = MetodePembayaranEntity::query()
+			->where('kode', $metodeBayar)
+			->where('is_active', true)
+			->exists();
+
+		if (!$exists) {
+			throw new PosDomainException('Metode pembayaran tidak aktif atau tidak ditemukan.');
+		}
 	}
 }

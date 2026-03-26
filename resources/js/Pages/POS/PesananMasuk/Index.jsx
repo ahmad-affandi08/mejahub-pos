@@ -9,7 +9,20 @@ import POSSummaryCard from "@/components/shared/pos/POSSummaryCard";
 import { formatIDR } from "@/components/shared/pos/format";
 import Form from "@/Pages/POS/PesananMasuk/Form";
 
-export default function Index({ menus, meja, orders, filters, flashMessage }) {
+function calculateTaxAmount(subtotal, taxConfig) {
+    if (!taxConfig) return 0;
+
+    const base = taxConfig.applies_to === "service_charge" ? 0 : subtotal;
+    const value = Number(taxConfig.nilai || 0);
+
+    if (taxConfig.jenis === "percentage") {
+        return Math.round((base * value) / 100);
+    }
+
+    return Math.round(value);
+}
+
+export default function Index({ menus, meja, orders, filters, flashMessage, taxConfig }) {
     const endpoint = "/pos/pesanan-masuk";
     const [search, setSearch] = useState(filters?.search ?? "");
     const [values, setValues] = useState({
@@ -30,6 +43,9 @@ export default function Index({ menus, meja, orders, filters, flashMessage }) {
         () => values.cart.reduce((acc, item) => acc + (item.harga * item.qty), 0),
         [values.cart]
     );
+
+    const pajak = useMemo(() => calculateTaxAmount(subtotal, taxConfig), [subtotal, taxConfig]);
+    const totalTagihan = useMemo(() => subtotal + pajak, [subtotal, pajak]);
 
     const handleChange = (field, value) => {
         setValues((prev) => ({ ...prev, [field]: value }));
@@ -99,6 +115,9 @@ export default function Index({ menus, meja, orders, filters, flashMessage }) {
             nama_pelanggan: values.namaPelanggan || null,
             catatan: values.catatan || null,
             status: "submitted",
+            diskon: 0,
+            pajak,
+            service_charge: 0,
             items: values.cart.map((item) => ({
                 data_menu_id: item.data_menu_id,
                 qty: item.qty,
@@ -129,7 +148,7 @@ export default function Index({ menus, meja, orders, filters, flashMessage }) {
                 <POSSummaryCard label="Menu Aktif" value={String(filteredMenus.length)} tone="sky" />
                 <POSSummaryCard label="Item Keranjang" value={String(values.cart.length)} tone="orange" />
                 <POSSummaryCard label="Pesanan Aktif" value={String(orders.length)} tone="slate" />
-                <POSSummaryCard label="Subtotal" value={formatIDR(subtotal)} tone="emerald" />
+                <POSSummaryCard label="Total" value={formatIDR(totalTagihan)} tone="emerald" />
             </div>
 
             <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
@@ -176,6 +195,11 @@ export default function Index({ menus, meja, orders, filters, flashMessage }) {
                     values={values}
                     options={{ meja }}
                     state={{ subtotal }}
+                    taxState={{
+                        taxConfig,
+                        pajak,
+                        totalTagihan,
+                    }}
                     handlers={{
                         onDecreaseQty: (menuId) => updateQty(menuId, -1),
                         onIncreaseQty: (menuId) => updateQty(menuId, 1),

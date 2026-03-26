@@ -68,6 +68,20 @@ const moduleItems = [
 		],
 	},
 	{
+		title: "Inventory",
+		icon: Package,
+		items: [
+			{ title: "Supplier", href: "/inventory/supplier" },
+			{ title: "Bahan Baku", href: "/inventory/bahan-baku" },
+			{ title: "Purchase Order", href: "/inventory/purchase-order" },
+			{ title: "Penerimaan Barang", href: "/inventory/penerimaan-barang" },
+			{ title: "Opname Stok", href: "/inventory/opname-stok" },
+			{ title: "Transfer Stok", href: "/inventory/transfer-stok" },
+			{ title: "Manajemen Waste", href: "/inventory/manajemen-waste" },
+			{ title: "Resep BOM", href: "/inventory/resep-b-o-m" },
+		],
+	},
+	{
 		title: "POS",
 		icon: CircleDollarSign,
 		items: [
@@ -82,9 +96,19 @@ const moduleItems = [
 		],
 	},
 	{
+		title: "Report",
+		icon: Grid3X3,
+		items: [{ title: "Laporan Stok", href: "/report/laporan-stok" }],
+	},
+	{
 		title: "Settings",
 		icon: Settings,
-		items: [],
+		items: [
+			{ title: "Profil Toko", href: "/settings/profil-toko" },
+			{ title: "Metode Pembayaran", href: "/settings/metode-pembayaran" },
+			{ title: "Konfigurasi Pajak", href: "/settings/konfigurasi-pajak" },
+			{ title: "Printer Silent", href: "/settings/printer-silent" },
+		],
 	},
 ];
 
