@@ -33,12 +33,19 @@ class ProfilTokoResource extends Controller
 			],
 			'flashMessage' => [
 				'success' => $request->session()->get('success'),
+				'error' => $request->session()->get('error'),
 			],
 		]);
 	}
 
 	public function store(Request $request): RedirectResponse
 	{
+		if (ProfilTokoEntity::query()->count() > 0) {
+			return redirect()
+				->route('settings.profil-toko.index')
+				->with('error', 'Profil toko hanya boleh 1 data. Silakan edit profil yang sudah ada.');
+		}
+
 		$payload = $request->validate([
 			'kode_toko' => ['nullable', 'string', 'max:40', 'unique:settings_profil_toko,kode_toko'],
 			'nama_toko' => ['required', 'string', 'max:150'],
@@ -57,6 +64,10 @@ class ProfilTokoResource extends Controller
 			'bahasa' => ['nullable', 'string', 'max:10'],
 			'is_default' => ['nullable', 'boolean'],
 			'is_active' => ['nullable', 'boolean'],
+		], [
+			'logo_file.image' => 'Upload gagal: file logo harus berupa gambar.',
+			'logo_file.mimes' => 'Upload gagal: format logo hanya boleh JPG, JPEG, PNG, atau WEBP.',
+			'logo_file.max' => 'Upload gagal: ukuran gambar maksimal 2MB.',
 		]);
 
 		$payload['timezone'] = $payload['timezone'] ?? 'Asia/Jakarta';
@@ -100,6 +111,10 @@ class ProfilTokoResource extends Controller
 			'bahasa' => ['nullable', 'string', 'max:10'],
 			'is_default' => ['nullable', 'boolean'],
 			'is_active' => ['nullable', 'boolean'],
+		], [
+			'logo_file.image' => 'Upload gagal: file logo harus berupa gambar.',
+			'logo_file.mimes' => 'Upload gagal: format logo hanya boleh JPG, JPEG, PNG, atau WEBP.',
+			'logo_file.max' => 'Upload gagal: ukuran gambar maksimal 2MB.',
 		]);
 
 		$payload['timezone'] = $payload['timezone'] ?? 'Asia/Jakarta';
@@ -110,10 +125,7 @@ class ProfilTokoResource extends Controller
 
 		if ($request->hasFile('logo_file')) {
 			$payload['logo_path'] = $this->storeLogo($request->file('logo_file'));
-
-			if (!empty($current->logo_path) && Str::startsWith($current->logo_path, 'profil-toko/')) {
-				Storage::disk('public')->delete($current->logo_path);
-			}
+			$this->deleteLogo($current->logo_path);
 		}
 
 		unset($payload['logo_file']);
@@ -129,10 +141,7 @@ class ProfilTokoResource extends Controller
 	{
 		$current = ProfilTokoEntity::query()->findOrFail($id);
 		$this->service->delete($id);
-
-		if (!empty($current->logo_path) && Str::startsWith($current->logo_path, 'profil-toko/')) {
-			Storage::disk('public')->delete($current->logo_path);
-		}
+		$this->deleteLogo($current->logo_path);
 
 		return redirect()
 			->route('settings.profil-toko.index')
@@ -144,7 +153,17 @@ class ProfilTokoResource extends Controller
 		$filename = Str::uuid()->toString() . '.' . $file->getClientOriginalExtension();
 		Storage::disk('public')->putFileAs('profil-toko', $file, $filename);
 
-		return 'profil-toko/' . $filename;
+		return $filename;
+	}
+
+	private function deleteLogo(?string $logoPath): void
+	{
+		if (empty($logoPath)) {
+			return;
+		}
+
+		$storedPath = Str::contains($logoPath, '/') ? $logoPath : 'profil-toko/' . $logoPath;
+		Storage::disk('public')->delete($storedPath);
 	}
 
 	public function create(): RedirectResponse

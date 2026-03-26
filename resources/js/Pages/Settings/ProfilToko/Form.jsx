@@ -1,5 +1,5 @@
 import { useForm } from "@inertiajs/react";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
@@ -27,6 +27,8 @@ export default function Form({ mode, endpoint, initialValues, onSuccess, onCance
         is_active: initialValues?.is_active ?? true,
     });
 
+    const [uploadError, setUploadError] = useState("");
+
     const logoPreviewUrl = useMemo(() => {
         if (data.logo_file instanceof File) {
             return URL.createObjectURL(data.logo_file);
@@ -40,8 +42,33 @@ export default function Form({ mode, endpoint, initialValues, onSuccess, onCance
             return data.logo_path;
         }
 
-        return `/storage/${data.logo_path}`;
+        if (data.logo_path.includes("/")) {
+            return `/storage/${data.logo_path}`;
+        }
+
+        return `/storage/profil-toko/${data.logo_path}`;
     }, [data.logo_file, data.logo_path]);
+
+    const handleLogoChange = (event) => {
+        const file = event.target.files?.[0] ?? null;
+
+        if (!file) {
+            setUploadError("");
+            setData("logo_file", null);
+            return;
+        }
+
+        const maxSize = 2 * 1024 * 1024;
+        if (file.size > maxSize) {
+            setUploadError("Upload gagal: ukuran gambar maksimal 2MB.");
+            setData("logo_file", null);
+            event.target.value = "";
+            return;
+        }
+
+        setUploadError("");
+        setData("logo_file", file);
+    };
 
     useEffect(() => {
         return () => {
@@ -53,6 +80,11 @@ export default function Form({ mode, endpoint, initialValues, onSuccess, onCance
 
     const submit = (event) => {
         event.preventDefault();
+
+        if (data.logo_file instanceof File && data.logo_file.size > 2 * 1024 * 1024) {
+            setUploadError("Upload gagal: ukuran gambar maksimal 2MB.");
+            return;
+        }
 
         const options = {
             preserveScroll: true,
@@ -162,7 +194,7 @@ export default function Form({ mode, endpoint, initialValues, onSuccess, onCance
                     <Input
                         type="file"
                         accept="image/jpeg,image/png,image/webp"
-                        onChange={(event) => setData("logo_file", event.target.files?.[0] ?? null)}
+                        onChange={handleLogoChange}
                     />
                     <p className="text-xs text-muted-foreground">Format: JPG, PNG, WEBP. Maksimal 2MB.</p>
                     {logoPreviewUrl ? (
@@ -172,7 +204,8 @@ export default function Form({ mode, endpoint, initialValues, onSuccess, onCance
                             className="mt-2 h-16 w-16 rounded-md border object-cover"
                         />
                     ) : null}
-                    {data.logo_path ? <p className="text-xs text-muted-foreground">Path logo: {data.logo_path}</p> : null}
+                    {data.logo_path ? <p className="text-xs text-muted-foreground">File tersimpan: {data.logo_path}</p> : null}
+                    {uploadError ? <p className="text-xs text-destructive">{uploadError}</p> : null}
                     {errors.logo_file ? <p className="text-xs text-destructive">{errors.logo_file}</p> : null}
                     {errors.logo_path ? <p className="text-xs text-destructive">{errors.logo_path}</p> : null}
                 </div>

@@ -5,7 +5,7 @@ import { DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 
 export default function Form({ mode, endpoint, initialValues, kategoriOptions, onSuccess, onCancel }) {
-    const { data, setData, post, put, processing, errors, reset } = useForm({
+    const { data, setData, post, transform, processing, errors, reset } = useForm({
         kategori_menu_id: initialValues?.kategori_menu_id ?? "",
         kode: initialValues?.kode ?? "",
         nama: initialValues?.nama ?? "",
@@ -28,10 +28,12 @@ export default function Form({ mode, endpoint, initialValues, kategoriOptions, o
         };
 
         if (mode === "edit" && initialValues?.id) {
-            put(`${endpoint}/${initialValues.id}`, options);
+            transform((payload) => ({ ...payload, _method: "put" }));
+            post(`${endpoint}/${initialValues.id}`, options);
             return;
         }
 
+        transform((payload) => payload);
         post(endpoint, options);
     };
 
