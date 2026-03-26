@@ -45,7 +45,7 @@ export default function Form({ mode, endpoint, initialValues, onSuccess, onCance
 					<Input
 						value={data.no_identitas}
 						onChange={(event) => setData("no_identitas", event.target.value)}
-						placeholder="Contoh: EMP-0001"
+						placeholder="3314xxxxxx"
 					/>
 					{errors.no_identitas ? <p className="text-xs text-destructive">{errors.no_identitas}</p> : null}
 				</div>
@@ -70,6 +70,7 @@ export default function Form({ mode, endpoint, initialValues, onSuccess, onCance
 						onChange={(event) => setData("jabatan", event.target.value)}
 						placeholder="Kasir / Supervisor"
 					/>
+					<p className="text-xs text-muted-foreground">Jabatan untuk posisi kerja operasional, bukan pengaturan akses menu aplikasi.</p>
 					{errors.jabatan ? <p className="text-xs text-destructive">{errors.jabatan}</p> : null}
 				</div>
 

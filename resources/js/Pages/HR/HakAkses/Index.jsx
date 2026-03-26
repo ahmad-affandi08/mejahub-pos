@@ -22,7 +22,7 @@ import {
     TableRow,
 } from "@/components/ui/table";
 
-export default function Index({ hakAkses, userOptions, filters, flashMessage }) {
+export default function Index({ hakAkses, userOptions, permissionCatalog, filters, flashMessage }) {
     const endpoint = "/hr/hak-akses";
     const searchValue = filters?.search ?? "";
 
@@ -78,7 +78,7 @@ export default function Index({ hakAkses, userOptions, filters, flashMessage }) 
                             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700">HR Security</p>
                             <h1 className="text-2xl font-semibold text-slate-900 md:text-3xl">Hak Akses</h1>
                             <p className="mt-1 text-sm text-slate-600">
-                                Kelola role, permission key, dan assignment user.
+                                Role mengatur akses menu sistem. Jabatan di Data Pegawai adalah posisi kerja operasional.
                             </p>
                         </div>
 
@@ -86,11 +86,11 @@ export default function Index({ hakAkses, userOptions, filters, flashMessage }) 
                             <DialogTrigger asChild>
                                 <Button>Tambah Role</Button>
                             </DialogTrigger>
-                            <DialogContent className="sm:max-w-xl">
+                            <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl">
                                 <DialogHeader>
                                     <DialogTitle>Tambah Role Hak Akses</DialogTitle>
                                     <DialogDescription>
-                                        Isi role lalu tentukan permission key dan user yang memiliki role tersebut.
+                                        Buat role akses sistem lalu pilih user yang akan memakai role ini.
                                     </DialogDescription>
                                 </DialogHeader>
                                 <Form
@@ -98,6 +98,7 @@ export default function Index({ hakAkses, userOptions, filters, flashMessage }) 
                                     endpoint={endpoint}
                                     initialValues={null}
                                     userOptions={userOptions}
+                                    permissionCatalog={permissionCatalog}
                                     onSuccess={() => setOpenCreate(false)}
                                     onCancel={() => setOpenCreate(false)}
                                 />
@@ -158,11 +159,11 @@ export default function Index({ hakAkses, userOptions, filters, flashMessage }) 
                                                     <DialogTrigger asChild>
                                                         <Button variant="outline" size="sm">Edit</Button>
                                                     </DialogTrigger>
-                                                    <DialogContent className="sm:max-w-xl">
+                                                    <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl">
                                                         <DialogHeader>
                                                             <DialogTitle>Edit Role Hak Akses</DialogTitle>
                                                             <DialogDescription>
-                                                                Perbarui role, permission key, dan assignment user.
+                                                                Perbarui akses role lalu sesuaikan assignment user.
                                                             </DialogDescription>
                                                         </DialogHeader>
                                                         <Form
@@ -170,6 +171,7 @@ export default function Index({ hakAkses, userOptions, filters, flashMessage }) 
                                                             endpoint={endpoint}
                                                             initialValues={item}
                                                             userOptions={userOptions}
+                                                            permissionCatalog={permissionCatalog}
                                                             onSuccess={() => setEditingItem(null)}
                                                             onCancel={() => setEditingItem(null)}
                                                         />
