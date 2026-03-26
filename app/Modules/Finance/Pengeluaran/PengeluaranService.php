@@ -115,12 +115,25 @@ class PengeluaranService
 	public function submit(int $id): void
 	{
 		$entity = PengeluaranEntity::query()->findOrFail($id);
+
+		if ($entity->status_approval === 'approved') {
+			abort(422, 'Pengeluaran yang sudah approved tidak bisa di-submit ulang.');
+		}
+
+		if ($entity->status_approval === 'submitted') {
+			return;
+		}
+
 		$entity->update(['status_approval' => 'submitted']);
 	}
 
 	public function approve(int $id, ?int $userId = null): void
 	{
 		$entity = PengeluaranEntity::query()->findOrFail($id);
+
+		if ($entity->status_approval !== 'submitted') {
+			abort(422, 'Hanya pengeluaran berstatus submitted yang bisa di-approve.');
+		}
 
 		$entity->update([
 			'status_approval' => 'approved',
@@ -147,6 +160,10 @@ class PengeluaranService
 	public function reject(int $id, ?int $userId = null): void
 	{
 		$entity = PengeluaranEntity::query()->findOrFail($id);
+
+		if (!in_array($entity->status_approval, ['submitted', 'approved'], true)) {
+			abort(422, 'Hanya pengeluaran berstatus submitted/approved yang bisa di-reject.');
+		}
 
 		$entity->update([
 			'status_approval' => 'rejected',

@@ -99,12 +99,25 @@ class PettyCashService
 	public function submit(int $id): void
 	{
 		$entity = PettyCashEntity::query()->findOrFail($id);
+
+		if ($entity->status_approval === 'approved') {
+			abort(422, 'Petty cash yang sudah approved tidak bisa di-submit ulang.');
+		}
+
+		if ($entity->status_approval === 'submitted') {
+			return;
+		}
+
 		$entity->update(['status_approval' => 'submitted']);
 	}
 
 	public function approve(int $id, ?int $userId = null): void
 	{
 		$entity = PettyCashEntity::query()->findOrFail($id);
+
+		if ($entity->status_approval !== 'submitted') {
+			abort(422, 'Hanya petty cash berstatus submitted yang bisa di-approve.');
+		}
 
 		$saldoSebelum = $this->currentBalance($entity->id);
 		$delta = $entity->jenis_arus === 'in' ? (float) $entity->nominal : -1 * (float) $entity->nominal;
@@ -135,6 +148,10 @@ class PettyCashService
 	public function reject(int $id, ?int $userId = null): void
 	{
 		$entity = PettyCashEntity::query()->findOrFail($id);
+
+		if (!in_array($entity->status_approval, ['submitted', 'approved'], true)) {
+			abort(422, 'Hanya petty cash berstatus submitted/approved yang bisa di-reject.');
+		}
 
 		$entity->update([
 			'status_approval' => 'rejected',

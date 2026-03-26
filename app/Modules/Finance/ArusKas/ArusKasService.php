@@ -200,7 +200,11 @@ class ArusKasService
 			->where('status', 'paid')
 			->get(['id', 'kode', 'metode_bayar', 'nominal_tagihan', 'payment_details', 'waktu_bayar', 'user_id']);
 
+		$paidPaymentIds = [];
+
 		foreach ($payments as $payment) {
+			$paidPaymentIds[] = (int) $payment->id;
+			$desiredReferences = [];
 			$details = collect($payment->payment_details ?? []);
 
 			if ($details->isNotEmpty()) {
@@ -212,11 +216,14 @@ class ArusKasService
 						continue;
 					}
 
+					$referenceCode = $payment->kode . '-SPLIT-' . ($idx + 1);
+					$desiredReferences[] = $referenceCode;
+
 					$this->upsertSourceJournal('pos_payment', (int) $payment->id, [
 						'tanggal' => optional($payment->waktu_bayar)?->toDateString() ?? now()->toDateString(),
 						'jenis_akun' => $this->resolveAkunByPaymentMethod($method),
 						'jenis_arus' => 'in',
-						'referensi_kode' => $payment->kode . '-SPLIT-' . ($idx + 1),
+						'referensi_kode' => $referenceCode,
 						'kategori' => 'penjualan',
 						'deskripsi' => 'Jurnal otomatis pembayaran POS (' . strtoupper($method) . ')',
 						'nominal' => $nominal,
@@ -225,10 +232,13 @@ class ArusKasService
 					], true);
 				}
 
+				$this->deleteStaleSourceJournals('pos_payment', (int) $payment->id, $desiredReferences);
+
 				continue;
 			}
 
 			$method = strtolower(trim((string) ($payment->metode_bayar ?? 'cash')));
+			$desiredReferences[] = $payment->kode;
 
 			$this->upsertSourceJournal('pos_payment', (int) $payment->id, [
 				'tanggal' => optional($payment->waktu_bayar)?->toDateString() ?? now()->toDateString(),
@@ -241,7 +251,11 @@ class ArusKasService
 				'status' => 'posted',
 				'created_by' => $payment->user_id,
 			], true);
+
+			$this->deleteStaleSourceJournals('pos_payment', (int) $payment->id, $desiredReferences);
 		}
+
+		$this->deleteOrphanSourceJournals('pos_payment', $paidPaymentIds);
 	}
 
 	private function syncFromPayroll(): void
@@ -251,18 +265,51 @@ class ArusKasService
 			->where('status', 'dibayar')
 			->get(['id', 'kode', 'tanggal_pembayaran', 'total_gaji']);
 
+		$activePayrollIds = [];
+
 		foreach ($items as $item) {
+			$activePayrollIds[] = (int) $item->id;
+			$referenceCode = $item->kode ?: 'PAYROLL-' . $item->id;
+
 			$this->upsertSourceJournal('payroll', (int) $item->id, [
 				'tanggal' => optional($item->tanggal_pembayaran)?->toDateString() ?? now()->toDateString(),
 				'jenis_akun' => 'bank',
 				'jenis_arus' => 'out',
-				'referensi_kode' => $item->kode ?: 'PAYROLL-' . $item->id,
+				'referensi_kode' => $referenceCode,
 				'kategori' => 'penggajian',
 				'deskripsi' => 'Jurnal otomatis pembayaran gaji',
 				'nominal' => (float) $item->total_gaji,
 				'status' => 'posted',
 			], true);
+
+			$this->deleteStaleSourceJournals('payroll', (int) $item->id, [$referenceCode]);
 		}
+
+		$this->deleteOrphanSourceJournals('payroll', $activePayrollIds);
+	}
+
+	private function deleteStaleSourceJournals(string $sourceType, int $sourceId, array $keepReferences): void
+	{
+		$query = ArusKasEntity::query()
+			->where('sumber_tipe', $sourceType)
+			->where('sumber_id', $sourceId);
+
+		if (!empty($keepReferences)) {
+			$query->whereNotIn('referensi_kode', $keepReferences);
+		}
+
+		$query->delete();
+	}
+
+	private function deleteOrphanSourceJournals(string $sourceType, array $activeSourceIds): void
+	{
+		$query = ArusKasEntity::query()->where('sumber_tipe', $sourceType);
+
+		if (!empty($activeSourceIds)) {
+			$query->whereNotIn('sumber_id', $activeSourceIds);
+		}
+
+		$query->delete();
 	}
 
 	private function resolveAkunByPaymentMethod(string $method): string

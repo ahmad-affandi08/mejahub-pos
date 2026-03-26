@@ -16,6 +16,7 @@ export default function Index({ pengeluaran, summary, categoryOptions, filters, 
 
     const [openCreate, setOpenCreate] = useState(false);
     const [editingItem, setEditingItem] = useState(null);
+    const [quickActionKey, setQuickActionKey] = useState("");
 
     const hasData = (pengeluaran?.data ?? []).length > 0;
 
@@ -32,6 +33,63 @@ export default function Index({ pengeluaran, summary, categoryOptions, filters, 
     const removeItem = (id) => {
         if (!window.confirm("Hapus data pengeluaran ini?")) return;
         router.post(`${endpoint}/delete`, { id: String(id) }, { preserveScroll: true });
+    };
+
+    const runQuickAction = (id, action) => {
+        const labels = {
+            submit: "Submit",
+            approve: "Approve",
+            reject: "Reject",
+        };
+
+        if (!window.confirm(`${labels[action]} data ini?`)) return;
+
+        const actionKey = `${id}:${action}`;
+        setQuickActionKey(actionKey);
+
+        router.put(`${endpoint}/${id}`, {
+            quick_action: true,
+            action,
+        }, {
+            preserveScroll: true,
+            onFinish: () => setQuickActionKey(""),
+        });
+    };
+
+    const isActionLoading = (id, action) => quickActionKey === `${id}:${action}`;
+    const isAnyActionLoading = quickActionKey !== "";
+
+    const actionButtons = (item) => {
+        if (item.status_approval === "draft" || item.status_approval === "rejected") {
+            return (
+                <Button size="sm" variant="secondary" disabled={isAnyActionLoading} onClick={() => runQuickAction(item.id, "submit")}>
+                    {isActionLoading(item.id, "submit") ? "Submitting..." : "Submit"}
+                </Button>
+            );
+        }
+
+        if (item.status_approval === "submitted") {
+            return (
+                <>
+                    <Button size="sm" disabled={isAnyActionLoading} onClick={() => runQuickAction(item.id, "approve")}>
+                        {isActionLoading(item.id, "approve") ? "Approving..." : "Approve"}
+                    </Button>
+                    <Button size="sm" variant="outline" disabled={isAnyActionLoading} onClick={() => runQuickAction(item.id, "reject")}>
+                        {isActionLoading(item.id, "reject") ? "Rejecting..." : "Reject"}
+                    </Button>
+                </>
+            );
+        }
+
+        if (item.status_approval === "approved") {
+            return (
+                <Button size="sm" variant="outline" disabled={isAnyActionLoading} onClick={() => runQuickAction(item.id, "reject")}>
+                    {isActionLoading(item.id, "reject") ? "Rejecting..." : "Reject"}
+                </Button>
+            );
+        }
+
+        return null;
     };
 
     return (
@@ -103,6 +161,7 @@ export default function Index({ pengeluaran, summary, categoryOptions, filters, 
                                     <TableCell><POSStatusBadge status={item.status_approval === "approved" ? "aktif" : item.status_approval === "rejected" ? "nonaktif" : "warning"} label={item.status_approval} /></TableCell>
                                     <TableCell className="text-right">
                                         <div className="flex justify-end gap-2">
+                                            {actionButtons(item)}
                                             <Dialog open={editingItem?.id === item.id} onOpenChange={(open) => setEditingItem(open ? item : null)}>
                                                 <DialogTrigger asChild><Button variant="outline" size="sm">Edit/Approval</Button></DialogTrigger>
                                                 <DialogContent className="sm:max-w-xl">

@@ -63,6 +63,29 @@ class PengeluaranResource extends Controller
 
 	public function update(Request $request, int $id): RedirectResponse
 	{
+		if ($request->boolean('quick_action')) {
+			$payload = $request->validate([
+				'quick_action' => ['required', 'boolean'],
+				'action' => ['required', 'in:submit,approve,reject'],
+			]);
+
+			if ($payload['action'] === 'submit') {
+				$this->service->submit($id);
+			}
+
+			if ($payload['action'] === 'approve') {
+				$this->service->approve($id, auth()->id());
+			}
+
+			if ($payload['action'] === 'reject') {
+				$this->service->reject($id, auth()->id());
+			}
+
+			return redirect()
+				->route('finance.pengeluaran.index')
+				->with('success', 'Status pengeluaran berhasil diperbarui.');
+		}
+
 		$payload = $request->validate([
 			'tanggal' => ['required', 'date'],
 			'kategori_biaya' => ['required', 'string', 'max:80'],
