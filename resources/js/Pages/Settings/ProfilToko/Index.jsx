@@ -23,6 +23,18 @@ import {
 import DashboardLayout from "@/layouts/DashboardLayout";
 import Form from "@/Pages/Settings/ProfilToko/Form";
 
+const resolveLogoUrl = (logoPath) => {
+    if (!logoPath) {
+        return null;
+    }
+
+    if (logoPath.startsWith("http://") || logoPath.startsWith("https://")) {
+        return logoPath;
+    }
+
+    return `/storage/${logoPath}`;
+};
+
 export default function Index({ profilToko, filters, flashMessage }) {
     const endpoint = "/settings/profil-toko";
     const searchValue = filters?.search ?? "";
@@ -86,6 +98,7 @@ export default function Index({ profilToko, filters, flashMessage }) {
                                 <TableRow>
                                     <TableHead>Kode</TableHead>
                                     <TableHead>Nama Toko</TableHead>
+                                    <TableHead>Logo</TableHead>
                                     <TableHead>Brand</TableHead>
                                     <TableHead>Kontak</TableHead>
                                     <TableHead>Default</TableHead>
@@ -99,6 +112,17 @@ export default function Index({ profilToko, filters, flashMessage }) {
                                         <TableRow key={item.id}>
                                             <TableCell>{item.kode_toko || "-"}</TableCell>
                                             <TableCell className="font-medium">{item.nama_toko}</TableCell>
+                                            <TableCell>
+                                                {resolveLogoUrl(item.logo_path) ? (
+                                                    <img
+                                                        src={resolveLogoUrl(item.logo_path)}
+                                                        alt={`Logo ${item.nama_toko}`}
+                                                        className="h-10 w-10 rounded-md border object-cover"
+                                                    />
+                                                ) : (
+                                                    "-"
+                                                )}
+                                            </TableCell>
                                             <TableCell>{item.nama_brand || "-"}</TableCell>
                                             <TableCell>{item.telepon || item.email || "-"}</TableCell>
                                             <TableCell>
@@ -128,7 +152,7 @@ export default function Index({ profilToko, filters, flashMessage }) {
                                     ))
                                 ) : (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="py-12 text-center text-sm text-muted-foreground">Belum ada profil toko.</TableCell>
+                                        <TableCell colSpan={8} className="py-12 text-center text-sm text-muted-foreground">Belum ada profil toko.</TableCell>
                                     </TableRow>
                                 )}
                             </TableBody>

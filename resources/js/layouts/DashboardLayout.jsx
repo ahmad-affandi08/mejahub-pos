@@ -60,25 +60,17 @@ const moduleItems = [
 		],
 	},
 	{
-		title: "HR",
-		icon: Users,
-		items: [
-			{ title: "Data Pegawai", href: "/hr/data-pegawai" },
-			{ title: "Hak Akses", href: "/hr/hak-akses" },
-		],
-	},
-	{
 		title: "Inventory",
 		icon: Package,
 		items: [
 			{ title: "Supplier", href: "/inventory/supplier" },
 			{ title: "Bahan Baku", href: "/inventory/bahan-baku" },
+			{ title: "Resep BOM", href: "/inventory/resep-b-o-m" },
 			{ title: "Purchase Order", href: "/inventory/purchase-order" },
 			{ title: "Penerimaan Barang", href: "/inventory/penerimaan-barang" },
 			{ title: "Opname Stok", href: "/inventory/opname-stok" },
 			{ title: "Transfer Stok", href: "/inventory/transfer-stok" },
 			{ title: "Manajemen Waste", href: "/inventory/manajemen-waste" },
-			{ title: "Resep BOM", href: "/inventory/resep-b-o-m" },
 		],
 	},
 	{
@@ -86,13 +78,21 @@ const moduleItems = [
 		icon: CircleDollarSign,
 		items: [
 			{ title: "Buka Shift", href: "/pos/buka-shift" },
+			{ title: "Tutup Shift", href: "/pos/tutup-shift" },
 			{ title: "Pesanan Masuk", href: "/pos/pesanan-masuk" },
 			{ title: "Split Bill", href: "/pos/split-bill" },
 			{ title: "Gabung Meja", href: "/pos/gabung-meja" },
+			{ title: "Pembayaran", href: "/pos/pembayaran" },
 			{ title: "Void Pesanan", href: "/pos/void-pesanan" },
 			{ title: "Refund Pesanan", href: "/pos/refund-pesanan" },
-			{ title: "Pembayaran", href: "/pos/pembayaran" },
-			{ title: "Tutup Shift", href: "/pos/tutup-shift" },
+		],
+	},
+	{
+		title: "HR",
+		icon: Users,
+		items: [
+			{ title: "Data Pegawai", href: "/hr/data-pegawai" },
+			{ title: "Hak Akses", href: "/hr/hak-akses" },
 		],
 	},
 	{

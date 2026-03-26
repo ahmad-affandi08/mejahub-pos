@@ -5,6 +5,9 @@ namespace App\Modules\Settings\ProfilToko;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -48,6 +51,7 @@ class ProfilTokoResource extends Controller
 			'kode_pos' => ['nullable', 'string', 'max:10'],
 			'npwp' => ['nullable', 'string', 'max:40'],
 			'logo_path' => ['nullable', 'string', 'max:255'],
+			'logo_file' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
 			'timezone' => ['nullable', 'string', 'max:80'],
 			'mata_uang' => ['nullable', 'string', 'max:10'],
 			'bahasa' => ['nullable', 'string', 'max:10'],
@@ -61,6 +65,12 @@ class ProfilTokoResource extends Controller
 		$payload['is_default'] = (bool) ($payload['is_default'] ?? false);
 		$payload['is_active'] = (bool) ($payload['is_active'] ?? true);
 
+		if ($request->hasFile('logo_file')) {
+			$payload['logo_path'] = $this->storeLogo($request->file('logo_file'));
+		}
+
+		unset($payload['logo_file']);
+
 		$this->service->create($payload);
 
 		return redirect()
@@ -70,6 +80,8 @@ class ProfilTokoResource extends Controller
 
 	public function update(Request $request, int $id): RedirectResponse
 	{
+		$current = ProfilTokoEntity::query()->findOrFail($id);
+
 		$payload = $request->validate([
 			'kode_toko' => ['nullable', 'string', 'max:40', 'unique:settings_profil_toko,kode_toko,' . $id],
 			'nama_toko' => ['required', 'string', 'max:150'],
@@ -82,6 +94,7 @@ class ProfilTokoResource extends Controller
 			'kode_pos' => ['nullable', 'string', 'max:10'],
 			'npwp' => ['nullable', 'string', 'max:40'],
 			'logo_path' => ['nullable', 'string', 'max:255'],
+			'logo_file' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
 			'timezone' => ['nullable', 'string', 'max:80'],
 			'mata_uang' => ['nullable', 'string', 'max:10'],
 			'bahasa' => ['nullable', 'string', 'max:10'],
@@ -95,6 +108,16 @@ class ProfilTokoResource extends Controller
 		$payload['is_default'] = (bool) ($payload['is_default'] ?? false);
 		$payload['is_active'] = (bool) ($payload['is_active'] ?? true);
 
+		if ($request->hasFile('logo_file')) {
+			$payload['logo_path'] = $this->storeLogo($request->file('logo_file'));
+
+			if (!empty($current->logo_path) && Str::startsWith($current->logo_path, 'profil-toko/')) {
+				Storage::disk('public')->delete($current->logo_path);
+			}
+		}
+
+		unset($payload['logo_file']);
+
 		$this->service->update($id, $payload);
 
 		return redirect()
@@ -104,11 +127,24 @@ class ProfilTokoResource extends Controller
 
 	public function destroy(int $id): RedirectResponse
 	{
+		$current = ProfilTokoEntity::query()->findOrFail($id);
 		$this->service->delete($id);
+
+		if (!empty($current->logo_path) && Str::startsWith($current->logo_path, 'profil-toko/')) {
+			Storage::disk('public')->delete($current->logo_path);
+		}
 
 		return redirect()
 			->route('settings.profil-toko.index')
 			->with('success', 'Profil toko berhasil dihapus.');
+	}
+
+	private function storeLogo(UploadedFile $file): string
+	{
+		$filename = Str::uuid()->toString() . '.' . $file->getClientOriginalExtension();
+		Storage::disk('public')->putFileAs('profil-toko', $file, $filename);
+
+		return 'profil-toko/' . $filename;
 	}
 
 	public function create(): RedirectResponse

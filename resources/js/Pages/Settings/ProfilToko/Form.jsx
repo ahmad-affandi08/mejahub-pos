@@ -1,4 +1,5 @@
 import { useForm } from "@inertiajs/react";
+import { useEffect, useMemo } from "react";
 
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
@@ -6,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
 export default function Form({ mode, endpoint, initialValues, onSuccess, onCancel }) {
-    const { data, setData, post, put, processing, errors, reset } = useForm({
+    const { data, setData, post, transform, processing, errors, reset } = useForm({
         kode_toko: initialValues?.kode_toko ?? "",
         nama_toko: initialValues?.nama_toko ?? "",
         nama_brand: initialValues?.nama_brand ?? "",
@@ -18,6 +19,7 @@ export default function Form({ mode, endpoint, initialValues, onSuccess, onCance
         kode_pos: initialValues?.kode_pos ?? "",
         npwp: initialValues?.npwp ?? "",
         logo_path: initialValues?.logo_path ?? "",
+        logo_file: null,
         timezone: initialValues?.timezone ?? "Asia/Jakarta",
         mata_uang: initialValues?.mata_uang ?? "IDR",
         bahasa: initialValues?.bahasa ?? "id",
@@ -25,11 +27,36 @@ export default function Form({ mode, endpoint, initialValues, onSuccess, onCance
         is_active: initialValues?.is_active ?? true,
     });
 
+    const logoPreviewUrl = useMemo(() => {
+        if (data.logo_file instanceof File) {
+            return URL.createObjectURL(data.logo_file);
+        }
+
+        if (!data.logo_path) {
+            return null;
+        }
+
+        if (data.logo_path.startsWith("http://") || data.logo_path.startsWith("https://")) {
+            return data.logo_path;
+        }
+
+        return `/storage/${data.logo_path}`;
+    }, [data.logo_file, data.logo_path]);
+
+    useEffect(() => {
+        return () => {
+            if (logoPreviewUrl?.startsWith("blob:")) {
+                URL.revokeObjectURL(logoPreviewUrl);
+            }
+        };
+    }, [logoPreviewUrl]);
+
     const submit = (event) => {
         event.preventDefault();
 
         const options = {
             preserveScroll: true,
+            forceFormData: true,
             onSuccess: () => {
                 reset();
                 onSuccess?.();
@@ -37,10 +64,12 @@ export default function Form({ mode, endpoint, initialValues, onSuccess, onCance
         };
 
         if (mode === "edit" && initialValues?.id) {
-            put(`${endpoint}/${initialValues.id}`, options);
+            transform((payload) => ({ ...payload, _method: "put" }));
+            post(`${endpoint}/${initialValues.id}`, options);
             return;
         }
 
+        transform((payload) => payload);
         post(endpoint, options);
     };
 
@@ -129,8 +158,22 @@ export default function Form({ mode, endpoint, initialValues, onSuccess, onCance
 
             <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                 <div className="space-y-1.5">
-                    <label className="text-sm font-medium">Logo Path</label>
-                    <Input value={data.logo_path} onChange={(event) => setData("logo_path", event.target.value)} />
+                    <label className="text-sm font-medium">Logo Toko</label>
+                    <Input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={(event) => setData("logo_file", event.target.files?.[0] ?? null)}
+                    />
+                    <p className="text-xs text-muted-foreground">Format: JPG, PNG, WEBP. Maksimal 2MB.</p>
+                    {logoPreviewUrl ? (
+                        <img
+                            src={logoPreviewUrl}
+                            alt="Preview logo toko"
+                            className="mt-2 h-16 w-16 rounded-md border object-cover"
+                        />
+                    ) : null}
+                    {data.logo_path ? <p className="text-xs text-muted-foreground">Path logo: {data.logo_path}</p> : null}
+                    {errors.logo_file ? <p className="text-xs text-destructive">{errors.logo_file}</p> : null}
                     {errors.logo_path ? <p className="text-xs text-destructive">{errors.logo_path}</p> : null}
                 </div>
                 <div className="space-y-1.5">
