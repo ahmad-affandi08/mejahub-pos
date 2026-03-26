@@ -112,6 +112,7 @@ const moduleItems = [
 			{ title: "Metode Pembayaran", href: "/settings/metode-pembayaran" },
 			{ title: "Konfigurasi Pajak", href: "/settings/konfigurasi-pajak" },
 			{ title: "Printer Silent", href: "/settings/printer-silent" },
+			{ title: "Recycle Bin", href: "/settings/recycle-bin" },
 		],
 	},
 ];
