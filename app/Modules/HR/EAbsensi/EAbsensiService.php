@@ -6,7 +6,9 @@ use App\Models\User;
 use App\Modules\HR\DataPegawai\DataPegawaiEntity;
 use App\Modules\HR\JadwalShift\JadwalShiftEntity;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\ValidationException;
 
 class EAbsensiService
 {
@@ -47,6 +49,9 @@ class EAbsensiService
 		return [
 			'profile' => [
 				'name' => $pegawai?->nama ?: $user->name,
+				'email' => $user->email,
+				'nomor_telepon' => $pegawai?->nomor_telepon,
+				'alamat' => $pegawai?->alamat,
 				'role' => $pegawai?->jabatan ?: 'Karyawan',
 				'badge' => 'LEAD',
 				'shiftLabel' => strtoupper((string) ($todaySchedule?->shift?->nama ?: 'BELUM DIATUR')),
@@ -74,6 +79,8 @@ class EAbsensiService
 				'require_location' => (bool) ($todaySchedule?->shift?->require_location_validation ?? true),
 				'require_face' => (bool) ($todaySchedule?->shift?->require_face_verification ?? true),
 				'radius_meter' => (int) ($todaySchedule?->shift?->radius_meter ?? 10),
+				'office_latitude' => $todaySchedule?->shift?->latitude,
+				'office_longitude' => $todaySchedule?->shift?->longitude,
 			],
 		];
 	}
@@ -98,6 +105,54 @@ class EAbsensiService
 
 		$jenisAbsen = $payload['jenis_absen'] ?? 'masuk';
 		$radiusMeter = (int) ($payload['radius_meter'] ?? ($todaySchedule?->shift?->radius_meter ?? 10));
+		$todayRecords = EAbsensiEntity::query()
+			->where('pegawai_id', $pegawai->id)
+			->whereDate('tanggal', $today)
+			->get();
+
+		$hasMasuk = $todayRecords->contains(fn (EAbsensiEntity $record) => $record->jenis_absen === 'masuk');
+		$hasKeluar = $todayRecords->contains(fn (EAbsensiEntity $record) => $record->jenis_absen === 'keluar');
+
+		if ($jenisAbsen === 'masuk' && $hasMasuk) {
+			throw ValidationException::withMessages([
+				'jenis_absen' => 'Anda sudah melakukan absen masuk hari ini.',
+			]);
+		}
+
+		if ($jenisAbsen === 'keluar' && !$hasMasuk) {
+			throw ValidationException::withMessages([
+				'jenis_absen' => 'Absen pulang hanya bisa dilakukan setelah absen masuk.',
+			]);
+		}
+
+		if ($jenisAbsen === 'keluar' && $hasKeluar) {
+			throw ValidationException::withMessages([
+				'jenis_absen' => 'Anda sudah melakukan absen pulang hari ini.',
+			]);
+		}
+
+		$requiresLocation = (bool) ($todaySchedule?->shift?->require_location_validation ?? true);
+		$requiresFace = (bool) ($todaySchedule?->shift?->require_face_verification ?? true);
+
+		if ($requiresLocation) {
+			if (!array_key_exists('latitude', $payload) || !array_key_exists('longitude', $payload)) {
+				throw ValidationException::withMessages([
+					'latitude' => 'Lokasi wajib diaktifkan untuk absensi.',
+				]);
+			}
+
+			if (array_key_exists('dalam_radius', $payload) && $payload['dalam_radius'] === false) {
+				throw ValidationException::withMessages([
+					'dalam_radius' => 'Lokasi Anda berada di luar radius absensi.',
+				]);
+			}
+		}
+
+		if ($requiresFace && (($payload['status_verifikasi_wajah'] ?? null) !== 'verified')) {
+			throw ValidationException::withMessages([
+				'status_verifikasi_wajah' => 'Verifikasi wajah wajib berhasil sebelum absensi.',
+			]);
+		}
 
 		return EAbsensiEntity::query()->create([
 			'kode' => 'ABS-' . Carbon::now()->format('Ymd-His'),
@@ -123,6 +178,64 @@ class EAbsensiService
 			'keterangan' => $payload['keterangan'] ?? null,
 			'is_active' => true,
 		]);
+	}
+
+	public function updateProfile(User $user, array $payload): void
+	{
+		$email = (string) $payload['email'];
+
+		$emailOwner = $email
+			? User::query()
+				->where('email', $email)
+				->where('id', '!=', $user->id)
+				->exists()
+			: false;
+
+		if ($emailOwner) {
+			throw ValidationException::withMessages([
+				'email' => 'Email sudah digunakan oleh pengguna lain.',
+			]);
+		}
+
+		$user->forceFill([
+			'name' => (string) $payload['name'],
+			'email' => $email,
+		])->save();
+
+		$pegawai = DataPegawaiEntity::query()
+			->where('user_id', $user->id)
+			->where('is_active', true)
+			->first();
+
+		if ($pegawai) {
+			$pegawai->update([
+				'nama' => (string) $payload['name'],
+				'nomor_telepon' => $payload['nomor_telepon'] ?? null,
+				'alamat' => $payload['alamat'] ?? null,
+			]);
+		}
+	}
+
+	public function changePassword(User $user, array $payload): void
+	{
+		$currentPassword = (string) ($payload['current_password'] ?? '');
+		$newPassword = (string) ($payload['new_password'] ?? '');
+
+		if (!Hash::check($currentPassword, (string) $user->password)) {
+			throw ValidationException::withMessages([
+				'current_password' => 'Kata sandi saat ini tidak sesuai.',
+			]);
+		}
+
+		if ($currentPassword === $newPassword) {
+			throw ValidationException::withMessages([
+				'new_password' => 'Kata sandi baru harus berbeda dari kata sandi saat ini.',
+			]);
+		}
+
+		$user->forceFill([
+			'password' => $newPassword,
+		])->save();
 	}
 
 	public function submitRequest(User $user, array $payload): EAbsensiPengajuanEntity

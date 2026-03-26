@@ -30,6 +30,34 @@ class EAbsensiResource extends Controller
 	{
 		$mode = (string) $request->input('mode', 'attendance');
 
+		if ($mode === 'profile_update') {
+			$payload = $request->validate([
+				'name' => ['required', 'string', 'max:150'],
+				'email' => ['required', 'email', 'max:120'],
+				'nomor_telepon' => ['nullable', 'string', 'max:30'],
+				'alamat' => ['nullable', 'string', 'max:1000'],
+			]);
+
+			$this->service->updateProfile($request->user(), $payload);
+
+			return redirect()
+				->route('hr.e-absensi.index')
+				->with('success', 'Profil berhasil diperbarui.');
+		}
+
+		if ($mode === 'change_password') {
+			$payload = $request->validate([
+				'current_password' => ['required', 'string'],
+				'new_password' => ['required', 'string', 'min:8', 'confirmed'],
+			]);
+
+			$this->service->changePassword($request->user(), $payload);
+
+			return redirect()
+				->route('hr.e-absensi.index')
+				->with('success', 'Kata sandi berhasil diperbarui.');
+		}
+
 		if ($mode === 'request_action') {
 			$payload = $request->validate([
 				'request_id' => ['required', 'integer', 'exists:absensi_pengajuan,id'],
@@ -71,6 +99,8 @@ class EAbsensiResource extends Controller
 			'status' => ['nullable', 'in:hadir,izin,sakit,alpha,cuti,terlambat'],
 			'metode_absen' => ['nullable', 'in:manual,face'],
 			'sumber_absen' => ['nullable', 'in:web,web-mobile,flutter'],
+			'foto_absen' => ['nullable', 'string', 'max:255'],
+			'watermark_text' => ['nullable', 'string', 'max:255'],
 			'latitude' => ['nullable', 'numeric', 'between:-90,90'],
 			'longitude' => ['nullable', 'numeric', 'between:-180,180'],
 			'lokasi_absen' => ['nullable', 'string', 'max:255'],
@@ -82,10 +112,14 @@ class EAbsensiResource extends Controller
 		]);
 
 		$this->service->submitCheckIn($request->user(), $payload);
+		$jenisAbsen = (string) ($payload['jenis_absen'] ?? 'masuk');
+		$message = $jenisAbsen === 'keluar'
+			? 'Absensi pulang berhasil direkam.'
+			: 'Absensi masuk berhasil direkam.';
 
 		return redirect()
 			->route('hr.e-absensi.index')
-			->with('success', 'Absensi pulang berhasil direkam.');
+			->with('success', $message);
 	}
 
 	public function update(): RedirectResponse

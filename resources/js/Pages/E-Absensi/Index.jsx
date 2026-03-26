@@ -1,8 +1,9 @@
 import { Head, router } from "@inertiajs/react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import MobileLayout from "@/layouts/MobileLayout";
 import BottomNav from "./components/BottomNav";
+import MobileAlertDialog from "./components/MobileAlertDialog";
 import MobileTopBar from "./components/MobileTopBar";
 import FailedRadiusScreen from "./screens/FailedRadiusScreen";
 import HistoryDetailScreen from "./screens/HistoryDetailScreen";
@@ -37,8 +38,8 @@ export default function Index({ mobileData, flashMessage }) {
     const geoPolicy = mobileData?.geo_policy ?? { radius_meter: 10 };
     const checkinStatus = mobileData?.today_status?.current ?? "BELUM ABSEN";
     const serverTime = mobileData?.today_status?.server_time ?? null;
-    const primaryAction = mobileData?.today_status?.primary_action ?? "ABSEN PULANG";
-    const primaryJenisAbsen = mobileData?.today_status?.primary_jenis_absen ?? "keluar";
+    const primaryAction = mobileData?.today_status?.primary_action ?? "ABSEN MASUK";
+    const primaryJenisAbsen = mobileData?.today_status?.primary_jenis_absen ?? "masuk";
 
     const endpoint = "/hr/e-absensi";
     const [activeTab, setActiveTab] = useState("home");
@@ -47,6 +48,72 @@ export default function Index({ mobileData, flashMessage }) {
     const [selectedRecord, setSelectedRecord] = useState(records[0] ?? null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isRequestSubmitting, setIsRequestSubmitting] = useState(false);
+    const [permissionState, setPermissionState] = useState({
+        camera: false,
+        location: false,
+    });
+    const [alertDialog, setAlertDialog] = useState({
+        open: false,
+        type: "info",
+        title: "Informasi",
+        message: "",
+    });
+
+    const showAlert = (type, title, message) => {
+        setAlertDialog({ open: true, type, title, message });
+    };
+
+    useEffect(() => {
+        let mounted = true;
+        let cameraPermission;
+        let locationPermission;
+
+        const syncPermissionState = async () => {
+            if (!navigator.permissions?.query) {
+                return;
+            }
+
+            try {
+                [cameraPermission, locationPermission] = await Promise.all([
+                    navigator.permissions.query({ name: "camera" }),
+                    navigator.permissions.query({ name: "geolocation" }),
+                ]);
+
+                if (!mounted) return;
+
+                const updatePermission = () => {
+                    setPermissionState({
+                        camera: cameraPermission.state === "granted",
+                        location: locationPermission.state === "granted",
+                    });
+                };
+
+                updatePermission();
+                cameraPermission.onchange = updatePermission;
+                locationPermission.onchange = updatePermission;
+            } catch {
+                // Permissions API tidak selalu tersedia di semua browser.
+            }
+        };
+
+        syncPermissionState();
+
+        return () => {
+            mounted = false;
+            if (cameraPermission) cameraPermission.onchange = null;
+            if (locationPermission) locationPermission.onchange = null;
+        };
+    }, []);
+
+    const handlePermissionChange = (next) => {
+        setPermissionState((prev) => ({ ...prev, ...next }));
+    };
+
+    useEffect(() => {
+        if (flashMessage?.success) {
+            showAlert("success", "Berhasil", flashMessage.success);
+        }
+    }, [flashMessage]);
 
     const titleSubtitle = useMemo(() => {
         if (view === "verify") return "VERIFIKASI WAJAH";
@@ -125,6 +192,14 @@ export default function Index({ mobileData, flashMessage }) {
                             },
                             {
                                 preserveScroll: true,
+                                onError: (errors) => {
+                                    const firstError = Object.values(errors ?? {}).find((value) => value);
+                                    showAlert(
+                                        "error",
+                                        "Pengajuan Gagal",
+                                        firstError ? (Array.isArray(firstError) ? firstError[0] : firstError) : "Pengajuan gagal diproses."
+                                    );
+                                },
                                 onFinish: () => setIsRequestSubmitting(false),
                             }
                         );
@@ -140,6 +215,14 @@ export default function Index({ mobileData, flashMessage }) {
                             },
                             {
                                 preserveScroll: true,
+                                onError: (errors) => {
+                                    const firstError = Object.values(errors ?? {}).find((value) => value);
+                                    showAlert(
+                                        "error",
+                                        "Proses Gagal",
+                                        firstError ? (Array.isArray(firstError) ? firstError[0] : firstError) : "Permintaan gagal diproses."
+                                    );
+                                },
                                 onFinish: () => setIsRequestSubmitting(false),
                             }
                         );
@@ -149,15 +232,26 @@ export default function Index({ mobileData, flashMessage }) {
         }
 
         if (view === "profile") {
-            return <ProfileScreen profile={profile} />;
+            return (
+                <ProfileScreen
+                    profile={profile}
+                    permissionState={permissionState}
+                    onPermissionChange={handlePermissionChange}
+                    onNotify={(payload) => showAlert(payload?.type || "info", payload?.title || "Informasi", payload?.message || "")}
+                />
+            );
         }
 
         if (view === "verify") {
             return (
                 <VerifyFaceScreen
+                    geoPolicy={geoPolicy}
+                    permissionState={permissionState}
+                    onPermissionChange={handlePermissionChange}
                     processing={isSubmitting}
-                    onSubmitSuccess={() => {
+                    onSubmitSuccess={(verificationData) => {
                         setIsSubmitting(true);
+
                         router.post(
                             endpoint,
                             {
@@ -165,13 +259,15 @@ export default function Index({ mobileData, flashMessage }) {
                                 metode_absen: "face",
                                 sumber_absen: "web-mobile",
                                 status: "hadir",
-                                skor_wajah: 98.5,
-                                status_verifikasi_wajah: "verified",
-                                latitude: -6.2088,
-                                longitude: 106.8456,
-                                lokasi_absen: "Jl. Sudirman No. 45, Jakarta Pusat, DKI Jakarta, 10220",
-                                radius_meter: geoPolicy.radius_meter ?? 10,
-                                dalam_radius: true,
+                                skor_wajah: verificationData?.skor_wajah ?? 98.5,
+                                status_verifikasi_wajah: verificationData?.status_verifikasi_wajah ?? "verified",
+                                foto_absen: verificationData?.foto_absen,
+                                watermark_text: verificationData?.watermark_text,
+                                latitude: verificationData?.latitude,
+                                longitude: verificationData?.longitude,
+                                lokasi_absen: verificationData?.lokasi_absen,
+                                radius_meter: verificationData?.radius_meter ?? geoPolicy.radius_meter ?? 10,
+                                dalam_radius: verificationData?.dalam_radius,
                                 keterangan: primaryAction === "ABSEN MASUK"
                                     ? "Absensi masuk dari aplikasi mobile karyawan."
                                     : primaryAction === "ABSEN PULANG"
@@ -181,6 +277,14 @@ export default function Index({ mobileData, flashMessage }) {
                             {
                                 preserveScroll: true,
                                 onFinish: () => setIsSubmitting(false),
+                                onError: (errors) => {
+                                    const firstError = Object.values(errors ?? {}).find((value) => value);
+                                    showAlert(
+                                        "error",
+                                        "Absensi Gagal",
+                                        firstError ? (Array.isArray(firstError) ? firstError[0] : firstError) : "Absensi gagal diproses. Silakan coba lagi."
+                                    );
+                                },
                                 onSuccess: () => {
                                     setActiveTab("history");
                                     setView("history");
@@ -188,7 +292,6 @@ export default function Index({ mobileData, flashMessage }) {
                             }
                         );
                     }}
-                    onSubmitFailed={() => setView("failed")}
                 />
             );
         }
@@ -220,13 +323,15 @@ export default function Index({ mobileData, flashMessage }) {
                 }
                 footer={<BottomNav active={isMainView ? activeTab : "home"} onChange={handleNavChange} />}
             >
-                {flashMessage?.success ? (
-                    <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-                        {flashMessage.success}
-                    </div>
-                ) : null}
                 {renderView()}
             </MobileLayout>
+            <MobileAlertDialog
+                open={alertDialog.open}
+                onOpenChange={(open) => setAlertDialog((prev) => ({ ...prev, open }))}
+                type={alertDialog.type}
+                title={alertDialog.title}
+                message={alertDialog.message}
+            />
         </>
     );
 }
