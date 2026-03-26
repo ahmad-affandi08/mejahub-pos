@@ -82,6 +82,16 @@ class HakAksesSeeder extends Seeder
                 ],
                 'emails' => ['kasir@mejahub.local'],
             ],
+            [
+                'kode' => 'staff',
+                'nama' => 'Staff',
+                'deskripsi' => 'Akses aplikasi mobile e-absensi karyawan.',
+                'is_active' => true,
+                'permissions' => [
+                    'hr.e-absensi.access',
+                ],
+                'emails' => ['staff@mejahub.local'],
+            ],
         ];
 
         foreach ($roles as $item) {

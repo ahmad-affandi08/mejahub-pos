@@ -19,7 +19,7 @@ class LoginResource extends Controller
     public function index(): Response|RedirectResponse
     {
         if (auth()->check()) {
-            return redirect('/dashboard/overview');
+            return redirect($this->resolveRedirectUrl());
         }
 
         return Inertia::render('Auth/Login', LoginCollection::guestPayload());
@@ -40,7 +40,7 @@ class LoginResource extends Controller
             'password' => $payload['password'],
         ], $remember, $request);
 
-        return redirect('/dashboard/overview');
+        return redirect($this->resolveRedirectUrl());
     }
 
     public function destroy(Request $request, ?int $id = null): RedirectResponse
@@ -48,5 +48,25 @@ class LoginResource extends Controller
         $this->service->logout($request);
 
         return redirect('/auth/login');
+    }
+
+    private function resolveRedirectUrl(): string
+    {
+        $user = auth()->user();
+
+        if (!$user) {
+            return '/dashboard/overview';
+        }
+
+        $isStaff = $user->hakAkses()
+            ->where('is_active', true)
+            ->where('kode', 'staff')
+            ->exists();
+
+        if ($isStaff) {
+            return '/hr/e-absensi';
+        }
+
+        return '/dashboard/overview';
     }
 }
