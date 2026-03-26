@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useForm } from "@inertiajs/react";
 
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ const statusOptions = [
 
 const numberValue = (value) => Number(value || 0);
 
-export default function Form({ mode, endpoint, initialValues, pegawaiOptions, onSuccess, onCancel }) {
+export default function Form({ mode, endpoint, initialValues, pegawaiOptions, gajiPokokTemplatePerPegawai, onSuccess, onCancel }) {
     const { data, setData, post, transform, processing, errors } = useForm({
         kode: initialValues?.kode ?? "",
         pegawai_id: initialValues?.pegawai_id ?? "",
@@ -38,6 +38,34 @@ export default function Form({ mode, endpoint, initialValues, pegawaiOptions, on
             + numberValue(data.bonus)
             - numberValue(data.potongan);
     }, [data.bonus, data.gaji_pokok, data.lembur, data.potongan, data.tunjangan]);
+
+    const templateGajiPokok = useMemo(() => {
+        const pegawaiId = Number(data.pegawai_id || 0);
+
+        if (pegawaiId <= 0) {
+            return null;
+        }
+
+        const value = gajiPokokTemplatePerPegawai?.[pegawaiId];
+
+        if (value === undefined || value === null || value === "") {
+            return null;
+        }
+
+        return numberValue(value);
+    }, [data.pegawai_id, gajiPokokTemplatePerPegawai]);
+
+    useEffect(() => {
+        if (mode !== "create") {
+            return;
+        }
+
+        if (templateGajiPokok === null) {
+            return;
+        }
+
+        setData("gaji_pokok", templateGajiPokok);
+    }, [mode, setData, templateGajiPokok]);
 
     const submit = (event) => {
         event.preventDefault();
@@ -67,13 +95,24 @@ export default function Form({ mode, endpoint, initialValues, pegawaiOptions, on
                 </div>
                 <div className="space-y-1.5">
                     <label className="text-sm font-medium">Pegawai</label>
-                    <select className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm" value={data.pegawai_id} onChange={(event) => setData("pegawai_id", event.target.value)} required>
+                    <select
+                        className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm"
+                        value={data.pegawai_id}
+                        onChange={(event) => {
+                            const selected = event.target.value;
+                            setData("pegawai_id", selected === "" ? "" : Number(selected));
+                        }}
+                        required
+                    >
                         <option value="">Pilih pegawai</option>
                         {pegawaiOptions.map((pegawai) => (
-                            <option key={pegawai.id} value={pegawai.id}>{pegawai.nama}</option>
+                            <option key={pegawai.id} value={pegawai.id}>
+                                {pegawai.nama}{pegawai.jabatan ? ` (${pegawai.jabatan})` : ""}
+                            </option>
                         ))}
                     </select>
                     {errors.pegawai_id ? <p className="text-xs text-destructive">{errors.pegawai_id}</p> : null}
+                    {templateGajiPokok !== null ? <p className="text-xs text-muted-foreground">Template gaji pokok aktif: {templateGajiPokok.toFixed(2)}</p> : null}
                 </div>
             </div>
 

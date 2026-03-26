@@ -90,7 +90,7 @@ export default function Index({ penggajian, pegawaiOptions, gajiPokokTemplatePer
                                 <DialogTrigger asChild>
                                     <Button>Tambah Penggajian</Button>
                                 </DialogTrigger>
-                                <DialogContent className="sm:max-w-2xl">
+                                <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
                                     <DialogHeader>
                                         <DialogTitle>Tambah Data Penggajian</DialogTitle>
                                         <DialogDescription>Isi komponen penggajian pegawai per periode.</DialogDescription>
@@ -100,6 +100,7 @@ export default function Index({ penggajian, pegawaiOptions, gajiPokokTemplatePer
                                         endpoint={endpoint}
                                         initialValues={null}
                                         pegawaiOptions={pegawaiOptions}
+                                        gajiPokokTemplatePerPegawai={gajiPokokTemplatePerPegawai}
                                         onSuccess={() => setOpenCreate(false)}
                                         onCancel={() => setOpenCreate(false)}
                                     />
@@ -160,7 +161,7 @@ export default function Index({ penggajian, pegawaiOptions, gajiPokokTemplatePer
                                                     <DialogTrigger asChild>
                                                         <Button variant="outline" size="sm">Edit</Button>
                                                     </DialogTrigger>
-                                                    <DialogContent className="sm:max-w-2xl">
+                                                    <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
                                                         <DialogHeader>
                                                             <DialogTitle>Edit Data Penggajian</DialogTitle>
                                                             <DialogDescription>Perbarui data penggajian pegawai.</DialogDescription>
@@ -170,6 +171,7 @@ export default function Index({ penggajian, pegawaiOptions, gajiPokokTemplatePer
                                                             endpoint={endpoint}
                                                             initialValues={item}
                                                             pegawaiOptions={pegawaiOptions}
+                                                            gajiPokokTemplatePerPegawai={gajiPokokTemplatePerPegawai}
                                                             onSuccess={() => setEditingItem(null)}
                                                             onCancel={() => setEditingItem(null)}
                                                         />
