@@ -4,6 +4,7 @@ namespace App\Modules\POS\VoidPesanan;
 
 use App\Http\Controllers\Controller;
 use App\Support\ApiResponder;
+use App\Support\PosDomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -48,11 +49,19 @@ class VoidPesananResource extends Controller
 			'alasan' => ['required', 'string'],
 		]);
 
-		$log = $this->service->voidOrder(
-			(int) $payload['pesanan_id'],
-			$payload['alasan'],
-			auth()->id(),
-		);
+		try {
+			$log = $this->service->voidOrder(
+				(int) $payload['pesanan_id'],
+				$payload['alasan'],
+				auth()->id(),
+			);
+		} catch (PosDomainException $exception) {
+			if ($request->expectsJson()) {
+				return ApiResponder::error($exception->getMessage(), status: $exception->status());
+			}
+
+			return back()->withErrors(['general' => $exception->getMessage()]);
+		}
 
 		if ($request->expectsJson()) {
 			return ApiResponder::success('Pesanan berhasil di-void.', [

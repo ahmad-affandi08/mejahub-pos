@@ -4,6 +4,7 @@ namespace App\Modules\POS\RefundPesanan;
 
 use App\Http\Controllers\Controller;
 use App\Support\ApiResponder;
+use App\Support\PosDomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -19,22 +20,38 @@ class RefundPesananResource extends Controller
 	public function index(Request $request): Response|JsonResponse
 	{
 		$search = trim((string) $request->query('search', ''));
-		$orders = $this->service->paidOrders($search);
-		$logs = $this->service->recentLogs();
+		$perPage = max(1, min((int) $request->query('per_page', 20), 100));
+		$receiptLogs = $this->service->receiptHistory($search, $perPage);
+		$receiptPayload = RefundPesananCollection::logs($receiptLogs->getCollection());
+		$ordersPayload = RefundPesananCollection::orders($this->service->paidOrders($search));
+		$pagination = [
+			'current_page' => $receiptLogs->currentPage(),
+			'last_page' => $receiptLogs->lastPage(),
+			'per_page' => $receiptLogs->perPage(),
+			'total' => $receiptLogs->total(),
+		];
 
 		if ($request->expectsJson()) {
 			return ApiResponder::success('Data refund berhasil dimuat.', [
-				'orders' => RefundPesananCollection::orders($orders),
-				'logs' => RefundPesananCollection::logs($logs),
+				'orders' => $ordersPayload,
+				'receipts' => $receiptPayload,
+				'logs' => $receiptPayload,
 			], [
-				'filters' => ['search' => $search],
+				'filters' => ['search' => $search, 'per_page' => $perPage],
+				'pagination' => $pagination,
 			]);
 		}
 
 		return Inertia::render('POS/RefundPesanan/Index', [
-			'orders' => RefundPesananCollection::orders($orders),
-			'logs' => RefundPesananCollection::logs($logs),
-			'filters' => ['search' => $search],
+			'orders' => $ordersPayload,
+			'receipts' => $receiptPayload,
+			'logs' => $receiptPayload,
+			'meta' => [
+				'search' => $search,
+				'per_page' => $perPage,
+				'pagination' => $pagination,
+			],
+			'filters' => ['search' => $search, 'per_page' => $perPage],
 			'flashMessage' => [
 				'success' => $request->session()->get('success'),
 			],
@@ -50,13 +67,21 @@ class RefundPesananResource extends Controller
 			'alasan' => ['required', 'string'],
 		]);
 
-		$log = $this->service->refundOrder(
-			(int) $payload['pesanan_id'],
-			(float) ($payload['nominal'] ?? 0),
-			$payload['metode'],
-			$payload['alasan'],
-			auth()->id(),
-		);
+		try {
+			$log = $this->service->refundOrder(
+				(int) $payload['pesanan_id'],
+				(float) ($payload['nominal'] ?? 0),
+				$payload['metode'],
+				$payload['alasan'],
+				auth()->id(),
+			);
+		} catch (PosDomainException $exception) {
+			if ($request->expectsJson()) {
+				return ApiResponder::error($exception->getMessage(), status: $exception->status());
+			}
+
+			return back()->withErrors(['general' => $exception->getMessage()]);
+		}
 
 		if ($request->expectsJson()) {
 			return ApiResponder::success('Refund berhasil diproses.', [

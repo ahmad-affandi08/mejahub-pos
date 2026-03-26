@@ -18,19 +18,45 @@ class TutupShiftResource extends Controller
 
 	public function index(Request $request): Response|JsonResponse
 	{
+		$search = trim((string) $request->query('search', ''));
+		$dateFrom = $request->query('date_from');
+		$dateTo = $request->query('date_to');
+		$perPage = max(1, min((int) $request->query('per_page', 20), 100));
+
 		$activeShift = $this->service->activeShift(auth()->id());
 		$summary = $activeShift ? $this->service->shiftSummary($activeShift) : null;
+		$shiftHistory = $this->service->shiftHistory($search, $dateFrom, $dateTo, $perPage);
+		$reports = TutupShiftCollection::toList($shiftHistory->getCollection());
+		$filters = [
+			'search' => $search,
+			'date_from' => $dateFrom,
+			'date_to' => $dateTo,
+			'per_page' => $perPage,
+		];
+		$pagination = [
+			'current_page' => $shiftHistory->currentPage(),
+			'last_page' => $shiftHistory->lastPage(),
+			'per_page' => $shiftHistory->perPage(),
+			'total' => $shiftHistory->total(),
+		];
 
 		if ($request->expectsJson()) {
 			return ApiResponder::success('Data tutup shift berhasil dimuat.', [
 				'active_shift' => $activeShift ? TutupShiftCollection::toItem(TutupShiftEntity::fromShift($activeShift)) : null,
 				'summary' => $summary,
+				'shift_reports' => $reports,
+			], [
+				'filters' => $filters,
+				'pagination' => $pagination,
 			]);
 		}
 
 		return Inertia::render('POS/TutupShift/Index', [
 			'activeShift' => $activeShift ? TutupShiftCollection::toItem(TutupShiftEntity::fromShift($activeShift)) : null,
 			'summary' => $summary,
+			'shiftReports' => $reports,
+			'filters' => $filters,
+			'pagination' => $pagination,
 			'flashMessage' => [
 				'success' => $request->session()->get('success'),
 			],

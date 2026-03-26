@@ -4,6 +4,7 @@ namespace App\Modules\POS\SplitBill;
 
 use App\Modules\POS\PesananMasuk\PesananMasukEntity;
 use App\Modules\POS\PesananMasuk\PesananMasukItemEntity;
+use App\Support\PosDomainException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -41,7 +42,7 @@ class SplitBillService
 				->filter(fn (int $qty) => $qty > 0);
 
 			if ($splitMap->isEmpty()) {
-				abort(422, 'Pilih minimal satu item untuk split bill.');
+				throw new PosDomainException('Pilih minimal satu item untuk split bill.');
 			}
 
 			$newOrder = PesananMasukEntity::query()->create([
@@ -69,7 +70,7 @@ class SplitBillService
 				}
 
 				if ($qtyDipindah > (int) $item->qty) {
-					abort(422, 'Qty split melebihi qty item asal.');
+					throw new PosDomainException('Qty split melebihi qty item asal.');
 				}
 
 				$hargaSatuan = (float) $item->harga_satuan;
@@ -100,6 +101,10 @@ class SplitBillService
 					'pesanan_item_asal_id' => $item->id,
 					'qty_dipindah' => $qtyDipindah,
 				];
+			}
+
+			if (empty($splitItems)) {
+				throw new PosDomainException('Tidak ada item valid yang dipindahkan pada split bill.');
 			}
 
 			$this->recalculateOrder($order->id);

@@ -7,6 +7,28 @@ use App\Modules\POS\Pembayaran\PembayaranEntity;
 
 class TutupShiftService
 {
+	public function shiftHistory(
+		string $search = '',
+		?string $dateFrom = null,
+		?string $dateTo = null,
+		int $perPage = 20,
+	)
+	{
+		return TutupShiftEntity::query()
+			->when($search !== '', function ($query) use ($search) {
+				$query->where(function ($inner) use ($search) {
+					$inner
+						->where('kode', 'like', '%' . $search . '%')
+						->orWhere('status', 'like', '%' . $search . '%')
+						->orWhere('catatan_tutup', 'like', '%' . $search . '%');
+				});
+			})
+			->when($dateFrom, fn ($query) => $query->whereDate('waktu_buka', '>=', $dateFrom))
+			->when($dateTo, fn ($query) => $query->whereDate('waktu_buka', '<=', $dateTo))
+			->latest('id')
+			->paginate(max(1, min($perPage, 100)));
+	}
+
 	public function shiftSummary(BukaShiftEntity $shift): array
 	{
 		$baseQuery = PembayaranEntity::query()->where('shift_id', $shift->id);

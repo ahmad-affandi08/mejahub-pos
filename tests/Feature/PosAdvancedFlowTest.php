@@ -283,6 +283,76 @@ class PosAdvancedFlowTest extends TestCase
             ]);
     }
 
+    public function test_refund_index_api_returns_receipts_with_pagination_meta(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        ['menu_id' => $menuId, 'meja_id' => $mejaId] = $this->seedMasterData();
+        $order = $this->createOrder($menuId, $mejaId, 'paid', 1, 15000);
+
+        DB::table('pos_refund_pesanan')->insert([
+            'pesanan_id' => $order->id,
+            'user_id' => $user->id,
+            'kode' => 'REF-TEST-LIST-001',
+            'nominal' => 15000,
+            'metode' => 'cash',
+            'alasan' => 'Test list',
+            'status' => 'processed',
+            'refunded_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->getJson('/pos/refund-pesanan?per_page=1&search=REF-TEST-LIST');
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonStructure([
+                'success',
+                'message',
+                'data' => ['orders', 'receipts', 'logs'],
+                'meta' => ['filters', 'pagination'],
+                'errors',
+            ])
+            ->assertJsonPath('meta.pagination.per_page', 1);
+    }
+
+    public function test_tutup_shift_index_api_returns_shift_reports_with_meta(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        BukaShiftEntity::query()->create([
+            'user_id' => $user->id,
+            'kode' => 'SFT-REPORT-001',
+            'status' => 'closed',
+            'kas_awal' => 100000,
+            'kas_aktual' => 100000,
+            'kas_sistem' => 100000,
+            'selisih' => 0,
+            'jumlah_transaksi' => 3,
+            'catatan_tutup' => 'Shift normal',
+            'waktu_buka' => now()->subHours(8),
+            'waktu_tutup' => now(),
+        ]);
+
+        $response = $this->getJson('/pos/tutup-shift?per_page=1&search=SFT-REPORT');
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonStructure([
+                'success',
+                'message',
+                'data' => ['active_shift', 'summary', 'shift_reports'],
+                'meta' => ['filters', 'pagination'],
+                'errors',
+            ])
+            ->assertJsonPath('meta.pagination.per_page', 1);
+    }
+
     private function seedMasterData(): array
     {
         $kategoriId = DB::table('kategori_menu')->insertGetId([

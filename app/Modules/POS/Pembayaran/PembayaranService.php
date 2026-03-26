@@ -5,10 +5,30 @@ namespace App\Modules\POS\Pembayaran;
 use App\Modules\POS\BukaShift\BukaShiftEntity;
 use App\Modules\POS\PesananMasuk\PesananMasukCollection;
 use App\Modules\POS\PesananMasuk\PesananMasukEntity;
+use App\Support\PosDomainException;
 use Illuminate\Support\Str;
 
 class PembayaranService
 {
+	public function receiptHistory(string $search = '', int $perPage = 20)
+	{
+		return PembayaranEntity::query()
+			->with(['pesanan.meja:id,nama', 'pesanan.items', 'kasir:id,name'])
+			->when($search !== '', function ($query) use ($search) {
+				$query->where(function ($inner) use ($search) {
+					$inner
+						->where('kode', 'like', '%' . $search . '%')
+						->orWhereHas('pesanan', function ($orderQuery) use ($search) {
+							$orderQuery
+								->where('kode', 'like', '%' . $search . '%')
+								->orWhere('nama_pelanggan', 'like', '%' . $search . '%');
+						});
+				});
+			})
+			->latest('id')
+			->paginate(max(1, min($perPage, 100)));
+	}
+
 	public function recentPayments(int $limit = 20)
 	{
 		return PembayaranEntity::query()
@@ -47,14 +67,14 @@ class PembayaranService
 		$order = PesananMasukEntity::query()->findOrFail((int) $payload['pesanan_id']);
 
 		if ($order->status !== 'submitted') {
-			abort(422, 'Pesanan tidak dalam status menunggu pembayaran.');
+			throw new PosDomainException('Pesanan tidak dalam status menunggu pembayaran.');
 		}
 
 		$nominalTagihan = (float) $order->total;
 		$nominalDibayar = (float) $payload['nominal_dibayar'];
 
 		if ($nominalDibayar < $nominalTagihan) {
-			abort(422, 'Nominal dibayar kurang dari total tagihan.');
+			throw new PosDomainException('Nominal dibayar kurang dari total tagihan.');
 		}
 
 		$shift = $this->activeShift($userId);

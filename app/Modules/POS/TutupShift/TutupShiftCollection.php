@@ -2,8 +2,15 @@
 
 namespace App\Modules\POS\TutupShift;
 
+use Illuminate\Support\Collection;
+
 class TutupShiftCollection
 {
+	public static function toList(Collection $shifts): array
+	{
+		return $shifts->map(fn (TutupShiftEntity $shift) => self::toItem($shift))->all();
+	}
+
 	public static function toItem(TutupShiftEntity $shift): array
 	{
 		return [

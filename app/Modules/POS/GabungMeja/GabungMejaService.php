@@ -4,6 +4,7 @@ namespace App\Modules\POS\GabungMeja;
 
 use App\Modules\POS\PesananMasuk\PesananMasukEntity;
 use App\Modules\POS\PesananMasuk\PesananMasukItemEntity;
+use App\Support\PosDomainException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -42,7 +43,7 @@ class GabungMejaService
 				->values();
 
 			if ($sourceIds->isEmpty()) {
-				abort(422, 'Pilih minimal satu pesanan sumber untuk digabung.');
+				throw new PosDomainException('Pilih minimal satu pesanan sumber untuk digabung.');
 			}
 
 			$sources = PesananMasukEntity::query()
@@ -52,7 +53,7 @@ class GabungMejaService
 				->get();
 
 			if ($sources->count() !== $sourceIds->count()) {
-				abort(422, 'Sebagian pesanan sumber tidak valid atau bukan status submitted.');
+				throw new PosDomainException('Sebagian pesanan sumber tidak valid atau bukan status submitted.');
 			}
 
 			foreach ($sources as $sourceOrder) {

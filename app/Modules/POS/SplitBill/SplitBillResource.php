@@ -4,6 +4,7 @@ namespace App\Modules\POS\SplitBill;
 
 use App\Http\Controllers\Controller;
 use App\Support\ApiResponder;
+use App\Support\PosDomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -47,12 +48,20 @@ class SplitBillResource extends Controller
 			'items.*.qty' => ['required', 'integer', 'min:0'],
 		]);
 
-		$log = $this->service->splitOrder(
-			(int) $payload['pesanan_id'],
-			$payload['items'],
-			auth()->id(),
-			$payload['catatan'] ?? null,
-		);
+		try {
+			$log = $this->service->splitOrder(
+				(int) $payload['pesanan_id'],
+				$payload['items'],
+				auth()->id(),
+				$payload['catatan'] ?? null,
+			);
+		} catch (PosDomainException $exception) {
+			if ($request->expectsJson()) {
+				return ApiResponder::error($exception->getMessage(), status: $exception->status());
+			}
+
+			return back()->withErrors(['general' => $exception->getMessage()]);
+		}
 
 		if ($request->expectsJson()) {
 			return ApiResponder::success('Split bill berhasil diproses.', [

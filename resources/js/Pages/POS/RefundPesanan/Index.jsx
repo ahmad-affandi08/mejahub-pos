@@ -41,7 +41,9 @@ function printRefundReceipt(receipt) {
     popup.print();
 }
 
-export default function Index({ orders, logs, flashMessage }) {
+export default function Index({ orders, logs = [], receipts = [], flashMessage }) {
+    const receiptLogs = receipts.length ? receipts : logs;
+
     const [values, setValues] = useState({
         selectedOrderId: "",
         nominal: "",
@@ -54,11 +56,11 @@ export default function Index({ orders, logs, flashMessage }) {
         [orders, values.selectedOrderId]
     );
 
-    const [selectedReceiptId, setSelectedReceiptId] = useState(logs[0]?.id ?? null);
+    const [selectedReceiptId, setSelectedReceiptId] = useState(receiptLogs[0]?.id ?? null);
 
     const selectedReceipt = useMemo(
-        () => logs.find((item) => item.id === selectedReceiptId) ?? logs[0] ?? null,
-        [logs, selectedReceiptId]
+        () => receiptLogs.find((item) => item.id === selectedReceiptId) ?? receiptLogs[0] ?? null,
+        [receiptLogs, selectedReceiptId]
     );
 
     const handleChange = (field, value) => {
@@ -99,7 +101,7 @@ export default function Index({ orders, logs, flashMessage }) {
 
             <div className="mb-4 grid gap-2 sm:grid-cols-3">
                 <POSSummaryCard label="Order Paid" value={String(orders.length)} tone="sky" />
-                <POSSummaryCard label="Riwayat Refund" value={String(logs.length)} tone="orange" />
+                <POSSummaryCard label="Riwayat Refund" value={String(receiptLogs.length)} tone="orange" />
                 <POSSummaryCard label="Order Dipilih" value={selectedOrder?.kode || "-"} tone="slate" />
             </div>
 
@@ -168,7 +170,7 @@ export default function Index({ orders, logs, flashMessage }) {
                                 </tr>
                             </thead>
                             <tbody>
-                                {logs.map((item) => (
+                                {receiptLogs.map((item) => (
                                     <tr key={item.id} className="border-b last:border-b-0">
                                         <td className="py-2">
                                             <input

@@ -3,6 +3,7 @@
 namespace App\Modules\POS\VoidPesanan;
 
 use App\Modules\POS\PesananMasuk\PesananMasukEntity;
+use App\Support\PosDomainException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -38,11 +39,11 @@ class VoidPesananService
 			$order = PesananMasukEntity::query()->findOrFail($pesananId);
 
 			if ($order->status === 'paid') {
-				abort(422, 'Pesanan sudah dibayar. Gunakan proses refund.');
+				throw new PosDomainException('Pesanan sudah dibayar. Gunakan proses refund.');
 			}
 
 			if ($order->status === 'void' || $order->status === 'voided') {
-				abort(422, 'Pesanan sudah di-void sebelumnya.');
+				throw new PosDomainException('Pesanan sudah di-void sebelumnya.');
 			}
 
 			$log = VoidPesananEntity::query()->create([

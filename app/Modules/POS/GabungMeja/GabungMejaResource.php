@@ -4,6 +4,7 @@ namespace App\Modules\POS\GabungMeja;
 
 use App\Http\Controllers\Controller;
 use App\Support\ApiResponder;
+use App\Support\PosDomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -46,12 +47,20 @@ class GabungMejaResource extends Controller
 			'catatan' => ['nullable', 'string'],
 		]);
 
-		$log = $this->service->mergeOrders(
-			(int) $payload['pesanan_target_id'],
-			$payload['pesanan_sumber_ids'],
-			auth()->id(),
-			$payload['catatan'] ?? null,
-		);
+		try {
+			$log = $this->service->mergeOrders(
+				(int) $payload['pesanan_target_id'],
+				$payload['pesanan_sumber_ids'],
+				auth()->id(),
+				$payload['catatan'] ?? null,
+			);
+		} catch (PosDomainException $exception) {
+			if ($request->expectsJson()) {
+				return ApiResponder::error($exception->getMessage(), status: $exception->status());
+			}
+
+			return back()->withErrors(['general' => $exception->getMessage()]);
+		}
 
 		if ($request->expectsJson()) {
 			return ApiResponder::success('Gabung meja berhasil diproses.', [

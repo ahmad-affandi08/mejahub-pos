@@ -4,6 +4,7 @@ namespace App\Modules\POS\Pembayaran;
 
 use App\Http\Controllers\Controller;
 use App\Support\ApiResponder;
+use App\Support\PosDomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -19,9 +20,11 @@ class PembayaranResource extends Controller
 	public function index(Request $request): Response|JsonResponse
 	{
 		$search = trim((string) $request->query('search', ''));
+		$perPage = (int) $request->query('per_page', 20);
 		$pendingOrders = $this->service->pendingOrders($search);
 		$activeShift = $this->service->activeShift(auth()->id());
-		$recentPayments = $this->service->recentPayments();
+		$receiptHistory = $this->service->receiptHistory($search, $perPage);
+		$recentPayments = $receiptHistory->getCollection();
 		$paymentPayload = $recentPayments->map(fn (PembayaranEntity $item) => PembayaranCollection::toListItem($item))->all();
 
 		if ($request->expectsJson()) {
@@ -34,7 +37,13 @@ class PembayaranResource extends Controller
 				] : null,
 				'recent_payments' => $paymentPayload,
 			], [
-				'filters' => ['search' => $search],
+				'filters' => ['search' => $search, 'per_page' => $perPage],
+				'pagination' => [
+					'current_page' => $receiptHistory->currentPage(),
+					'last_page' => $receiptHistory->lastPage(),
+					'per_page' => $receiptHistory->perPage(),
+					'total' => $receiptHistory->total(),
+				],
 			]);
 		}
 
@@ -46,7 +55,13 @@ class PembayaranResource extends Controller
 				'status' => $activeShift->status,
 			] : null,
 			'recentPayments' => $paymentPayload,
-			'filters' => ['search' => $search],
+			'filters' => ['search' => $search, 'per_page' => $perPage],
+			'pagination' => [
+				'current_page' => $receiptHistory->currentPage(),
+				'last_page' => $receiptHistory->lastPage(),
+				'per_page' => $receiptHistory->perPage(),
+				'total' => $receiptHistory->total(),
+			],
 			'flashMessage' => [
 				'success' => $request->session()->get('success'),
 			],
@@ -62,8 +77,16 @@ class PembayaranResource extends Controller
 			'catatan' => ['nullable', 'string'],
 		]);
 
-		$payment = $this->service->payOrder($payload, auth()->id());
-		$payment = $payment->load(['pesanan.meja:id,nama', 'pesanan.items', 'kasir:id,name']);
+		try {
+			$payment = $this->service->payOrder($payload, auth()->id());
+			$payment = $payment->load(['pesanan.meja:id,nama', 'pesanan.items', 'kasir:id,name']);
+		} catch (PosDomainException $exception) {
+			if ($request->expectsJson()) {
+				return ApiResponder::error($exception->getMessage(), status: $exception->status());
+			}
+
+			return back()->withErrors(['general' => $exception->getMessage()]);
+		}
 
 		if ($request->expectsJson()) {
 			return ApiResponder::success('Pembayaran berhasil diproses.', [

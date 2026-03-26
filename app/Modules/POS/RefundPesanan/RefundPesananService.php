@@ -3,12 +3,32 @@
 namespace App\Modules\POS\RefundPesanan;
 
 use App\Modules\POS\PesananMasuk\PesananMasukEntity;
+use App\Support\PosDomainException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class RefundPesananService
 {
+	public function receiptHistory(string $search = '', int $perPage = 20)
+	{
+		return RefundPesananEntity::query()
+			->with(['pesanan.meja:id,nama', 'pesanan.items', 'kasir:id,name'])
+			->when($search !== '', function ($query) use ($search) {
+				$query->where(function ($inner) use ($search) {
+					$inner
+						->where('kode', 'like', '%' . $search . '%')
+						->orWhereHas('pesanan', function ($orderQuery) use ($search) {
+							$orderQuery
+								->where('kode', 'like', '%' . $search . '%')
+								->orWhere('nama_pelanggan', 'like', '%' . $search . '%');
+						});
+				});
+			})
+			->latest('id')
+			->paginate(max(1, min($perPage, 100)));
+	}
+
 	public function paidOrders(string $search = ''): Collection
 	{
 		return PesananMasukEntity::query()
@@ -39,14 +59,14 @@ class RefundPesananService
 			$order = PesananMasukEntity::query()->findOrFail($pesananId);
 
 			if ($order->status !== 'paid') {
-				abort(422, 'Hanya pesanan dengan status paid yang bisa direfund.');
+				throw new PosDomainException('Hanya pesanan dengan status paid yang bisa direfund.');
 			}
 
 			$orderTotal = (float) $order->total;
 			$refundNominal = $nominal > 0 ? $nominal : $orderTotal;
 
 			if ($refundNominal > $orderTotal) {
-				abort(422, 'Nominal refund melebihi total pesanan.');
+				throw new PosDomainException('Nominal refund melebihi total pesanan.');
 			}
 
 			$log = RefundPesananEntity::query()->create([
