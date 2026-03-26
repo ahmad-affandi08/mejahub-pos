@@ -21,9 +21,10 @@ export default function Index({ recycleBin, moduleOptions, filters, flashMessage
 
     const hasData = (recycleBin?.data ?? []).length > 0;
     const currentRows = recycleBin?.data ?? [];
+    const toSelectionKey = (item) => JSON.stringify({ model_key: item.model_key, id: item.id });
 
     const selectedMap = useMemo(() => new Set(selectedItems), [selectedItems]);
-    const allCurrentSelected = currentRows.length > 0 && currentRows.every((item) => selectedMap.has(`${item.model_key}::${item.id}`));
+    const allCurrentSelected = currentRows.length > 0 && currentRows.every((item) => selectedMap.has(toSelectionKey(item)));
 
     const submitSearch = (event) => {
         event.preventDefault();
@@ -62,7 +63,7 @@ export default function Index({ recycleBin, moduleOptions, filters, flashMessage
     };
 
     const toggleRow = (item) => {
-        const key = `${item.model_key}::${item.id}`;
+        const key = toSelectionKey(item);
 
         if (selectedMap.has(key)) {
             setSelectedItems((prev) => prev.filter((value) => value !== key));
@@ -74,14 +75,14 @@ export default function Index({ recycleBin, moduleOptions, filters, flashMessage
 
     const toggleSelectAllCurrent = () => {
         if (allCurrentSelected) {
-            const currentKeys = new Set(currentRows.map((item) => `${item.model_key}::${item.id}`));
+            const currentKeys = new Set(currentRows.map((item) => toSelectionKey(item)));
             setSelectedItems((prev) => prev.filter((value) => !currentKeys.has(value)));
             return;
         }
 
         setSelectedItems((prev) => {
             const merged = new Set(prev);
-            currentRows.forEach((item) => merged.add(`${item.model_key}::${item.id}`));
+            currentRows.forEach((item) => merged.add(toSelectionKey(item)));
             return Array.from(merged);
         });
     };
@@ -96,14 +97,25 @@ export default function Index({ recycleBin, moduleOptions, filters, flashMessage
             return;
         }
 
-        const items = selectedItems.map((value) => {
-            const [modelKey, id] = value.split("::");
+        const items = selectedItems
+            .map((value) => {
+                try {
+                    const parsed = JSON.parse(value);
 
-            return {
-                model_key: modelKey,
-                record_id: Number(id),
-            };
-        });
+                    return {
+                        model_key: String(parsed.model_key ?? ""),
+                        record_id: Number(parsed.id ?? 0),
+                    };
+                } catch {
+                    return null;
+                }
+            })
+            .filter((item) => item && item.model_key && item.record_id > 0);
+
+        if (!items.length) {
+            window.alert("Data terpilih tidak valid. Coba pilih ulang data yang akan dihapus.");
+            return;
+        }
 
         router.post(endpoint, {
             action: "force_delete_bulk",
@@ -111,6 +123,7 @@ export default function Index({ recycleBin, moduleOptions, filters, flashMessage
         }, {
             preserveScroll: true,
             onSuccess: () => setSelectedItems([]),
+            onError: () => window.alert("Hapus permanen bulk gagal. Cek data yang dipilih lalu coba lagi."),
         });
     };
 
@@ -184,7 +197,7 @@ export default function Index({ recycleBin, moduleOptions, filters, flashMessage
                                             <TableCell className="text-center">
                                                 <input
                                                     type="checkbox"
-                                                    checked={selectedMap.has(`${item.model_key}::${item.id}`)}
+                                                    checked={selectedMap.has(toSelectionKey(item))}
                                                     onChange={() => toggleRow(item)}
                                                 />
                                             </TableCell>

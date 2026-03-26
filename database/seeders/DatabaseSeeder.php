@@ -20,6 +20,8 @@ class DatabaseSeeder extends Seeder
             HakAksesSeeder::class,
             DataPegawaiSeeder::class,
             PengaturanShiftSeeder::class,
+            KategoriMenuSeeder::class,
+            MenuSeeder::class,
             SettingsSeeder::class,
         ]);
     }
