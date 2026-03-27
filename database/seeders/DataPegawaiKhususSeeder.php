@@ -97,6 +97,14 @@ class DataPegawaiKhususSeeder extends Seeder
 				'nomor_telepon' => '081229246113',
 				'email' => 'ginanjareksa145@gmail.com',
 			],
+			[
+				'no_identitas' => '3313055802070001',
+				'nama' => 'Leni Fikaregina',
+				'jabatan' => 'Kitchen',
+				'alamat' => 'Krapyak, RT 02 RW 03 Matesih, Matesih, Karanganyar, Jawa Tengah',
+				'nomor_telepon' => '081326536244',
+				'email' => 'kareginaleni@gmail.com',
+			],
             [
 				'no_identitas' => '1278010708000001',
 				'nama' => 'AHMAD AFFANDI SIKUMBANG',

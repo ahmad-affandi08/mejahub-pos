@@ -2,6 +2,7 @@
 
 namespace App\Modules\Report\LaporanPajak;
 
+use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 
@@ -14,6 +15,7 @@ class LaporanPajakService
 			->selectRaw('COUNT(*) as total_transaksi')
 			->selectRaw('COALESCE(SUM(subtotal), 0) as total_subtotal')
 			->selectRaw('COALESCE(SUM(pajak), 0) as total_pajak')
+			->selectRaw('COALESCE(SUM(service_charge), 0) as total_service_charge')
 			->selectRaw('COALESCE(SUM(total), 0) as total_bruto')
 			->selectRaw('CASE
 				WHEN COALESCE(SUM(subtotal), 0) > 0
@@ -29,4 +31,20 @@ class LaporanPajakService
 			->paginate($perPage)
 			->withQueryString();
 	}
+
+	public function summary(): array
+	{
+		$totalPajak = (float) DB::table('pos_pesanan')->whereNull('deleted_at')->where('status', 'paid')->sum('pajak');
+		$totalSC = (float) DB::table('pos_pesanan')->whereNull('deleted_at')->where('status', 'paid')->sum('service_charge');
+		$totalSubtotal = (float) DB::table('pos_pesanan')->whereNull('deleted_at')->where('status', 'paid')->sum('subtotal');
+
+		return [
+			'total_pajak' => round($totalPajak, 2),
+			'total_service_charge' => round($totalSC, 2),
+			'total_subtotal' => round($totalSubtotal, 2),
+			'total_titipan' => round($totalPajak + $totalSC, 2),
+			'efektif_persen' => $totalSubtotal > 0 ? round(($totalPajak / $totalSubtotal) * 100, 2) : 0,
+		];
+	}
 }
+

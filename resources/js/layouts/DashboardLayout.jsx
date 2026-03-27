@@ -136,9 +136,17 @@ const moduleItems = [
 		icon: Grid3X3,
 		items: [
 			{ title: "Laporan Penjualan", href: "/report/laporan-penjualan" },
-			{ title: "Laporan Shift", href: "/report/laporan-shift" },
+			{ title: "Laporan Keuangan", href: "/report/laporan-keuangan" },
+			{ title: "Laporan Hutang", href: "/report/laporan-hutang" },
+			{ title: "Petty Cash & Biaya", href: "/report/laporan-petty-cash" },
+			{ title: "Performa Menu", href: "/report/laporan-performa-menu" },
 			{ title: "Laporan Pajak", href: "/report/laporan-pajak" },
+			{ title: "Laporan Shift", href: "/report/laporan-shift" },
 			{ title: "Laporan Stok", href: "/report/laporan-stok" },
+			{ title: "Laporan Waste", href: "/report/laporan-waste" },
+			{ title: "Selisih Opname", href: "/report/laporan-opname-selisih" },
+			{ title: "Void & Refund", href: "/report/laporan-void-refund" },
+			{ title: "Heatmap Transaksi", href: "/report/laporan-heatmap" },
 		],
 	},
 	{
