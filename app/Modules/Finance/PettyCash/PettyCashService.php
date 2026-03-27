@@ -54,6 +54,8 @@ class PettyCashService
 			'saldo_setelah' => $this->currentBalance(),
 			'status_approval' => $payload['status_approval'] ?? 'draft',
 			'deskripsi' => $payload['deskripsi'],
+			'bahan_baku_id' => $payload['bahan_baku_id'] ?? null,
+			'qty_bahan' => isset($payload['qty_bahan']) ? (float) $payload['qty_bahan'] : null,
 			'created_by' => $userId,
 			'catatan' => $payload['catatan'] ?? null,
 			'is_active' => (bool) ($payload['is_active'] ?? true),
@@ -77,6 +79,8 @@ class PettyCashService
 			'jenis_arus' => $payload['jenis_arus'],
 			'nominal' => (float) ($payload['nominal'] ?? 0),
 			'deskripsi' => $payload['deskripsi'],
+			'bahan_baku_id' => $payload['bahan_baku_id'] ?? null,
+			'qty_bahan' => isset($payload['qty_bahan']) ? (float) $payload['qty_bahan'] : null,
 			'catatan' => $payload['catatan'] ?? null,
 			'is_active' => (bool) ($payload['is_active'] ?? true),
 		]);
@@ -143,6 +147,15 @@ class PettyCashService
 			'approved_at' => now(),
 			'catatan' => $entity->catatan,
 		], false);
+
+		if ($entity->bahan_baku_id && $entity->qty_bahan > 0) {
+			$bahanBaku = \App\Modules\Inventory\BahanBaku\BahanBakuEntity::query()->find($entity->bahan_baku_id);
+			if ($bahanBaku) {
+				$bahanBaku->stok_saat_ini += (float) $entity->qty_bahan;
+				$bahanBaku->harga_beli_terakhir = (float) $entity->nominal / (float) $entity->qty_bahan;
+				$bahanBaku->save();
+			}
+		}
 	}
 
 	public function reject(int $id, ?int $userId = null): void
@@ -160,6 +173,14 @@ class PettyCashService
 		]);
 
 		$this->arusKasService->deleteSourceJournals('petty_cash', $entity->id);
+
+		if ($entity->getOriginal('status_approval') === 'approved' && $entity->bahan_baku_id && $entity->qty_bahan > 0) {
+			$bahanBaku = \App\Modules\Inventory\BahanBaku\BahanBakuEntity::query()->find($entity->bahan_baku_id);
+			if ($bahanBaku) {
+				$bahanBaku->stok_saat_ini -= (float) $entity->qty_bahan;
+				$bahanBaku->save();
+			}
+		}
 	}
 
 	public function delete(int $id): void

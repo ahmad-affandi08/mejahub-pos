@@ -22,9 +22,17 @@ class PettyCashResource extends Controller
 
 		$paginator = $this->service->paginate($search, $perPage, $status);
 
+		$bahanBakuList = \App\Modules\Inventory\BahanBaku\BahanBakuEntity::query()
+			->where('is_active', true)
+			->orderBy('nama')
+			->get(['id', 'nama', 'satuan'])
+			->map(fn ($item) => ['id' => $item->id, 'nama' => $item->nama, 'satuan' => $item->satuan])
+			->all();
+
 		return Inertia::render('Finance/PettyCash/Index', [
 			'pettyCash' => PettyCashCollection::toIndex($paginator),
 			'summary' => $this->service->summary(),
+			'bahanBakuList' => $bahanBakuList,
 			'filters' => [
 				'search' => $search,
 				'status' => $status,
@@ -46,6 +54,8 @@ class PettyCashResource extends Controller
 			'nominal' => ['required', 'numeric', 'min:0'],
 			'status_approval' => ['nullable', 'in:draft,submitted,approved,rejected'],
 			'deskripsi' => ['required', 'string', 'max:255'],
+			'bahan_baku_id' => ['nullable', 'exists:inventory_bahan_baku,id'],
+			'qty_bahan' => ['nullable', 'numeric', 'min:0.001'],
 			'catatan' => ['nullable', 'string'],
 			'is_active' => ['nullable', 'boolean'],
 		]);
@@ -89,6 +99,8 @@ class PettyCashResource extends Controller
 			'jenis_arus' => ['required', 'in:in,out'],
 			'nominal' => ['required', 'numeric', 'min:0'],
 			'deskripsi' => ['required', 'string', 'max:255'],
+			'bahan_baku_id' => ['nullable', 'exists:inventory_bahan_baku,id'],
+			'qty_bahan' => ['nullable', 'numeric', 'min:0.001'],
 			'catatan' => ['nullable', 'string'],
 			'is_active' => ['nullable', 'boolean'],
 			'action' => ['nullable', 'in:submit,approve,reject'],

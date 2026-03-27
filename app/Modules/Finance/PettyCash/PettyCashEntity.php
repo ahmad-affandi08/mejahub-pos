@@ -19,8 +19,15 @@ class PettyCashEntity extends Model
         'tanggal' => 'date',
         'nominal' => 'decimal:2',
         'saldo_setelah' => 'decimal:2',
+        'bahan_baku_id' => 'integer',
+        'qty_bahan' => 'decimal:3',
         'approved_at' => 'datetime',
         'is_active' => 'boolean',
     ];
+
+    public function bahanBaku()
+    {
+        return $this->belongsTo(\App\Modules\Inventory\BahanBaku\BahanBakuEntity::class, 'bahan_baku_id');
+    }
 }
 

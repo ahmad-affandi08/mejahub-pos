@@ -10,9 +10,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import DashboardLayout from "@/layouts/DashboardLayout";
 import Form from "@/Pages/Finance/PettyCash/Form";
 
-export default function Index({ pettyCash, summary, filters, flashMessage }) {
+export default function Index({ pettyCash, summary, filters, flashMessage, bahanBakuList }) {
     const endpoint = "/finance/petty-cash";
     const searchValue = filters?.search ?? "";
+    
+    if (typeof window !== 'undefined' && bahanBakuList) {
+        window.bahanBakuList = bahanBakuList;
+    }
 
     const [openCreate, setOpenCreate] = useState(false);
     const [editingItem, setEditingItem] = useState(null);

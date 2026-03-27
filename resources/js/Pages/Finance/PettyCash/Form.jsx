@@ -12,6 +12,8 @@ export default function Form({ mode, endpoint, initialValues, onSuccess, onCance
         jenis_arus: initialValues?.jenis_arus ?? "in",
         nominal: initialValues?.nominal ?? 0,
         deskripsi: initialValues?.deskripsi ?? "",
+        bahan_baku_id: initialValues?.bahan_baku_id ?? null,
+        qty_bahan: initialValues?.qty_bahan ?? null,
         catatan: initialValues?.catatan ?? "",
         is_active: initialValues?.is_active ?? true,
         action: "",
@@ -53,14 +55,73 @@ export default function Form({ mode, endpoint, initialValues, onSuccess, onCance
                 </div>
                 <div className="space-y-1.5">
                     <label className="text-sm font-medium">Jenis Arus</label>
-                    <select className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm" value={data.jenis_arus} onChange={(event) => setData("jenis_arus", event.target.value)}>
+                    <select className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm" value={data.jenis_arus} onChange={(event) => {
+                        setData((prev) => ({
+                            ...prev,
+                            jenis_arus: event.target.value,
+                            bahan_baku_id: event.target.value === "out" ? prev.bahan_baku_id : null,
+                            qty_bahan: event.target.value === "out" ? prev.qty_bahan : null,
+                        }));
+                    }}>
                         <option value="in">Masuk</option>
                         <option value="out">Keluar</option>
                     </select>
                 </div>
             </div>
 
-            <div className="space-y-1.5"><label className="text-sm font-medium">Deskripsi</label><Input value={data.deskripsi} onChange={(event) => setData("deskripsi", event.target.value)} required /></div>
+            <div className="space-y-1.5"><label className="text-sm font-medium">Deskripsi / Keperluan</label><Input value={data.deskripsi} onChange={(event) => setData("deskripsi", event.target.value)} required /></div>
+
+            {data.jenis_arus === "out" && (
+                <div className="rounded-lg border bg-slate-50 p-4">
+                    <div className="mb-3 flex items-center gap-2">
+                        <input
+                            type="checkbox"
+                            className="rounded border-gray-300 text-primary focus:ring-primary"
+                            id="beli_bahan"
+                            checked={!!data.bahan_baku_id}
+                            onChange={(e) => {
+                                setData((prev) => ({
+                                    ...prev,
+                                    bahan_baku_id: e.target.checked ? "" : null,
+                                    qty_bahan: e.target.checked ? "" : null,
+                                }));
+                            }}
+                        />
+                        <label htmlFor="beli_bahan" className="text-sm font-medium text-slate-700">Pembelian Bahan Baku (Auto tambah stok)</label>
+                    </div>
+
+                    {data.bahan_baku_id !== null && (
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                            <div className="space-y-1.5">
+                                <label className="text-sm font-medium">Bahan Baku</label>
+                                <select 
+                                    className="h-9 w-full rounded-lg border border-input bg-white px-3 text-sm" 
+                                    value={data.bahan_baku_id} 
+                                    onChange={(e) => setData("bahan_baku_id", e.target.value || "")}
+                                    required
+                                >
+                                    <option value="" disabled>Pilih bahan baku...</option>
+                                    {(window.bahanBakuList || []).map((bahan) => (
+                                        <option key={bahan.id} value={bahan.id}>{bahan.nama} ({bahan.satuan})</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-sm font-medium">Qty Dibeli</label>
+                                <Input 
+                                    type="number" 
+                                    min={0.001} 
+                                    step="0.001" 
+                                    className="bg-white"
+                                    value={data.qty_bahan || ""} 
+                                    onChange={(event) => setData("qty_bahan", event.target.value)} 
+                                    required 
+                                />
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
 
             {mode === "edit" ? (
                 <div className="space-y-1.5">
