@@ -5,81 +5,14 @@ namespace App\Modules\Report\LaporanPenjualan;
 use App\Modules\HR\Penggajian\PenggajianEntity;
 use App\Modules\POS\Pembayaran\PembayaranEntity;
 use App\Modules\Settings\MetodePembayaran\MetodePembayaranEntity;
-use App\Modules\Settings\ProfilToko\ProfilTokoEntity;
+use App\Support\ReportExportTrait;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
 use Illuminate\Support\Facades\DB;
 
 class LaporanPenjualanService
 {
-	public function storeProfileHeader(): array
-	{
-		$profile = ProfilTokoEntity::query()
-			->where('is_active', true)
-			->orderByDesc('is_default')
-			->orderByDesc('id')
-			->first();
-
-		if (!$profile) {
-			return [
-				'nama_toko' => 'Mejahub POS',
-				'nama_brand' => null,
-				'kode_toko' => null,
-				'alamat_lengkap' => '-',
-				'telepon' => '-',
-				'email' => '-',
-				'npwp' => null,
-			];
-		}
-
-		$alamat = collect([
-			$profile->alamat,
-			$profile->kota,
-			$profile->provinsi,
-			$profile->kode_pos,
-		])->filter(fn ($item) => is_string($item) && trim($item) !== '')->implode(', ');
-
-		return [
-			'nama_toko' => $profile->nama_toko,
-			'nama_brand' => $profile->nama_brand,
-			'kode_toko' => $profile->kode_toko,
-			'alamat_lengkap' => $alamat !== '' ? $alamat : '-',
-			'telepon' => $profile->telepon ?: '-',
-			'email' => $profile->email ?: '-',
-			'npwp' => $profile->npwp,
-		];
-	}
-
-	public function exportFileName(array $filters, string $exportType): string
-	{
-		$periodType = (string) ($filters['period_type'] ?? 'daily');
-		$start = (string) ($filters['effective_range']['start'] ?? now()->toDateString());
-		$end = (string) ($filters['effective_range']['end'] ?? now()->toDateString());
-
-		$periodLabelMap = [
-			'daily' => 'harian',
-			'weekly' => 'mingguan',
-			'monthly' => 'bulanan',
-			'custom' => 'custom',
-		];
-
-		$periodLabel = $periodLabelMap[$periodType] ?? 'harian';
-		$safeStart = str_replace('-', '', $start);
-		$safeEnd = str_replace('-', '', $end);
-		$ext = strtolower($exportType) === 'pdf' ? 'pdf' : 'xls';
-
-		return "laporan-penjualan-{$periodLabel}-{$safeStart}-sampai-{$safeEnd}.{$ext}";
-	}
-
-	public function renderPdfHtml(array $storeProfile, array $report, array $filters): string
-	{
-		return $this->buildExportHtml($storeProfile, $report, $filters, false);
-	}
-
-	public function renderExcelHtml(array $storeProfile, array $report, array $filters): string
-	{
-		return "\xEF\xBB\xBF" . $this->buildExportHtml($storeProfile, $report, $filters, true);
-	}
+	use ReportExportTrait;
 
 	public function buildDashboard(
 		string $periodType = 'daily',
@@ -116,6 +49,50 @@ class LaporanPenjualanService
 			'payroll_vs_revenue' => $payrollVsRevenue,
 			'daily_trend' => $dailyTrend,
 		];
+	}
+
+	public function buildExportTableHtml(array $report): string
+	{
+		$summary = $report['summary'] ?? [];
+		$topItems = $report['top_items'] ?? [];
+		$paymentMethods = $report['payment_methods'] ?? [];
+		$payroll = $report['payroll_vs_revenue'] ?? [];
+		$dailyTrend = $report['daily_trend'] ?? [];
+
+		$html = '<div class="section-title">Ringkasan</div><table><tbody>'
+			. '<tr><th>Omzet</th><td>' . $this->formatCurrency((float) ($summary['omzet'] ?? 0)) . '</td></tr>'
+			. '<tr><th>Jumlah Transaksi</th><td>' . (int) ($summary['jumlah_transaksi'] ?? 0) . '</td></tr>'
+			. '<tr><th>Rata-rata Transaksi</th><td>' . $this->formatCurrency((float) ($summary['rata_rata_transaksi'] ?? 0)) . '</td></tr>'
+			. '<tr><th>Total Dibayar</th><td>' . $this->formatCurrency((float) ($summary['nominal_dibayar'] ?? 0)) . '</td></tr>'
+			. '<tr><th>Total Kembalian</th><td>' . $this->formatCurrency((float) ($summary['kembalian'] ?? 0)) . '</td></tr>'
+			. '</tbody></table>';
+
+		if (!empty($topItems)) {
+			$html .= '<div class="section-title">Item Terlaris</div><table><thead><tr><th>No</th><th>Menu</th><th style="text-align:right;">Qty</th><th style="text-align:right;">Nilai Penjualan</th></tr></thead><tbody>';
+			foreach ($topItems as $i => $item) { $html .= '<tr><td>' . ($i + 1) . '</td><td>' . e($item['nama_menu'] ?? '-') . '</td><td style="text-align:right;">' . (int) ($item['total_qty'] ?? 0) . '</td><td style="text-align:right;">' . $this->formatCurrency((float) ($item['total_penjualan'] ?? 0)) . '</td></tr>'; }
+			$html .= '</tbody></table>';
+		}
+
+		if (!empty($paymentMethods)) {
+			$html .= '<div class="section-title">Metode Pembayaran</div><table><thead><tr><th>Metode</th><th style="text-align:right;">Transaksi</th><th style="text-align:right;">Nominal</th></tr></thead><tbody>';
+			foreach ($paymentMethods as $item) { $html .= '<tr><td>' . e($item['nama'] ?? '-') . '</td><td style="text-align:right;">' . (int) ($item['jumlah_transaksi'] ?? 0) . '</td><td style="text-align:right;">' . $this->formatCurrency((float) ($item['total_nominal'] ?? 0)) . '</td></tr>'; }
+			$html .= '</tbody></table>';
+		}
+
+		$html .= '<div class="section-title">Payroll vs Pendapatan</div><table><tbody>'
+			. '<tr><th>Pendapatan</th><td>' . $this->formatCurrency((float) ($payroll['pendapatan'] ?? 0)) . '</td></tr>'
+			. '<tr><th>Penggajian</th><td>' . $this->formatCurrency((float) ($payroll['penggajian'] ?? 0)) . '</td></tr>'
+			. '<tr><th>Selisih</th><td>' . $this->formatCurrency((float) ($payroll['selisih'] ?? 0)) . '</td></tr>'
+			. '<tr><th>Rasio Payroll</th><td>' . number_format((float) ($payroll['rasio_persen'] ?? 0), 2, ',', '.') . '%</td></tr>'
+			. '</tbody></table>';
+
+		if (!empty($dailyTrend)) {
+			$html .= '<div class="section-title">Tren Harian</div><table><thead><tr><th>Tanggal</th><th style="text-align:right;">Transaksi</th><th style="text-align:right;">Omzet</th></tr></thead><tbody>';
+			foreach ($dailyTrend as $item) { $html .= '<tr><td>' . e($item['tanggal'] ?? '-') . '</td><td style="text-align:right;">' . (int) ($item['jumlah_transaksi'] ?? 0) . '</td><td style="text-align:right;">' . $this->formatCurrency((float) ($item['omzet'] ?? 0)) . '</td></tr>'; }
+			$html .= '</tbody></table>';
+		}
+
+		return $html;
 	}
 
 	private function resolvePeriodRange(string $periodType, string $referenceDate, ?string $dateFrom, ?string $dateTo): array
@@ -331,106 +308,5 @@ class LaporanPenjualanService
 		} catch (\Throwable) {
 			return null;
 		}
-	}
-
-	private function buildExportHtml(array $storeProfile, array $report, array $filters, bool $forExcel): string
-	{
-		$summary = $report['summary'] ?? [];
-		$topItems = $report['top_items'] ?? [];
-		$paymentMethods = $report['payment_methods'] ?? [];
-		$payroll = $report['payroll_vs_revenue'] ?? [];
-		$dailyTrend = $report['daily_trend'] ?? [];
-		$rangeLabel = (string) ($filters['effective_range']['label'] ?? '-');
-
-		$headerStyle = $forExcel
-			? ''
-			: 'style="font-family: DejaVu Sans, sans-serif; font-size: 12px; color: #0f172a;"';
-
-		$topRows = '';
-		foreach ($topItems as $index => $item) {
-			$no = $index + 1;
-			$topRows .= '<tr>'
-				. '<td>' . $no . '</td>'
-				. '<td>' . e((string) ($item['nama_menu'] ?? '-')) . '</td>'
-				. '<td style="text-align:right;">' . (int) ($item['total_qty'] ?? 0) . '</td>'
-				. '<td style="text-align:right;">' . $this->formatCurrency((float) ($item['total_penjualan'] ?? 0)) . '</td>'
-				. '</tr>';
-		}
-
-		if ($topRows === '') {
-			$topRows = '<tr><td colspan="4" style="text-align:center;">Tidak ada data</td></tr>';
-		}
-
-		$paymentRows = '';
-		foreach ($paymentMethods as $item) {
-			$paymentRows .= '<tr>'
-				. '<td>' . e((string) ($item['nama'] ?? '-')) . '</td>'
-				. '<td style="text-align:right;">' . (int) ($item['jumlah_transaksi'] ?? 0) . '</td>'
-				. '<td style="text-align:right;">' . $this->formatCurrency((float) ($item['total_nominal'] ?? 0)) . '</td>'
-				. '</tr>';
-		}
-
-		if ($paymentRows === '') {
-			$paymentRows = '<tr><td colspan="3" style="text-align:center;">Tidak ada data</td></tr>';
-		}
-
-		$trendRows = '';
-		foreach ($dailyTrend as $item) {
-			$trendRows .= '<tr>'
-				. '<td>' . e((string) ($item['tanggal'] ?? '-')) . '</td>'
-				. '<td style="text-align:right;">' . (int) ($item['jumlah_transaksi'] ?? 0) . '</td>'
-				. '<td style="text-align:right;">' . $this->formatCurrency((float) ($item['omzet'] ?? 0)) . '</td>'
-				. '</tr>';
-		}
-
-		if ($trendRows === '') {
-			$trendRows = '<tr><td colspan="3" style="text-align:center;">Tidak ada data</td></tr>';
-		}
-
-		return '<html><head><meta charset="UTF-8" />'
-			. '<title>Laporan Penjualan</title>'
-			. '<style>
-				body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 12px; color: #0f172a; }
-				table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
-				th, td { border: 1px solid #cbd5e1; padding: 6px; }
-				th { background: #e2e8f0; text-align: left; }
-				.section-title { font-size: 13px; font-weight: bold; margin: 14px 0 8px; }
-			</style></head><body ' . $headerStyle . '>'
-			. '<h2 style="margin:0;">' . e((string) ($storeProfile['nama_toko'] ?? 'Mejahub POS')) . '</h2>'
-			. (!empty($storeProfile['nama_brand']) ? '<p style="margin:3px 0;">' . e((string) $storeProfile['nama_brand']) . '</p>' : '')
-			. '<p style="margin:3px 0;">Kode Toko: ' . e((string) ($storeProfile['kode_toko'] ?? '-')) . '</p>'
-			. '<p style="margin:3px 0;">Alamat: ' . e((string) ($storeProfile['alamat_lengkap'] ?? '-')) . '</p>'
-			. '<p style="margin:3px 0;">Telepon: ' . e((string) ($storeProfile['telepon'] ?? '-')) . ' | Email: ' . e((string) ($storeProfile['email'] ?? '-')) . '</p>'
-			. (!empty($storeProfile['npwp']) ? '<p style="margin:3px 0;">NPWP: ' . e((string) $storeProfile['npwp']) . '</p>' : '')
-			. '<hr />'
-			. '<h3 style="margin:8px 0 4px;">Laporan Penjualan</h3>'
-			. '<p style="margin:0 0 10px;">Periode: ' . e($rangeLabel) . '</p>'
-			. '<div class="section-title">Ringkasan</div>'
-			. '<table><tbody>'
-			. '<tr><th>Omzet</th><td>' . $this->formatCurrency((float) ($summary['omzet'] ?? 0)) . '</td></tr>'
-			. '<tr><th>Jumlah Transaksi</th><td>' . (int) ($summary['jumlah_transaksi'] ?? 0) . '</td></tr>'
-			. '<tr><th>Rata-rata Transaksi</th><td>' . $this->formatCurrency((float) ($summary['rata_rata_transaksi'] ?? 0)) . '</td></tr>'
-			. '<tr><th>Total Dibayar</th><td>' . $this->formatCurrency((float) ($summary['nominal_dibayar'] ?? 0)) . '</td></tr>'
-			. '<tr><th>Total Kembalian</th><td>' . $this->formatCurrency((float) ($summary['kembalian'] ?? 0)) . '</td></tr>'
-			. '</tbody></table>'
-			. '<div class="section-title">Item Terlaris</div>'
-			. '<table><thead><tr><th>No</th><th>Menu</th><th style="text-align:right;">Qty</th><th style="text-align:right;">Nilai Penjualan</th></tr></thead><tbody>' . $topRows . '</tbody></table>'
-			. '<div class="section-title">Metode Pembayaran</div>'
-			. '<table><thead><tr><th>Metode</th><th style="text-align:right;">Transaksi</th><th style="text-align:right;">Nominal</th></tr></thead><tbody>' . $paymentRows . '</tbody></table>'
-			. '<div class="section-title">Payroll vs Pendapatan</div>'
-			. '<table><tbody>'
-			. '<tr><th>Pendapatan</th><td>' . $this->formatCurrency((float) ($payroll['pendapatan'] ?? 0)) . '</td></tr>'
-			. '<tr><th>Penggajian</th><td>' . $this->formatCurrency((float) ($payroll['penggajian'] ?? 0)) . '</td></tr>'
-			. '<tr><th>Selisih</th><td>' . $this->formatCurrency((float) ($payroll['selisih'] ?? 0)) . '</td></tr>'
-			. '<tr><th>Rasio Payroll</th><td>' . number_format((float) ($payroll['rasio_persen'] ?? 0), 2, ',', '.') . '%</td></tr>'
-			. '</tbody></table>'
-			. '<div class="section-title">Tren Harian</div>'
-			. '<table><thead><tr><th>Tanggal</th><th style="text-align:right;">Transaksi</th><th style="text-align:right;">Omzet</th></tr></thead><tbody>' . $trendRows . '</tbody></table>'
-			. '</body></html>';
-	}
-
-	private function formatCurrency(float $value): string
-	{
-		return 'Rp ' . number_format($value, 0, ',', '.');
 	}
 }

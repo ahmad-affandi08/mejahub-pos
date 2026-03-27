@@ -50,17 +50,18 @@ class LaporanPenjualanResource extends Controller
 
 		if (in_array($exportType, ['pdf', 'excel'], true)) {
 			$storeProfile = $this->service->storeProfileHeader();
-			$fileName = $this->service->exportFileName($filters, $exportType);
+			$fileName = $this->service->exportFileName('laporan-penjualan', $filters, $exportType);
+			$tableHtml = $this->service->buildExportTableHtml($payload);
 
 			if ($exportType === 'pdf') {
-				$html = $this->service->renderPdfHtml($storeProfile, $payload, $filters);
+				$html = $this->service->renderPdfHtml($storeProfile, 'Laporan Penjualan', $tableHtml, $filters);
 
 				return Pdf::loadHTML($html)
 					->setPaper('a4', 'portrait')
 					->download($fileName);
 			}
 
-			$html = $this->service->renderExcelHtml($storeProfile, $payload, $filters);
+			$html = $this->service->renderExcelHtml($storeProfile, 'Laporan Penjualan', $tableHtml, $filters);
 
 			return response($html, 200, [
 				'Content-Type' => 'application/vnd.ms-excel; charset=UTF-8',

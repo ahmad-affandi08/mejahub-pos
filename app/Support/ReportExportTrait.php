@@ -72,16 +72,16 @@ trait ReportExportTrait
 	private function buildBaseExportHtml(array $sp, string $title, string $tableHtml, array $filters, bool $forExcel): string
 	{
 		$rangeLabel = (string) ($filters['effective_range']['label'] ?? '-');
-		$headerStyle = $forExcel ? '' : 'style="font-family: DejaVu Sans, sans-serif; font-size: 12px; color: #0f172a;"';
+		$headerStyle = $forExcel ? '' : 'style="font-family: \'Times New Roman\', Arial, sans-serif; font-size: 12pt; color: #0f172a;"';
 
 		return '<html><head><meta charset="UTF-8" />'
 			. '<title>' . e($title) . '</title>'
 			. '<style>
-				body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 12px; color: #0f172a; }
+				body { font-family: "Times New Roman", Arial, sans-serif; font-size: 12pt; color: #0f172a; }
 				table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
-				th, td { border: 1px solid #cbd5e1; padding: 6px; }
+				th, td { border: 1px solid #cbd5e1; padding: 6px; font-size: 12pt; }
 				th { background: #e2e8f0; text-align: left; }
-				.section-title { font-size: 13px; font-weight: bold; margin: 14px 0 8px; }
+				.section-title { font-size: 13pt; font-weight: bold; margin: 14px 0 8px; }
 			</style></head><body ' . $headerStyle . '>'
 			. '<h2 style="margin:0;">' . e((string) ($sp['nama_toko'] ?? 'Mejahub POS')) . '</h2>'
 			. (!empty($sp['nama_brand']) ? '<p style="margin:3px 0;">' . e((string) $sp['nama_brand']) . '</p>' : '')
