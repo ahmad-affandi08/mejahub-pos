@@ -22,6 +22,7 @@ class PenerimaanBarangEntity extends Model
 
     protected $casts = [
         'tanggal_terima' => 'date',
+        'jatuh_tempo' => 'date',
         'total' => 'decimal:2',
     ];
 
@@ -44,5 +45,9 @@ class PenerimaanBarangEntity extends Model
     {
         return $this->hasMany(PenerimaanBarangItemEntity::class, 'penerimaan_barang_id');
     }
-}
 
+    public function hutang()
+    {
+        return $this->hasOne(\App\Modules\Finance\Hutang\HutangEntity::class, 'sumber_id')->where('sumber_tipe', 'penerimaan_barang');
+    }
+}

@@ -20,6 +20,11 @@ export default function Form({ endpoint, purchaseOrderOptions, supplierOptions, 
         nomor_surat_jalan: "",
         tanggal_terima: "",
         status: "received",
+        status_pembayaran: "unpaid",
+        metode_pembayaran: "kas",
+        akun_kas_id: "",
+        jatuh_tempo: "",
+        jumlah_dibayar: 0,
         catatan: "",
         items: [emptyItem],
     });
@@ -86,6 +91,42 @@ export default function Form({ endpoint, purchaseOrderOptions, supplierOptions, 
                     <label className="text-sm font-medium">Tanggal Terima</label>
                     <Input type="date" value={data.tanggal_terima} onChange={(event) => setData("tanggal_terima", event.target.value)} />
                 </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-4 rounded-xl relative">
+                <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Status Pembayaran</label>
+                    <select className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm" value={data.status_pembayaran} onChange={(e) => setData("status_pembayaran", e.target.value)}>
+                        <option value="unpaid">Belum Bayar (Hutang)</option>
+                        <option value="partial">Bayar Sebagian (DP)</option>
+                        <option value="paid">Lunas (Cash)</option>
+                    </select>
+                </div>
+                
+                {data.status_pembayaran !== "unpaid" && (
+                    <div className="space-y-1.5">
+                        <label className="text-sm font-medium">Metode Bayar</label>
+                        <select className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm" value={data.metode_pembayaran} onChange={(e) => setData("metode_pembayaran", e.target.value)}>
+                            <option value="kas">Kas Tunai</option>
+                            <option value="transfer_bank">Transfer Bank</option>
+                            <option value="ewallet">E-Wallet</option>
+                        </select>
+                    </div>
+                )}
+                
+                {data.status_pembayaran === "partial" && (
+                    <div className="space-y-1.5">
+                        <label className="text-sm font-medium">Nominal DP</label>
+                        <Input type="number" min="0" value={data.jumlah_dibayar} onChange={(e) => setData("jumlah_dibayar", Number(e.target.value))} />
+                    </div>
+                )}
+
+                {data.status_pembayaran !== "paid" && (
+                    <div className="space-y-1.5">
+                        <label className="text-sm font-medium">Jatuh Tempo</label>
+                        <Input type="date" value={data.jatuh_tempo} onChange={(e) => setData("jatuh_tempo", e.target.value)} />
+                    </div>
+                )}
             </div>
 
             <div className="space-y-3 rounded-xl border p-3">

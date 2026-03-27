@@ -111,6 +111,7 @@ const moduleItems = [
 		icon: CircleDollarSign,
 		items: [
 			{ title: "Arus Kas", href: "/finance/arus-kas" },
+			{ title: "Hutang Supplier", href: "/finance/hutang" },
 			{ title: "Petty Cash", href: "/finance/petty-cash" },
 			{ title: "Pengeluaran", href: "/finance/pengeluaran" },
 		],

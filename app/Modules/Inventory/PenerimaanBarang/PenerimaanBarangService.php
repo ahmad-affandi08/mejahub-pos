@@ -58,12 +58,49 @@ class PenerimaanBarangService
 				'nomor_surat_jalan' => $payload['nomor_surat_jalan'] ?? null,
 				'tanggal_terima' => $payload['tanggal_terima'] ?? now()->toDateString(),
 				'status' => $payload['status'] ?? 'received',
+				'status_pembayaran' => $payload['status_pembayaran'] ?? 'unpaid',
+				'metode_pembayaran' => $payload['metode_pembayaran'] ?? null,
+				'akun_kas_id' => $payload['akun_kas_id'] ?? null,
+				'jatuh_tempo' => $payload['jatuh_tempo'] ?? null,
 				'total' => 0,
 				'catatan' => $payload['catatan'] ?? null,
 			]);
 
 			$total = $this->syncItemsAndStock($receipt, $items, $userId);
 			$receipt->update(['total' => $total]);
+
+			$statusBayar = $payload['status_pembayaran'] ?? 'unpaid';
+			$nominalDibayar = (float) ($payload['jumlah_dibayar'] ?? 0);
+
+			if ($statusBayar === 'unpaid' || $statusBayar === 'partial') {
+				$hutang = \App\Modules\Finance\Hutang\HutangEntity::create([
+					'kode' => 'AP-' . strtoupper(Str::random(10)),
+					'supplier_id' => $payload['supplier_id'] ?? null,
+					'sumber_tipe' => 'penerimaan_barang',
+					'sumber_id' => $receipt->id,
+					'tanggal_hutang' => $receipt->tanggal_terima,
+					'jatuh_tempo' => $payload['jatuh_tempo'] ?? null,
+					'nominal_hutang' => $total,
+					'sisa_hutang' => $total - $nominalDibayar,
+					'status' => $statusBayar,
+					'catatan' => 'Hutang otomatis dari Penerimaan ' . $kode,
+					'created_by' => $userId,
+				]);
+
+				if ($nominalDibayar > 0) {
+					\App\Modules\Finance\Hutang\PembayaranHutangEntity::create([
+						'kode' => 'PAY-' . strtoupper(Str::random(10)),
+						'hutang_id' => $hutang->id,
+						'tanggal_bayar' => $receipt->tanggal_terima,
+						'nominal_bayar' => $nominalDibayar,
+						'metode_pembayaran' => $payload['metode_pembayaran'] ?? 'kas',
+						'akun_kas_id' => $payload['akun_kas_id'] ?? null,
+						'referensi' => $kode,
+						'catatan' => 'DP Penerimaan Barang',
+						'created_by' => $userId,
+					]);
+				}
+			}
 
 			$this->syncPurchaseOrderReceiptState($receipt->purchase_order_id);
 
