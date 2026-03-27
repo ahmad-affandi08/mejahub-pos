@@ -37,6 +37,7 @@ export default function Index({ mobileData, flashMessage }) {
     const requestHistory = mobileData?.request_history ?? [];
     const incomingShiftSwapRequests = mobileData?.incoming_shift_swap_requests ?? [];
     const coworkers = mobileData?.coworkers ?? [];
+    const swapContext = mobileData?.swap_context ?? { jabatan: null, self_shift_dates: [] };
     const geoPolicy = mobileData?.geo_policy ?? { radius_meter: 10 };
     const checkinStatus = mobileData?.today_status?.current ?? "BELUM ABSEN";
     const serverTime = mobileData?.today_status?.server_time ?? null;
@@ -224,9 +225,11 @@ export default function Index({ mobileData, flashMessage }) {
             return (
                 <RequestScreen
                     coworkers={coworkers}
+                    swapContext={swapContext}
                     requestHistory={requestHistory}
                     incomingRequests={incomingShiftSwapRequests}
                     processing={isRequestSubmitting}
+                    onNotify={(payload) => showAlert(payload?.type || "info", payload?.title || "Informasi", payload?.message || "")}
                     onSubmitRequest={(payload) => {
                         setIsRequestSubmitting(true);
                         router.post(

@@ -17,6 +17,7 @@ class EAbsensiCollection
 			'request_history' => $payload['request_history'],
 			'incoming_shift_swap_requests' => $payload['incoming_shift_swap_requests'],
 			'coworkers' => $payload['coworkers'],
+			'swap_context' => $payload['swap_context'] ?? ['jabatan' => null, 'self_shift_dates' => []],
 			'today_status' => $payload['today_status'],
 			'geo_policy' => $payload['geo_policy'],
 		];

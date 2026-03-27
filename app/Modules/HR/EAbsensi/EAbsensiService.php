@@ -48,7 +48,8 @@ class EAbsensiService
 		$calendarData = $this->buildCalendarData($pegawaiId, $calendarMonth);
 		$requestHistory = $this->getRequestHistory($pegawaiId);
 		$incomingShiftSwapRequests = $this->getIncomingShiftSwapRequests($pegawaiId);
-		$coworkers = $this->getCoworkerOptions($pegawaiId);
+		$coworkers = $this->getCoworkerOptions($pegawai);
+		$swapContext = $this->getSwapContext($pegawai);
 
 		return [
 			'profile' => [
@@ -74,6 +75,7 @@ class EAbsensiService
 			'request_history' => $requestHistory,
 			'incoming_shift_swap_requests' => $incomingShiftSwapRequests,
 			'coworkers' => $coworkers,
+			'swap_context' => $swapContext,
 			'today_status' => [
 				'current' => $canAttendToday ? $todayStatus : 'TIDAK ADA SHIFT',
 				'server_time' => $nowTime,
@@ -278,15 +280,83 @@ class EAbsensiService
 			: 'menunggu_atasan';
 		$lampiran = $this->storeRequestAttachment($payload['lampiran'] ?? null);
 
+		$jadwalShiftId = $payload['jadwal_shift_id'] ?? null;
+		$jadwalShiftTujuanId = $payload['jadwal_shift_tujuan_id'] ?? null;
+		$pegawaiTujuanId = $jenisPengajuan === 'tukar_shift' ? ($payload['pegawai_tujuan_id'] ?? null) : null;
+
+		if ($jenisPengajuan === 'tukar_shift') {
+			$pegawaiTujuanId = (int) ($pegawaiTujuanId ?? 0);
+			if ($pegawaiTujuanId <= 0) {
+				throw ValidationException::withMessages([
+					'pegawai_tujuan_id' => 'Pilih rekan tukar shift terlebih dahulu.',
+				]);
+			}
+
+			if ($pegawaiTujuanId === (int) $pegawai->id) {
+				throw ValidationException::withMessages([
+					'pegawai_tujuan_id' => 'Tukar shift tidak dapat diajukan ke diri sendiri.',
+				]);
+			}
+
+			$targetPegawai = DataPegawaiEntity::query()
+				->where('id', $pegawaiTujuanId)
+				->where('is_active', true)
+				->first();
+
+			if (!$targetPegawai) {
+				throw ValidationException::withMessages([
+					'pegawai_tujuan_id' => 'Data rekan tukar shift tidak ditemukan.',
+				]);
+			}
+
+			$currentJabatan = mb_strtolower(trim((string) ($pegawai->jabatan ?? '')));
+			$targetJabatan = mb_strtolower(trim((string) ($targetPegawai->jabatan ?? '')));
+
+			if ($currentJabatan !== '' && $targetJabatan !== '' && $currentJabatan !== $targetJabatan) {
+				throw ValidationException::withMessages([
+					'pegawai_tujuan_id' => 'Tukar shift hanya bisa diajukan ke rekan dengan jabatan yang sama.',
+				]);
+			}
+
+			$tanggalMulai = (string) ($payload['tanggal_mulai'] ?? '');
+
+			$jadwalPengaju = JadwalShiftEntity::query()
+				->where('pegawai_id', $pegawai->id)
+				->whereDate('tanggal', $tanggalMulai)
+				->where('is_active', true)
+				->first();
+
+			if (!$jadwalPengaju) {
+				throw ValidationException::withMessages([
+					'tanggal_mulai' => 'Anda belum memiliki jadwal shift pada tanggal tersebut.',
+				]);
+			}
+
+			$jadwalTujuan = JadwalShiftEntity::query()
+				->where('pegawai_id', $targetPegawai->id)
+				->whereDate('tanggal', $tanggalMulai)
+				->where('is_active', true)
+				->first();
+
+			if (!$jadwalTujuan) {
+				throw ValidationException::withMessages([
+					'tanggal_mulai' => 'Rekan yang dipilih belum memiliki jadwal shift pada tanggal tersebut.',
+				]);
+			}
+
+			$jadwalShiftId = $jadwalPengaju->id;
+			$jadwalShiftTujuanId = $jadwalTujuan->id;
+		}
+
 		return EAbsensiPengajuanEntity::query()->create([
 			'kode' => 'REQ-' . Carbon::now()->format('Ymd-His'),
 			'pegawai_id' => $pegawai->id,
 			'jenis_pengajuan' => $jenisPengajuan,
 			'tanggal_mulai' => $payload['tanggal_mulai'],
 			'tanggal_selesai' => $payload['tanggal_selesai'] ?? $payload['tanggal_mulai'],
-			'pegawai_tujuan_id' => $jenisPengajuan === 'tukar_shift' ? ($payload['pegawai_tujuan_id'] ?? null) : null,
-			'jadwal_shift_id' => $payload['jadwal_shift_id'] ?? null,
-			'jadwal_shift_tujuan_id' => $payload['jadwal_shift_tujuan_id'] ?? null,
+			'pegawai_tujuan_id' => $pegawaiTujuanId,
+			'jadwal_shift_id' => $jadwalShiftId,
+			'jadwal_shift_tujuan_id' => $jadwalShiftTujuanId,
 			'alasan' => $payload['alasan'] ?? null,
 			'lampiran' => $lampiran,
 			'status' => $status,
@@ -578,22 +648,78 @@ class EAbsensiService
 		})->values()->all();
 	}
 
-	private function getCoworkerOptions(?int $pegawaiId): array
+	private function getCoworkerOptions(?DataPegawaiEntity $pegawai): array
 	{
-		return DataPegawaiEntity::query()
+		if (!$pegawai) {
+			return [];
+		}
+
+		$jabatan = trim((string) ($pegawai->jabatan ?? ''));
+
+		$items = DataPegawaiEntity::query()
 			->select(['id', 'nama', 'jabatan'])
 			->where('is_active', true)
-			->when($pegawaiId, fn ($query) => $query->where('id', '!=', $pegawaiId))
+			->where('id', '!=', $pegawai->id)
+			->when($jabatan !== '', function ($query) use ($jabatan) {
+				$query->whereRaw('LOWER(TRIM(jabatan)) = ?', [mb_strtolower($jabatan)]);
+			})
 			->orderBy('nama')
 			->limit(300)
+			->get();
+
+		$ids = $items->pluck('id')->all();
+
+		$shiftDatesByPegawai = JadwalShiftEntity::query()
+			->select(['pegawai_id', 'tanggal'])
+			->whereIn('pegawai_id', $ids)
+			->where('is_active', true)
+			->whereBetween('tanggal', [Carbon::now()->subDays(30)->toDateString(), Carbon::now()->addDays(180)->toDateString()])
 			->get()
+			->groupBy('pegawai_id')
+			->map(fn ($rows) => $rows
+				->map(fn ($row) => optional($row->tanggal)->toDateString())
+				->filter()
+				->values()
+				->all()
+			)
+			->all();
+
+		return $items
 			->map(fn (DataPegawaiEntity $item) => [
 				'id' => $item->id,
 				'nama' => $item->nama,
 				'jabatan' => $item->jabatan,
+				'shift_dates' => $shiftDatesByPegawai[$item->id] ?? [],
 			])
 			->values()
 			->all();
+	}
+
+	private function getSwapContext(?DataPegawaiEntity $pegawai): array
+	{
+		if (!$pegawai) {
+			return [
+				'jabatan' => null,
+				'self_shift_dates' => [],
+			];
+		}
+
+		$selfShiftDates = JadwalShiftEntity::query()
+			->select(['tanggal'])
+			->where('pegawai_id', $pegawai->id)
+			->where('is_active', true)
+			->whereBetween('tanggal', [Carbon::now()->subDays(30)->toDateString(), Carbon::now()->addDays(180)->toDateString()])
+			->orderBy('tanggal')
+			->get()
+			->map(fn ($row) => optional($row->tanggal)->toDateString())
+			->filter()
+			->values()
+			->all();
+
+		return [
+			'jabatan' => $pegawai->jabatan,
+			'self_shift_dates' => $selfShiftDates,
+		];
 	}
 
 	private function getIncomingShiftSwapRequests(?int $pegawaiId): array
