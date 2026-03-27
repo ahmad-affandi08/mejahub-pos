@@ -4,6 +4,7 @@ namespace App\Modules\HR\Penggajian;
 
 use App\Modules\HR\Absensi\AbsensiEntity;
 use App\Modules\HR\DataPegawai\DataPegawaiEntity;
+use App\Modules\HR\PengaturanGaji\PengaturanGajiEntity;
 use App\Modules\HR\Penggajian\PenggajianEntity;
 use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -58,9 +59,11 @@ class PenggajianService
         $expectedWorkDays = $this->countWorkdaysInRange($startDate, $endDate, $hariKerja);
         $skipExisting = (bool) ($payload['skip_existing'] ?? true);
         $includeTerlambatPenalty = (bool) ($payload['include_terlambat_penalty'] ?? false);
+        $useSalaryPolicy = (bool) ($payload['use_salary_policy'] ?? true);
         $gajiPokokDefault = (float) ($payload['gaji_pokok_default'] ?? 0);
         $gajiPokokPerPegawai = $this->normalizeGajiPokokPerPegawai($payload['gaji_pokok_per_pegawai'] ?? []);
         $gajiPokokPerJabatan = $this->normalizeGajiPokokPerJabatan($payload['gaji_pokok_per_jabatan'] ?? []);
+        $salaryPolicyMap = $useSalaryPolicy ? $this->getPolicyMapByPegawaiId() : [];
 
         $pegawaiIds = collect($payload['pegawai_ids'] ?? [])
             ->map(fn ($id) => (int) $id)
@@ -88,10 +91,73 @@ class PenggajianService
 
             $rekap = $this->buildAttendanceRecap($absensiByDate, $expectedWorkDays);
 
-            $potonganTambahan = (float) ($payload['potongan_per_alpha'] ?? 0) * $rekap['jumlah_alpha'];
+            $policy = $salaryPolicyMap[(int) $pegawai->id] ?? [];
+            $policyActive = $useSalaryPolicy && (bool) ($policy['aktifkan_kebijakan'] ?? true);
 
-            if ($includeTerlambatPenalty) {
-                $potonganTambahan += (float) ($payload['potongan_per_terlambat'] ?? 0) * $rekap['jumlah_terlambat'];
+            $potonganPerIzin = $policyActive
+                ? (float) ($policy['potongan_per_izin'] ?? 0)
+                : (float) ($payload['potongan_per_izin'] ?? 0);
+            $potonganPerSakit = $policyActive
+                ? (float) ($policy['potongan_per_sakit'] ?? 0)
+                : (float) ($payload['potongan_per_sakit'] ?? 0);
+            $potonganPerAlpha = $policyActive
+                ? (float) ($policy['potongan_per_alpha'] ?? 0)
+                : (float) ($payload['potongan_per_alpha'] ?? 0);
+            $potonganPerTerlambat = $policyActive
+                ? (float) ($policy['potongan_per_terlambat'] ?? 0)
+                : (float) ($payload['potongan_per_terlambat'] ?? 0);
+
+            $potongIzin = $policyActive
+                ? (bool) ($policy['potong_izin'] ?? false)
+                : $potonganPerIzin > 0;
+            $potongSakit = $policyActive
+                ? (bool) ($policy['potong_sakit'] ?? false)
+                : $potonganPerSakit > 0;
+            $potongAlpha = $policyActive
+                ? (bool) ($policy['potong_alpha'] ?? true)
+                : true;
+            $potongTerlambat = $policyActive
+                ? (bool) ($policy['potong_terlambat'] ?? false)
+                : $includeTerlambatPenalty;
+
+            $potonganTambahan = 0;
+
+            if ($potongIzin) {
+                $potonganTambahan += $potonganPerIzin * $rekap['jumlah_izin'];
+            }
+
+            if ($potongSakit) {
+                $potonganTambahan += $potonganPerSakit * $rekap['jumlah_sakit'];
+            }
+
+            if ($potongAlpha) {
+                $potonganTambahan += $potonganPerAlpha * $rekap['jumlah_alpha'];
+            }
+
+            if ($potongTerlambat) {
+                $potonganTambahan += $potonganPerTerlambat * $rekap['jumlah_terlambat'];
+            }
+
+            $lemburNominal = (float) ($payload['lembur_default'] ?? 0);
+
+            if ($policyActive && (float) ($policy['lembur_per_jam'] ?? 0) > 0) {
+                $keluarByDate = AbsensiEntity::query()
+                    ->with('shift:id,jam_keluar')
+                    ->where('pegawai_id', $pegawai->id)
+                    ->whereBetween('tanggal', [$startDate->toDateString(), $endDate->toDateString()])
+                    ->where('jenis_absen', 'keluar')
+                    ->where('is_active', true)
+                    ->orderByDesc('id')
+                    ->get(['id', 'tanggal', 'jam_keluar', 'shift_id'])
+                    ->unique(fn ($item) => optional($item->tanggal)?->toDateString())
+                    ->values();
+
+                $totalLemburJam = $this->calculateOvertimeHours(
+                    $keluarByDate,
+                    (int) ($policy['lembur_min_menit'] ?? 60)
+                );
+
+                $lemburNominal = $totalLemburJam * (float) ($policy['lembur_per_jam'] ?? 0);
             }
 
             $gajiPokok = $this->resolveGajiPokokPegawai(
@@ -109,7 +175,7 @@ class PenggajianService
                 'tanggal_pembayaran' => $payload['tanggal_pembayaran'] ?? null,
                 'gaji_pokok' => $gajiPokok,
                 'tunjangan' => (float) ($payload['tunjangan_default'] ?? 0),
-                'lembur' => (float) ($payload['lembur_default'] ?? 0),
+                'lembur' => $lemburNominal,
                 'bonus' => (float) ($payload['bonus_default'] ?? 0),
                 'potongan' => (float) ($payload['potongan_default'] ?? 0) + $potonganTambahan,
                 'status' => $payload['status'] ?? 'proses',
@@ -302,5 +368,44 @@ class PenggajianService
         }
 
         return $default;
+    }
+
+    private function getPolicyMapByPegawaiId(): array
+    {
+        return PengaturanGajiEntity::query()
+            ->where('is_active', true)
+            ->get(['pegawai_id', 'kebijakan_penggajian'])
+            ->mapWithKeys(function (PengaturanGajiEntity $item) {
+                return [(int) $item->pegawai_id => (array) ($item->kebijakan_penggajian ?? [])];
+            })
+            ->all();
+    }
+
+    private function calculateOvertimeHours(Collection $keluarByDate, int $minimumMinutes): float
+    {
+        $totalMinutes = 0;
+
+        foreach ($keluarByDate as $record) {
+            if (!$record->jam_keluar || !$record->shift?->jam_keluar) {
+                continue;
+            }
+
+            $actual = Carbon::parse((string) $record->tanggal . ' ' . (string) $record->jam_keluar);
+            $scheduled = Carbon::parse((string) $record->tanggal . ' ' . (string) $record->shift->jam_keluar);
+
+            $diffMinutes = $scheduled->diffInMinutes($actual, false);
+
+            if ($diffMinutes <= 0) {
+                continue;
+            }
+
+            if ($minimumMinutes > 0 && $diffMinutes < $minimumMinutes) {
+                continue;
+            }
+
+            $totalMinutes += $diffMinutes;
+        }
+
+        return round($totalMinutes / 60, 2);
     }
 }

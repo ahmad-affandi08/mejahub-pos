@@ -67,7 +67,7 @@ export default function Index({ salaryTemplates, pegawaiOptions, filters, flashM
                             <DialogTrigger asChild>
                                 <Button>Tambah Template</Button>
                             </DialogTrigger>
-                            <DialogContent className="sm:max-w-2xl">
+                            <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
                                 <DialogHeader>
                                     <DialogTitle>Tambah Template Gaji Pegawai</DialogTitle>
                                     <DialogDescription>Satu pegawai hanya boleh memiliki satu template aktif.</DialogDescription>
@@ -100,6 +100,7 @@ export default function Index({ salaryTemplates, pegawaiOptions, filters, flashM
                                 <TableHead>Jabatan</TableHead>
                                 <TableHead>Gaji Pokok</TableHead>
                                 <TableHead>Status</TableHead>
+                                <TableHead>Kebijakan Payroll</TableHead>
                                 <TableHead>Catatan</TableHead>
                                 <TableHead className="text-right">Aksi</TableHead>
                             </TableRow>
@@ -114,6 +115,18 @@ export default function Index({ salaryTemplates, pegawaiOptions, filters, flashM
                                         <TableCell>
                                             <POSStatusBadge status={item.is_active ? "aktif" : "nonaktif"} label={item.is_active ? "Aktif" : "Nonaktif"} />
                                         </TableCell>
+                                        <TableCell className="max-w-sm text-xs text-slate-600">
+                                            {(() => {
+                                                const policy = item.kebijakan_penggajian || {};
+                                                return [
+                                                    `Lembur/jam: ${formatIDR(policy.lembur_per_jam ?? 0)}`,
+                                                    `Izin: ${policy.potong_izin ? formatIDR(policy.potongan_per_izin ?? 0) : "Tidak Potong"}`,
+                                                    `Sakit: ${policy.potong_sakit ? formatIDR(policy.potongan_per_sakit ?? 0) : "Tidak Potong"}`,
+                                                    `Alpha: ${policy.potong_alpha ? formatIDR(policy.potongan_per_alpha ?? 0) : "Tidak Potong"}`,
+                                                    `Terlambat: ${policy.potong_terlambat ? formatIDR(policy.potongan_per_terlambat ?? 0) : "Tidak Potong"}`,
+                                                ].join(" | ");
+                                            })()}
+                                        </TableCell>
                                         <TableCell className="max-w-xs truncate">{item.catatan || "-"}</TableCell>
                                         <TableCell className="text-right">
                                             <div className="flex items-center justify-end gap-2">
@@ -121,7 +134,7 @@ export default function Index({ salaryTemplates, pegawaiOptions, filters, flashM
                                                     <DialogTrigger asChild>
                                                         <Button variant="outline" size="sm">Edit</Button>
                                                     </DialogTrigger>
-                                                    <DialogContent className="sm:max-w-2xl">
+                                                    <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
                                                         <DialogHeader>
                                                             <DialogTitle>Edit Template Gaji Pegawai</DialogTitle>
                                                             <DialogDescription>Perbarui gaji pokok template untuk generate payroll.</DialogDescription>
@@ -143,7 +156,7 @@ export default function Index({ salaryTemplates, pegawaiOptions, filters, flashM
                                 ))
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={6} className="py-12 text-center text-sm text-muted-foreground">
+                                    <TableCell colSpan={7} className="py-12 text-center text-sm text-muted-foreground">
                                         Belum ada template gaji pegawai.
                                     </TableCell>
                                 </TableRow>

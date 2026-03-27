@@ -1,5 +1,5 @@
 import { Link, router, usePage } from "@inertiajs/react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
 	CircleDollarSign,
 	ChevronDown,
@@ -155,11 +155,55 @@ const moduleItems = [
 export default function DashboardLayout({ title = "Dashboard", children }) {
 	const { url, props } = usePage();
 	const userName = props?.auth?.user?.name ?? "Pengguna";
+	const hasRoles = props?.auth?.has_roles === true;
+	const permissionKeys = Array.isArray(props?.auth?.permission_keys)
+		? props.auth.permission_keys
+		: [];
+
+	const filteredModuleItems = useMemo(() => {
+		const keySet = new Set(permissionKeys);
+		const hasWildcard = keySet.has("*");
+		const unrestricted = !hasRoles || permissionKeys.length === 0 || hasWildcard;
+
+		const inferPermission = (href) => {
+			const segments = String(href || "")
+				.split("/")
+				.filter(Boolean);
+
+			if (segments.length < 2) {
+				return null;
+			}
+
+			return `${segments[0]}.${segments[1]}.access`;
+		};
+
+		return moduleItems
+			.map((module) => {
+				const items = (module.items || []).filter((sub) => {
+					if (unrestricted) {
+						return true;
+					}
+
+					const permission = sub.permission ?? inferPermission(sub.href);
+					if (!permission) {
+						return true;
+					}
+
+					return keySet.has(permission);
+				});
+
+				return {
+					...module,
+					items,
+				};
+			})
+			.filter((module) => (module.items || []).length > 0);
+	}, [hasRoles, permissionKeys]);
 
 	const [openModules, setOpenModules] = useState(() => {
 		const initialState = {};
 
-		moduleItems.forEach((module) => {
+		filteredModuleItems.forEach((module) => {
 			initialState[module.title] = module.items.some((sub) =>
 				url.startsWith(sub.href)
 			);
@@ -172,7 +216,7 @@ export default function DashboardLayout({ title = "Dashboard", children }) {
 		setOpenModules((prev) => {
 			const next = { ...prev };
 
-			moduleItems.forEach((module) => {
+			filteredModuleItems.forEach((module) => {
 				const isActive = module.items.some((sub) => url.startsWith(sub.href));
 				if (isActive) {
 					next[module.title] = true;
@@ -181,7 +225,7 @@ export default function DashboardLayout({ title = "Dashboard", children }) {
 
 			return next;
 		});
-	}, [url]);
+	}, [filteredModuleItems, url]);
 
 	const toggleModule = (title) => {
 		setOpenModules((prev) => ({
@@ -225,7 +269,7 @@ export default function DashboardLayout({ title = "Dashboard", children }) {
 							</SidebarGroupLabel>
 							<SidebarGroupContent>
 								<SidebarMenu className="px-2">
-									{moduleItems.map((module) => {
+									{filteredModuleItems.map((module) => {
 										if (!module.items.length) {
 											return null;
 										}

@@ -19,6 +19,7 @@ class PengaturanGajiEntity extends Model
 
     protected $casts = [
         'gaji_pokok' => 'decimal:2',
+        'kebijakan_penggajian' => 'array',
         'is_active' => 'boolean',
     ];
 

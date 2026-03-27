@@ -56,13 +56,44 @@ class PengaturanGajiService
             ->all();
     }
 
+    public function getActivePolicyMapByPegawaiId(): array
+    {
+        return PengaturanGajiEntity::query()
+            ->where('is_active', true)
+            ->get(['pegawai_id', 'kebijakan_penggajian'])
+            ->mapWithKeys(function (PengaturanGajiEntity $item) {
+                return [
+                    (int) $item->pegawai_id => $this->normalizePolicy($item->kebijakan_penggajian ?? []),
+                ];
+            })
+            ->all();
+    }
+
     private function normalizePayload(array $payload): array
     {
         return [
             'pegawai_id' => (int) $payload['pegawai_id'],
             'gaji_pokok' => (float) ($payload['gaji_pokok'] ?? 0),
+            'kebijakan_penggajian' => $this->normalizePolicy($payload['kebijakan_penggajian'] ?? []),
             'catatan' => $payload['catatan'] ?? null,
             'is_active' => (bool) ($payload['is_active'] ?? true),
+        ];
+    }
+
+    private function normalizePolicy(array $policy): array
+    {
+        return [
+            'aktifkan_kebijakan' => (bool) ($policy['aktifkan_kebijakan'] ?? true),
+            'lembur_per_jam' => (float) ($policy['lembur_per_jam'] ?? 0),
+            'lembur_min_menit' => (int) ($policy['lembur_min_menit'] ?? 60),
+            'potong_izin' => (bool) ($policy['potong_izin'] ?? false),
+            'potongan_per_izin' => (float) ($policy['potongan_per_izin'] ?? 0),
+            'potong_sakit' => (bool) ($policy['potong_sakit'] ?? false),
+            'potongan_per_sakit' => (float) ($policy['potongan_per_sakit'] ?? 0),
+            'potong_alpha' => (bool) ($policy['potong_alpha'] ?? true),
+            'potongan_per_alpha' => (float) ($policy['potongan_per_alpha'] ?? 0),
+            'potong_terlambat' => (bool) ($policy['potong_terlambat'] ?? false),
+            'potongan_per_terlambat' => (float) ($policy['potongan_per_terlambat'] ?? 0),
         ];
     }
 }

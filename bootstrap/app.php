@@ -4,6 +4,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use App\Http\Middleware\CheckPermission;
+use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\Request;
 use Illuminate\Session\TokenMismatchException;
@@ -16,6 +17,9 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->redirectGuestsTo('/auth/login');
+        $middleware->web(append: [
+            HandleInertiaRequests::class,
+        ]);
 
         $middleware->alias([
             'permission' => CheckPermission::class,

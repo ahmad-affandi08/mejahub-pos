@@ -37,9 +37,12 @@ export default function GenerateForm({ endpoint, pegawaiOptions, gajiPokokTempla
         lembur_default: 0,
         bonus_default: 0,
         potongan_default: 0,
+        potongan_per_izin: 0,
+        potongan_per_sakit: 0,
         potongan_per_alpha: 0,
         include_terlambat_penalty: false,
         potongan_per_terlambat: 0,
+        use_salary_policy: true,
         status: "proses",
         kode_prefix: "GJI",
         skip_existing: true,
@@ -212,8 +215,26 @@ export default function GenerateForm({ endpoint, pegawaiOptions, gajiPokokTempla
                     <Input type="number" min={0} step="0.01" value={data.potongan_default} onChange={(event) => setData("potongan_default", Number(event.target.value || 0))} />
                 </div>
                 <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Potongan per Izin</label>
+                    <Input type="number" min={0} step="0.01" value={data.potongan_per_izin} onChange={(event) => setData("potongan_per_izin", Number(event.target.value || 0))} />
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Potongan per Sakit</label>
+                    <Input type="number" min={0} step="0.01" value={data.potongan_per_sakit} onChange={(event) => setData("potongan_per_sakit", Number(event.target.value || 0))} />
+                </div>
+                <div className="space-y-1.5">
                     <label className="text-sm font-medium">Potongan per Alpha</label>
                     <Input type="number" min={0} step="0.01" value={data.potongan_per_alpha} onChange={(event) => setData("potongan_per_alpha", Number(event.target.value || 0))} />
+                </div>
+                <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Gunakan Kebijakan Payroll UI</label>
+                    <select className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm" value={data.use_salary_policy ? "1" : "0"} onChange={(event) => setData("use_salary_policy", event.target.value === "1")}>
+                        <option value="1">Ya (dari Pengaturan Gaji)</option>
+                        <option value="0">Tidak (pakai input form ini)</option>
+                    </select>
                 </div>
             </div>
 

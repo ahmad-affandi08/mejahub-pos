@@ -31,6 +31,7 @@ class PengaturanGajiCollection
             'pegawai_nama' => $item->pegawai?->nama,
             'jabatan' => $item->pegawai?->jabatan,
             'gaji_pokok' => (float) $item->gaji_pokok,
+            'kebijakan_penggajian' => $item->kebijakan_penggajian ?? [],
             'catatan' => $item->catatan,
             'is_active' => (bool) $item->is_active,
             'created_at' => optional($item->created_at)?->toDateTimeString(),
