@@ -13,6 +13,7 @@ class EAbsensiCollection
 			'shift_info' => $payload['shift_info'],
 			'weekly_summary' => $payload['weekly_summary'],
 			'records' => $payload['records'],
+			'calendar_data' => $payload['calendar_data'] ?? ['month_label' => '-', 'month_key' => '-', 'days' => [], 'summary' => []],
 			'request_history' => $payload['request_history'],
 			'incoming_shift_swap_requests' => $payload['incoming_shift_swap_requests'],
 			'coworkers' => $payload['coworkers'],

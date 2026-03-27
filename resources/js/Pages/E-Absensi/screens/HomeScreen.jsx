@@ -17,10 +17,11 @@ function resolveGreetingPeriod(serverTime) {
     return "malam";
 }
 
-export default function HomeScreen({ profile, shiftInfo, summary, checkinStatus, primaryAction, serverTime, onStartCheckout }) {
+export default function HomeScreen({ profile, shiftInfo, summary, checkinStatus, primaryAction, canAttend = true, serverTime, onStartCheckout }) {
     const greetingPeriod = resolveGreetingPeriod(serverTime);
     const actionLabel = primaryAction || "ABSEN MASUK";
     const isDoneToday = actionLabel === "SUDAH ABSEN";
+    const isActionDisabled = isDoneToday || !canAttend;
 
     return (
         <div className="space-y-5">
@@ -58,7 +59,7 @@ export default function HomeScreen({ profile, shiftInfo, summary, checkinStatus,
                 <button
                     type="button"
                     onClick={onStartCheckout}
-                    disabled={isDoneToday}
+                    disabled={isActionDisabled}
                     className="mt-4 inline-flex w-full items-center justify-center gap-2.5 rounded-full bg-[#22005f] px-5 py-3 text-base font-semibold tracking-wide text-white shadow-[0_10px_20px_rgba(34,0,95,0.3)] disabled:cursor-not-allowed disabled:bg-[#8a7aa8] disabled:shadow-none"
                 >
                     <Fingerprint className="h-5 w-5" />

@@ -1,10 +1,11 @@
 import { Head, router } from "@inertiajs/react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import MobileLayout from "@/layouts/MobileLayout";
 import BottomNav from "./components/BottomNav";
 import MobileAlertDialog from "./components/MobileAlertDialog";
 import MobileTopBar from "./components/MobileTopBar";
+import CalendarScreen from "./screens/CalendarScreen";
 import FailedRadiusScreen from "./screens/FailedRadiusScreen";
 import HistoryDetailScreen from "./screens/HistoryDetailScreen";
 import HistoryScreen from "./screens/HistoryScreen";
@@ -13,7 +14,7 @@ import ProfileScreen from "./screens/ProfileScreen";
 import RequestScreen from "./screens/RequestScreen";
 import VerifyFaceScreen from "./screens/VerifyFaceScreen";
 
-const mainViews = ["home", "history", "requests", "profile"];
+const mainViews = ["home", "calendar", "history", "requests", "profile"];
 
 export default function Index({ mobileData, flashMessage }) {
     const profile = mobileData?.profile ?? {
@@ -32,6 +33,7 @@ export default function Index({ mobileData, flashMessage }) {
     };
     const summary = mobileData?.weekly_summary ?? [];
     const records = mobileData?.records ?? [];
+    const calendarData = mobileData?.calendar_data ?? { month_label: "-", month_key: "-", days: [], summary: {} };
     const requestHistory = mobileData?.request_history ?? [];
     const incomingShiftSwapRequests = mobileData?.incoming_shift_swap_requests ?? [];
     const coworkers = mobileData?.coworkers ?? [];
@@ -39,7 +41,8 @@ export default function Index({ mobileData, flashMessage }) {
     const checkinStatus = mobileData?.today_status?.current ?? "BELUM ABSEN";
     const serverTime = mobileData?.today_status?.server_time ?? null;
     const primaryAction = mobileData?.today_status?.primary_action ?? "ABSEN MASUK";
-    const primaryJenisAbsen = mobileData?.today_status?.primary_jenis_absen ?? "masuk";
+    const primaryJenisAbsen = mobileData?.today_status?.primary_jenis_absen ?? null;
+    const canAttend = mobileData?.today_status?.can_attend ?? false;
 
     const endpoint = "/hr/e-absensi";
     const [activeTab, setActiveTab] = useState("home");
@@ -48,6 +51,7 @@ export default function Index({ mobileData, flashMessage }) {
     const [selectedRecord, setSelectedRecord] = useState(records[0] ?? null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isRequestSubmitting, setIsRequestSubmitting] = useState(false);
+    const [isCalendarLoading, setIsCalendarLoading] = useState(false);
     const [permissionState, setPermissionState] = useState({
         camera: false,
         location: false,
@@ -105,9 +109,9 @@ export default function Index({ mobileData, flashMessage }) {
         };
     }, []);
 
-    const handlePermissionChange = (next) => {
+    const handlePermissionChange = useCallback((next) => {
         setPermissionState((prev) => ({ ...prev, ...next }));
-    };
+    }, []);
 
     useEffect(() => {
         if (flashMessage?.success) {
@@ -117,6 +121,7 @@ export default function Index({ mobileData, flashMessage }) {
 
     const titleSubtitle = useMemo(() => {
         if (view === "verify") return "VERIFIKASI WAJAH";
+        if (view === "calendar") return "KALENDER STAFF";
         if (view === "detail") return "DETAIL LOG";
         if (view === "failed") return "ABSENSI GAGAL";
         return "APLIKASI KARYAWAN";
@@ -126,6 +131,28 @@ export default function Index({ mobileData, flashMessage }) {
         setActiveTab(next);
         setView(next);
     };
+
+    const handleCalendarMonthChange = useCallback((monthKey) => {
+        if (!monthKey) {
+            return;
+        }
+
+        setIsCalendarLoading(true);
+
+        router.get(
+            endpoint,
+            { calendar_month: monthKey },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                replace: true,
+                onError: () => {
+                    showAlert("error", "Gagal Memuat Kalender", "Data kalender tidak dapat dimuat. Silakan coba lagi.");
+                },
+                onFinish: () => setIsCalendarLoading(false),
+            }
+        );
+    }, []);
 
     const handleBack = () => {
         if (view === "verify" || view === "failed") {
@@ -155,8 +182,16 @@ export default function Index({ mobileData, flashMessage }) {
                     summary={summary}
                     checkinStatus={checkinStatus}
                     primaryAction={primaryAction}
+                    canAttend={canAttend}
                     serverTime={serverTime}
-                    onStartCheckout={() => setView("verify")}
+                    onStartCheckout={() => {
+                        if (!canAttend) {
+                            showAlert("error", "Absensi Ditolak", "Anda belum memiliki shift aktif hari ini. Hubungi atasan untuk pengaturan jadwal.");
+                            return;
+                        }
+
+                        setView("verify");
+                    }}
                 />
             );
         }
@@ -171,6 +206,16 @@ export default function Index({ mobileData, flashMessage }) {
                         setSelectedRecord(record);
                         setView("detail");
                     }}
+                />
+            );
+        }
+
+        if (view === "calendar") {
+            return (
+                <CalendarScreen
+                    calendarData={calendarData}
+                    loading={isCalendarLoading}
+                    onChangeMonth={handleCalendarMonthChange}
                 />
             );
         }
@@ -192,6 +237,7 @@ export default function Index({ mobileData, flashMessage }) {
                             },
                             {
                                 preserveScroll: true,
+                                forceFormData: true,
                                 onError: (errors) => {
                                     const firstError = Object.values(errors ?? {}).find((value) => value);
                                     showAlert(
@@ -255,7 +301,7 @@ export default function Index({ mobileData, flashMessage }) {
                         router.post(
                             endpoint,
                             {
-                                jenis_absen: primaryJenisAbsen,
+                                jenis_absen: primaryJenisAbsen ?? "masuk",
                                 metode_absen: "face",
                                 sumber_absen: "web-mobile",
                                 status: "hadir",
@@ -276,6 +322,7 @@ export default function Index({ mobileData, flashMessage }) {
                             },
                             {
                                 preserveScroll: true,
+                                forceFormData: true,
                                 onFinish: () => setIsSubmitting(false),
                                 onError: (errors) => {
                                     const firstError = Object.values(errors ?? {}).find((value) => value);

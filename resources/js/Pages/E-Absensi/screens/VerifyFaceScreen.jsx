@@ -24,6 +24,7 @@ function calculateDistanceMeter(lat1, lon1, lat2, lon2) {
 export default function VerifyFaceScreen({ onSubmitSuccess, processing = false, geoPolicy = {}, permissionState, onPermissionChange }) {
     const videoRef = useRef(null);
     const streamRef = useRef(null);
+    const cameraRequestRef = useRef(0);
 
     const [cameraReady, setCameraReady] = useState(false);
     const [cameraLoading, setCameraLoading] = useState(false);
@@ -47,6 +48,45 @@ export default function VerifyFaceScreen({ onSubmitSuccess, processing = false, 
         window.setTimeout(resolve, ms);
     });
 
+    const getUserMediaWithTimeout = async (constraints, timeoutMs = 12000) => {
+        let timerId;
+
+        try {
+            return await Promise.race([
+                navigator.mediaDevices.getUserMedia(constraints),
+                new Promise((_, reject) => {
+                    timerId = window.setTimeout(() => {
+                        reject(new Error("CAMERA_TIMEOUT"));
+                    }, timeoutMs);
+                }),
+            ]);
+        } finally {
+            if (timerId) {
+                window.clearTimeout(timerId);
+            }
+        }
+    };
+
+    const resolveCameraErrorMessage = (error) => {
+        if (error?.message === "CAMERA_TIMEOUT") {
+            return "Koneksi kamera timeout. Tutup aplikasi lain yang memakai kamera lalu coba lagi.";
+        }
+
+        if (error?.name === "NotAllowedError" || error?.name === "SecurityError") {
+            return "Izin kamera ditolak browser. Izinkan kamera lalu coba lagi.";
+        }
+
+        if (error?.name === "NotReadableError" || error?.name === "TrackStartError") {
+            return "Kamera sedang dipakai aplikasi/tab lain. Tutup dulu lalu aktifkan ulang kamera.";
+        }
+
+        if (error?.name === "NotFoundError" || error?.name === "DevicesNotFoundError") {
+            return "Perangkat kamera tidak ditemukan di browser ini.";
+        }
+
+        return "Kamera terdeteksi tetapi preview belum tampil. Tekan tombol Aktifkan Ulang Kamera.";
+    };
+
     const attachAndPlayStream = async (stream) => {
         const video = videoRef.current;
         if (!video) {
@@ -69,6 +109,9 @@ export default function VerifyFaceScreen({ onSubmitSuccess, processing = false, 
     };
 
     const startCamera = useCallback(async () => {
+        const requestId = cameraRequestRef.current + 1;
+        cameraRequestRef.current = requestId;
+
         if (!requireFace) {
             setCameraReady(true);
             setCameraError("");
@@ -104,10 +147,17 @@ export default function VerifyFaceScreen({ onSubmitSuccess, processing = false, 
         }
 
         let ready = false;
+        let lastError = null;
 
         for (const constraints of constraintsQueue) {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                const stream = await getUserMediaWithTimeout(constraints);
+
+                if (cameraRequestRef.current !== requestId) {
+                    stream.getTracks().forEach((track) => track.stop());
+                    return;
+                }
+
                 const played = await attachAndPlayStream(stream);
 
                 if (played) {
@@ -117,9 +167,14 @@ export default function VerifyFaceScreen({ onSubmitSuccess, processing = false, 
                 }
 
                 stream.getTracks().forEach((track) => track.stop());
-            } catch {
+            } catch (error) {
+                lastError = error;
                 // Coba kandidat constraints berikutnya.
             }
+        }
+
+        if (cameraRequestRef.current !== requestId) {
+            return;
         }
 
         setCameraLoading(false);
@@ -132,7 +187,7 @@ export default function VerifyFaceScreen({ onSubmitSuccess, processing = false, 
         }
 
         setCameraReady(false);
-        setCameraError("Kamera terdeteksi tetapi preview belum tampil. Tekan tombol Aktifkan Ulang Kamera.");
+        setCameraError(resolveCameraErrorMessage(lastError));
         onPermissionChange?.({ camera: false });
         stopCameraStream();
     }, [onPermissionChange, requireFace]);
@@ -238,17 +293,26 @@ export default function VerifyFaceScreen({ onSubmitSuccess, processing = false, 
 
         context.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
 
-        onSubmitSuccess?.({
-            latitude: location.lat,
-            longitude: location.lon,
-            lokasi_absen: `Koordinat perangkat (${location.lat}, ${location.lon})`,
-            radius_meter: radiusMeter,
-            dalam_radius: withinRadius,
-            foto_absen: `capture-${Date.now()}.jpg`,
-            watermark_text: "Capture kamera perangkat",
-            skor_wajah: 98.5,
-            status_verifikasi_wajah: "verified",
-        });
+        canvas.toBlob((blob) => {
+            if (!blob) {
+                return;
+            }
+
+            const fileName = `absensi-${Date.now()}.jpg`;
+            const imageFile = new File([blob], fileName, { type: "image/jpeg" });
+
+            onSubmitSuccess?.({
+                latitude: location.lat,
+                longitude: location.lon,
+                lokasi_absen: `Koordinat perangkat (${location.lat}, ${location.lon})`,
+                radius_meter: radiusMeter,
+                dalam_radius: withinRadius,
+                foto_absen: imageFile,
+                watermark_text: "Capture kamera perangkat",
+                skor_wajah: 98.5,
+                status_verifikasi_wajah: "verified",
+            });
+        }, "image/jpeg", 0.9);
     };
 
     return (

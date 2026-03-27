@@ -6,13 +6,15 @@ use App\Models\User;
 use App\Modules\HR\DataPegawai\DataPegawaiEntity;
 use App\Modules\HR\JadwalShift\JadwalShiftEntity;
 use Carbon\Carbon;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
 class EAbsensiService
 {
-	public function getMobilePayload(User $user): array
+	public function getMobilePayload(User $user, ?string $calendarMonth = null): array
 	{
 		$pegawai = $this->resolvePegawai($user);
 		$pegawaiId = $pegawai?->id;
@@ -42,6 +44,8 @@ class EAbsensiService
 		$weeklySummary = $this->buildWeeklySummary($pegawaiId);
 		$todayStatus = $this->resolveTodayStatus($records, $today);
 		$todayPrimaryAction = $this->resolveTodayPrimaryAction($records, $today);
+		$canAttendToday = $todaySchedule !== null;
+		$calendarData = $this->buildCalendarData($pegawaiId, $calendarMonth);
 		$requestHistory = $this->getRequestHistory($pegawaiId);
 		$incomingShiftSwapRequests = $this->getIncomingShiftSwapRequests($pegawaiId);
 		$coworkers = $this->getCoworkerOptions($pegawaiId);
@@ -66,14 +70,16 @@ class EAbsensiService
 			],
 			'weekly_summary' => $weeklySummary,
 			'records' => EAbsensiCollection::formatRecords($records),
+			'calendar_data' => $calendarData,
 			'request_history' => $requestHistory,
 			'incoming_shift_swap_requests' => $incomingShiftSwapRequests,
 			'coworkers' => $coworkers,
 			'today_status' => [
-				'current' => $todayStatus,
+				'current' => $canAttendToday ? $todayStatus : 'TIDAK ADA SHIFT',
 				'server_time' => $nowTime,
-				'primary_action' => $todayPrimaryAction['label'],
-				'primary_jenis_absen' => $todayPrimaryAction['jenis_absen'],
+				'primary_action' => $canAttendToday ? $todayPrimaryAction['label'] : 'SHIFT BELUM DIATUR',
+				'primary_jenis_absen' => $canAttendToday ? $todayPrimaryAction['jenis_absen'] : null,
+				'can_attend' => $canAttendToday,
 			],
 			'geo_policy' => [
 				'require_location' => (bool) ($todaySchedule?->shift?->require_location_validation ?? true),
@@ -97,11 +103,17 @@ class EAbsensiService
 		$nowTime = Carbon::now()->format('H:i:s');
 
 		$todaySchedule = JadwalShiftEntity::query()
-			->with(['shift:id,radius_meter'])
+			->with(['shift:id,radius_meter,require_face_verification,require_location_validation'])
 			->where('pegawai_id', $pegawai->id)
 			->whereDate('tanggal', $today)
 			->where('is_active', true)
 			->first();
+
+		if (!$todaySchedule || !$todaySchedule->shift_id) {
+			throw ValidationException::withMessages([
+				'jadwal_shift_id' => 'Anda tidak memiliki jadwal shift aktif hari ini sehingga absensi tidak dapat dilakukan.',
+			]);
+		}
 
 		$jenisAbsen = $payload['jenis_absen'] ?? 'masuk';
 		$radiusMeter = (int) ($payload['radius_meter'] ?? ($todaySchedule?->shift?->radius_meter ?? 10));
@@ -154,6 +166,8 @@ class EAbsensiService
 			]);
 		}
 
+		$storedPhotoPath = $this->storeAttendancePhoto($payload['foto_absen'] ?? null);
+
 		return EAbsensiEntity::query()->create([
 			'kode' => 'ABS-' . Carbon::now()->format('Ymd-His'),
 			'pegawai_id' => $pegawai->id,
@@ -166,7 +180,7 @@ class EAbsensiService
 			'status' => $payload['status'] ?? 'hadir',
 			'metode_absen' => $payload['metode_absen'] ?? 'face',
 			'sumber_absen' => $payload['sumber_absen'] ?? 'web-mobile',
-			'foto_absen' => $payload['foto_absen'] ?? null,
+			'foto_absen' => $storedPhotoPath,
 			'watermark_text' => $payload['watermark_text'] ?? null,
 			'latitude' => $payload['latitude'] ?? null,
 			'longitude' => $payload['longitude'] ?? null,
@@ -178,6 +192,18 @@ class EAbsensiService
 			'keterangan' => $payload['keterangan'] ?? null,
 			'is_active' => true,
 		]);
+	}
+
+	private function storeAttendancePhoto(mixed $photo): ?string
+	{
+		if (!$photo instanceof UploadedFile) {
+			return null;
+		}
+
+		$extension = strtolower((string) ($photo->getClientOriginalExtension() ?: 'jpg'));
+		$filename = 'absensi-' . Carbon::now()->format('YmdHis') . '-' . substr(md5((string) mt_rand()), 0, 8) . '.' . $extension;
+
+		return Storage::disk('public')->putFileAs('absensi-foto', $photo, $filename);
 	}
 
 	public function updateProfile(User $user, array $payload): void
@@ -250,7 +276,7 @@ class EAbsensiService
 		$status = $jenisPengajuan === 'tukar_shift'
 			? 'menunggu_karyawan_tujuan'
 			: 'menunggu_atasan';
-		$lampiran = isset($payload['lampiran']) ? basename((string) $payload['lampiran']) : null;
+		$lampiran = $this->storeRequestAttachment($payload['lampiran'] ?? null);
 
 		return EAbsensiPengajuanEntity::query()->create([
 			'kode' => 'REQ-' . Carbon::now()->format('Ymd-His'),
@@ -266,6 +292,18 @@ class EAbsensiService
 			'status' => $status,
 			'is_active' => true,
 		]);
+	}
+
+	private function storeRequestAttachment(mixed $attachment): ?string
+	{
+		if (!$attachment instanceof UploadedFile) {
+			return null;
+		}
+
+		$extension = strtolower((string) ($attachment->getClientOriginalExtension() ?: 'pdf'));
+		$filename = 'lampiran-' . Carbon::now()->format('YmdHis') . '-' . substr(md5((string) mt_rand()), 0, 8) . '.' . $extension;
+
+		return Storage::disk('public')->putFileAs('absensi-lampiran', $attachment, $filename);
 	}
 
 	public function respondShiftSwapRequest(User $user, int $requestId, string $action): EAbsensiPengajuanEntity
@@ -406,6 +444,111 @@ class EAbsensiService
 		return [
 			'label' => 'SUDAH ABSEN',
 			'jenis_absen' => 'keluar',
+		];
+	}
+
+	private function buildCalendarData(?int $pegawaiId, ?string $calendarMonth = null): array
+	{
+		$monthStart = Carbon::now()->startOfMonth();
+		if (is_string($calendarMonth) && preg_match('/^\d{4}-\d{2}$/', $calendarMonth) === 1) {
+			$parsedMonth = Carbon::createFromFormat('Y-m', $calendarMonth);
+			if ($parsedMonth !== false) {
+				$monthStart = $parsedMonth->startOfMonth();
+			}
+		}
+
+		$monthEnd = $monthStart->copy()->endOfMonth();
+		$today = Carbon::now()->toDateString();
+		$prevMonthKey = $monthStart->copy()->subMonth()->format('Y-m');
+		$nextMonthKey = $monthStart->copy()->addMonth()->format('Y-m');
+
+		$statusCount = [
+			'hadir' => 0,
+			'izin' => 0,
+			'sakit' => 0,
+			'alpha' => 0,
+			'cuti' => 0,
+		];
+
+		if (!$pegawaiId) {
+			return [
+				'month_label' => $monthStart->translatedFormat('F Y'),
+				'month_key' => $monthStart->format('Y-m'),
+				'prev_month_key' => $prevMonthKey,
+				'next_month_key' => $nextMonthKey,
+				'days' => [],
+				'summary' => $statusCount,
+			];
+		}
+
+		$schedules = JadwalShiftEntity::query()
+			->with(['shift:id,nama,jam_masuk,jam_keluar'])
+			->where('pegawai_id', $pegawaiId)
+			->where('is_active', true)
+			->whereBetween('tanggal', [$monthStart->toDateString(), $monthEnd->toDateString()])
+			->get()
+			->keyBy(fn (JadwalShiftEntity $item) => optional($item->tanggal)->toDateString());
+
+		$recordsByDate = EAbsensiEntity::query()
+			->where('pegawai_id', $pegawaiId)
+			->whereBetween('tanggal', [$monthStart->toDateString(), $monthEnd->toDateString()])
+			->orderByDesc('id')
+			->get()
+			->groupBy(fn (EAbsensiEntity $item) => optional($item->tanggal)->toDateString());
+
+		$days = [];
+
+		for ($cursor = $monthStart->copy(); $cursor->lte($monthEnd); $cursor->addDay()) {
+			$dateKey = $cursor->toDateString();
+			$schedule = $schedules->get($dateKey);
+			$dayRecords = $recordsByDate->get($dateKey, collect());
+			$latestRecord = $dayRecords->first();
+			$masukRecord = $dayRecords->first(fn (EAbsensiEntity $item) => $item->jenis_absen === 'masuk');
+			$keluarRecord = $dayRecords->first(fn (EAbsensiEntity $item) => $item->jenis_absen === 'keluar');
+
+			$status = 'libur';
+			if ($latestRecord) {
+				$status = strtolower((string) $latestRecord->status);
+				if ($status === 'terlambat') {
+					$status = 'hadir';
+				}
+			} elseif ($schedule) {
+				$status = $dateKey < $today ? 'alpha' : 'belum';
+			}
+
+			if (array_key_exists($status, $statusCount)) {
+				$statusCount[$status]++;
+			}
+
+			$days[] = [
+				'date' => $dateKey,
+				'day' => (int) $cursor->day,
+				'dow' => (int) $cursor->dayOfWeekIso,
+				'status' => $status,
+				'raw_status' => $latestRecord?->status,
+				'shift_name' => $schedule?->shift?->nama,
+				'shift_entry' => $schedule?->shift?->jam_masuk ? substr((string) $schedule->shift->jam_masuk, 0, 5) : null,
+				'shift_exit' => $schedule?->shift?->jam_keluar ? substr((string) $schedule->shift->jam_keluar, 0, 5) : null,
+				'has_schedule' => $schedule !== null,
+				'has_attendance' => $latestRecord !== null,
+				'jam_masuk' => $masukRecord?->jam_masuk ? substr((string) $masukRecord->jam_masuk, 0, 5) : null,
+				'jam_keluar' => $keluarRecord?->jam_keluar ? substr((string) $keluarRecord->jam_keluar, 0, 5) : null,
+				'metode_absen' => $latestRecord?->metode_absen,
+				'lokasi_absen' => $latestRecord?->lokasi_absen,
+				'keterangan' => $latestRecord?->keterangan,
+				'foto_absen' => $latestRecord?->foto_absen,
+				'foto_url' => $latestRecord?->foto_absen ? Storage::url((string) $latestRecord->foto_absen) : null,
+				'status_verifikasi_wajah' => $latestRecord?->status_verifikasi_wajah,
+			];
+		}
+
+		return [
+			'month_label' => $monthStart->translatedFormat('F Y'),
+			'month_key' => $monthStart->format('Y-m'),
+			'prev_month_key' => $prevMonthKey,
+			'next_month_key' => $nextMonthKey,
+			'days' => $days,
+			'summary' => $statusCount,
 		];
 	}
 

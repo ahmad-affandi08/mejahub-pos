@@ -15,7 +15,9 @@ export default function RequestScreen({
         tanggal_selesai: "",
         alasan: "",
         pegawai_tujuan_id: "",
+        lampiran: null,
     });
+    const [lampiranError, setLampiranError] = useState("");
 
     const requestTypeOptions = [
         { key: "izin", label: "Izin", icon: CalendarDays },
@@ -26,13 +28,46 @@ export default function RequestScreen({
     const submit = (event) => {
         event.preventDefault();
 
+        if (lampiranError) {
+            return;
+        }
+
         onSubmitRequest?.({
             jenis_pengajuan: selectedType,
             tanggal_mulai: form.tanggal_mulai,
             tanggal_selesai: form.tanggal_selesai || form.tanggal_mulai,
             alasan: form.alasan,
             pegawai_tujuan_id: selectedType === "tukar_shift" ? form.pegawai_tujuan_id : null,
+            lampiran: form.lampiran,
         });
+    };
+
+    const handleLampiranChange = (event) => {
+        const selectedFile = event.target.files?.[0] ?? null;
+
+        if (!selectedFile) {
+            setForm((prev) => ({ ...prev, lampiran: null }));
+            setLampiranError("");
+            return;
+        }
+
+        const allowedMime = ["application/pdf", "image/jpeg", "image/png"];
+        if (!allowedMime.includes(selectedFile.type)) {
+            setLampiranError("Format lampiran harus PDF, JPG, atau PNG.");
+            setForm((prev) => ({ ...prev, lampiran: null }));
+            event.target.value = "";
+            return;
+        }
+
+        if (selectedFile.size > 5 * 1024 * 1024) {
+            setLampiranError("Ukuran lampiran maksimal 5MB.");
+            setForm((prev) => ({ ...prev, lampiran: null }));
+            event.target.value = "";
+            return;
+        }
+
+        setLampiranError("");
+        setForm((prev) => ({ ...prev, lampiran: selectedFile }));
     };
 
     return (
@@ -124,13 +159,26 @@ export default function RequestScreen({
 
             <div>
                 <p className="text-xs font-semibold tracking-[0.18em] text-[#767182]">LAMPIRAN DOKUMEN (OPSIONAL)</p>
-                <label className="mt-2.5 block cursor-pointer rounded-2xl border-2 border-dashed border-[#dfd9ea] bg-[#f2efeb] px-4 py-7 text-center">
+                <label htmlFor="lampiran-file" className="mt-2.5 block cursor-pointer rounded-2xl border-2 border-dashed border-[#dfd9ea] bg-[#f2efeb] px-4 py-7 text-center">
                     <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#d8c5f5]">
                         <FileUp className="h-6 w-6 text-[#22005f]" />
                     </div>
                     <p className="mt-3 text-lg font-semibold text-[#151220]">Klik untuk unggah berkas</p>
                     <p className="mt-1 text-xs text-[#7b7587]">PDF, JPG, PNG (Maks. 5MB)</p>
                 </label>
+                <input
+                    id="lampiran-file"
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    onChange={handleLampiranChange}
+                    className="hidden"
+                />
+                {form.lampiran ? (
+                    <p className="mt-2 text-xs text-[#2f006d]">File terpilih: {form.lampiran.name}</p>
+                ) : null}
+                {lampiranError ? (
+                    <p className="mt-2 text-xs text-rose-700">{lampiranError}</p>
+                ) : null}
             </div>
 
             <button

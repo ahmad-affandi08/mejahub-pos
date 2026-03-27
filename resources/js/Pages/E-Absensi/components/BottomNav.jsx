@@ -1,4 +1,5 @@
 import {
+    CalendarDays,
     CalendarClock,
     House,
     ListChecks,
@@ -8,6 +9,7 @@ import {
 
 const navItems = [
     { key: "home", label: "Beranda", icon: House },
+    { key: "calendar", label: "Kalender", icon: CalendarDays },
     { key: "history", label: "Riwayat", icon: ListChecks },
     { key: "requests", label: "Pengajuan", icon: CalendarClock },
     { key: "profile", label: "Profil", icon: UserRound },
@@ -16,7 +18,7 @@ const navItems = [
 export default function BottomNav({ active, onChange }) {
     return (
         <div className="rounded-[20px] bg-[#efedf5] p-1.5">
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-5 gap-1.5">
                 {navItems.map((item) => {
                     const Icon = item.icon;
                     const isActive = active === item.key;

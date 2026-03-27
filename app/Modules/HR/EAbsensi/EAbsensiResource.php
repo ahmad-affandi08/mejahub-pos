@@ -16,7 +16,10 @@ class EAbsensiResource extends Controller
 
 	public function index(Request $request): Response
 	{
-		$payload = $this->service->getMobilePayload($request->user());
+		$payload = $this->service->getMobilePayload(
+			$request->user(),
+			$request->query('calendar_month')
+		);
 
 		return Inertia::render('E-Absensi/Index', [
 			'mobileData' => EAbsensiCollection::toMobilePayload($payload),
@@ -84,7 +87,7 @@ class EAbsensiResource extends Controller
 				'jadwal_shift_id' => ['nullable', 'integer', 'exists:jadwal_shift,id'],
 				'jadwal_shift_tujuan_id' => ['nullable', 'integer', 'exists:jadwal_shift,id'],
 				'alasan' => ['required', 'string', 'max:2000'],
-				'lampiran' => ['nullable', 'string', 'max:255'],
+				'lampiran' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
 			]);
 
 			$this->service->submitRequest($request->user(), $payload);
@@ -99,7 +102,7 @@ class EAbsensiResource extends Controller
 			'status' => ['nullable', 'in:hadir,izin,sakit,alpha,cuti,terlambat'],
 			'metode_absen' => ['nullable', 'in:manual,face'],
 			'sumber_absen' => ['nullable', 'in:web,web-mobile,flutter'],
-			'foto_absen' => ['nullable', 'string', 'max:255'],
+			'foto_absen' => ['nullable', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
 			'watermark_text' => ['nullable', 'string', 'max:255'],
 			'latitude' => ['nullable', 'numeric', 'between:-90,90'],
 			'longitude' => ['nullable', 'numeric', 'between:-180,180'],
