@@ -5,6 +5,7 @@ import {
 	ChevronDown,
 	Grid3X3,
 	LayoutDashboard,
+	LogOut,
 	Package,
 	Settings,
 	Users,
@@ -242,19 +243,19 @@ export default function DashboardLayout({ title = "Dashboard", children }) {
 					collapsible="icon"
 					className="border-r border-white/10"
 				>
-					<SidebarHeader className="border-b border-white/10 p-3">
+					<SidebarHeader className="border-b border-white/10 p-3 group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:border-none">
 						<SidebarMenu>
 							<SidebarMenuItem>
 								<SidebarMenuButton
 									asChild
 									size="lg"
-									className="h-14 rounded-xl bg-white/5 px-3 hover:bg-white/10"
+									className="h-14 rounded-xl bg-white/5 px-3 hover:bg-white/10 group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:hover:bg-transparent"
 								>
-									<Link href="/">
+									<Link href="/" className="flex items-center group-data-[collapsible=icon]:justify-center">
 										<Logo
-											className="w-full"
-											textClassName="text-3xl text-sidebar-foreground"
-											iconClassName="h-4 w-4 translate-y-[1px]"
+											className="w-full group-data-[collapsible=icon]:w-6 group-data-[collapsible=icon]:h-6"
+											textClassName="text-3xl text-sidebar-foreground group-data-[collapsible=icon]:hidden"
+											iconClassName="h-4 w-4 translate-y-[1px] group-data-[collapsible=icon]:h-6 group-data-[collapsible=icon]:w-6 group-data-[collapsible=icon]:translate-y-0"
 											accentClassName="text-sidebar-primary"
 										/>
 									</Link>
@@ -269,7 +270,7 @@ export default function DashboardLayout({ title = "Dashboard", children }) {
 								MENU
 							</SidebarGroupLabel>
 							<SidebarGroupContent>
-								<SidebarMenu className="px-2">
+								<SidebarMenu>
 									{filteredModuleItems.map((module) => {
 										if (!module.items.length) {
 											return null;
@@ -282,22 +283,22 @@ export default function DashboardLayout({ title = "Dashboard", children }) {
 
 										return (
 											<SidebarMenuItem key={module.title}>
-											<SidebarMenuButton
+												<SidebarMenuButton
 													tooltip={module.title}
 													isActive={isModuleActive}
 													onClick={() => toggleModule(module.title)}
-													className="rounded-xl px-3 py-2.5 data-[active=true]:bg-white/14 data-[active=true]:text-white hover:bg-white/8"
-											>
+													className="rounded-xl px-3 py-2.5 data-[active=true]:bg-white/14 data-[active=true]:text-white hover:bg-white/8 group-data-[collapsible=icon]:!p-1 group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:justify-center"
+												>
 													<>
-														<span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-white/10">
-															<module.icon className="h-4 w-4" />
+														<span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-white/10 group-data-[collapsible=icon]:bg-transparent">
+															<module.icon className="h-4 w-4 shrink-0" />
 														</span>
-														<span className="font-medium">{module.title}</span>
+														<span className="font-medium group-data-[collapsible=icon]:hidden">{module.title}</span>
 														<ChevronDown
-															className={`ml-auto h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`}
+															className={`ml-auto h-4 w-4 shrink-0 transition-transform group-data-[collapsible=icon]:hidden ${isOpen ? "rotate-180" : ""}`}
 														/>
 													</>
-											</SidebarMenuButton>
+												</SidebarMenuButton>
 
 												{isOpen ? (
 													<SidebarMenuSub className="mt-1 ml-2 space-y-1 border-l border-white/10 pl-3">
@@ -324,23 +325,25 @@ export default function DashboardLayout({ title = "Dashboard", children }) {
 						</SidebarGroup>
 					</SidebarContent>
 
-					<SidebarFooter className="border-t border-white/10 bg-black/10 p-3">
-						<SidebarMenu className="gap-2">
+					<SidebarFooter className="border-t border-white/10 bg-black/10 p-3 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:border-none group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:pb-4">
+						<SidebarMenu className="gap-2 group-data-[collapsible=icon]:gap-4">
 							<SidebarMenuItem>
-								<SidebarMenuButton className="h-11 rounded-xl bg-white/6 px-3 hover:bg-white/12">
-									<span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-sidebar-primary/85 text-black">
-										<Users className="h-4 w-4" />
+								<SidebarMenuButton className="h-11 rounded-xl bg-white/6 px-3 hover:bg-white/12 group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center">
+									<span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sidebar-primary/85 text-black">
+										<Users className="h-4 w-4 shrink-0" />
 									</span>
-									<span className="font-medium text-sidebar-foreground">{userName}</span>
+									<span className="font-medium text-sidebar-foreground group-data-[collapsible=icon]:hidden">{userName}</span>
 								</SidebarMenuButton>
 							</SidebarMenuItem>
 							<SidebarMenuItem>
 								<Button
 									variant="secondary"
-									className="h-10 w-full justify-center rounded-xl bg-white/90 text-slate-900 hover:bg-white"
+									className="h-10 w-full justify-center rounded-xl bg-white/90 text-slate-900 hover:bg-white group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:p-0"
 									onClick={() => router.get("/auth/logout")}
+									title="Logout"
 								>
-									Logout
+									<LogOut className="hidden h-4 w-4 group-data-[collapsible=icon]:block" />
+									<span className="group-data-[collapsible=icon]:hidden">Logout</span>
 								</Button>
 							</SidebarMenuItem>
 						</SidebarMenu>
