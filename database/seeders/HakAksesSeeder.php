@@ -23,6 +23,14 @@ class HakAksesSeeder extends Seeder
                 'emails' => ['owner@mejahub.local'],
             ],
             [
+                'kode' => 'admin',
+                'nama' => 'Admin',
+                'deskripsi' => 'Akses penuh seluruh modul.',
+                'is_active' => true,
+                'permissions' => ['*'],
+                'emails' => ['admin@mejahub.local'],
+            ],
+            [
                 'kode' => 'manager',
                 'nama' => 'Manager Outlet',
                 'deskripsi' => 'Akses operasional outlet dan laporan.',
