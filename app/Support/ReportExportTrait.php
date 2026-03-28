@@ -72,27 +72,39 @@ trait ReportExportTrait
 	private function buildBaseExportHtml(array $sp, string $title, string $tableHtml, array $filters, bool $forExcel): string
 	{
 		$rangeLabel = (string) ($filters['effective_range']['label'] ?? '-');
-		$headerStyle = $forExcel ? '' : 'style="font-family: \'Times New Roman\', Arial, sans-serif; font-size: 12pt; color: #0f172a;"';
+		$headerStyle = $forExcel ? '' : 'style="font-family: \'Times New Roman\', Arial, sans-serif; font-size: 11pt; color: #0f172a;"';
+		$brand = !empty($sp['nama_brand']) ? (string) $sp['nama_brand'] : null;
 
 		return '<html><head><meta charset="UTF-8" />'
 			. '<title>' . e($title) . '</title>'
 			. '<style>
-				body { font-family: "Times New Roman", Arial, sans-serif; font-size: 12pt; color: #0f172a; }
-				table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
-				th, td { border: 1px solid #cbd5e1; padding: 6px; font-size: 12pt; }
+				body { font-family: "Times New Roman", Arial, sans-serif; font-size: 11pt; color: #0f172a; margin: 0; padding: 12px; }
+				.report-wrap { width: 100%; }
+				.header-meta { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+				.header-meta td { border: none; padding: 1px 0; font-size: 10pt; vertical-align: top; }
+				.store-title { font-size: 16pt; font-weight: 700; margin: 0 0 1px; line-height: 1.2; }
+				.store-brand { font-size: 10pt; margin: 0 0 2px; line-height: 1.2; }
+				.report-title { font-size: 12pt; font-weight: 700; margin: 0 0 2px; line-height: 1.2; }
+				.report-period { font-size: 10pt; margin: 0; line-height: 1.2; }
+				hr { margin: 8px 0 6px; border: 0; border-top: 1px solid #64748b; }
+				table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+				th, td { border: 1px solid #cbd5e1; padding: 4px; font-size: 10pt; }
 				th { background: #e2e8f0; text-align: left; }
-				.section-title { font-size: 13pt; font-weight: bold; margin: 14px 0 8px; }
+				.section-title { font-size: 11pt; font-weight: 700; margin: 10px 0 6px; }
 			</style></head><body ' . $headerStyle . '>'
-			. '<h2 style="margin:0;">' . e((string) ($sp['nama_toko'] ?? 'Mejahub POS')) . '</h2>'
-			. (!empty($sp['nama_brand']) ? '<p style="margin:3px 0;">' . e((string) $sp['nama_brand']) . '</p>' : '')
-			. '<p style="margin:3px 0;">Kode Toko: ' . e((string) ($sp['kode_toko'] ?? '-')) . '</p>'
-			. '<p style="margin:3px 0;">Alamat: ' . e((string) ($sp['alamat_lengkap'] ?? '-')) . '</p>'
-			. '<p style="margin:3px 0;">Telepon: ' . e((string) ($sp['telepon'] ?? '-')) . ' | Email: ' . e((string) ($sp['email'] ?? '-')) . '</p>'
-			. (!empty($sp['npwp']) ? '<p style="margin:3px 0;">NPWP: ' . e((string) $sp['npwp']) . '</p>' : '')
+			. '<div class="report-wrap">'
+			. '<div class="store-title">' . e((string) ($sp['nama_toko'] ?? 'Mejahub POS')) . '</div>'
+			. ($brand ? '<div class="store-brand">' . e($brand) . '</div>' : '')
+			. '<table class="header-meta"><tbody>'
+			. '<tr><td>Alamat: ' . e((string) ($sp['alamat_lengkap'] ?? '-')) . '</td></tr>'
+			. '<tr><td>Telepon: ' . e((string) ($sp['telepon'] ?? '-')) . ' | Email: ' . e((string) ($sp['email'] ?? '-')) . '</td></tr>'
+			. (!empty($sp['npwp']) ? '<tr><td>NPWP: ' . e((string) $sp['npwp']) . '</td></tr>' : '')
+			. '</tbody></table>'
 			. '<hr />'
-			. '<h3 style="margin:8px 0 4px;">' . e($title) . '</h3>'
-			. '<p style="margin:0 0 10px;">Periode: ' . e($rangeLabel) . '</p>'
+			. '<div class="report-title">' . e($title) . '</div>'
+			. '<div class="report-period">Periode: ' . e($rangeLabel) . '</div>'
 			. $tableHtml
+			. '</div>'
 			. '</body></html>';
 	}
 

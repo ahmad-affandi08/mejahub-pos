@@ -5,8 +5,11 @@ namespace App\Modules\HR\JadwalShift;
 use App\Http\Controllers\Controller;
 use App\Modules\HR\DataPegawai\DataPegawaiEntity;
 use App\Modules\HR\PengaturanShift\PengaturanShiftEntity;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -16,13 +19,49 @@ class JadwalShiftResource extends Controller
     {
     }
 
-    public function index(Request $request): Response
+    public function index(Request $request): Response|BinaryFileResponse|HttpResponse
     {
         $search = trim((string) $request->query('search', ''));
+        $month = trim((string) $request->query('month', ''));
+        $dateFrom = trim((string) $request->query('date_from', ''));
+        $dateTo = trim((string) $request->query('date_to', ''));
         $perPage = (int) $request->query('per_page', 10);
+        $exportType = strtolower((string) $request->query('export', ''));
+
+        if (in_array($exportType, ['pdf', 'excel'], true)) {
+            $hasCustomRange = $dateFrom !== '' || $dateTo !== '';
+            $exportMonth = $month !== '' ? $month : now()->format('Y-m');
+
+            if ($hasCustomRange) {
+                $matrix = $this->service->matrixByRange($dateFrom !== '' ? $dateFrom : null, $dateTo !== '' ? $dateTo : null, $search);
+                $filters = $this->service->buildExportFiltersForRange($dateFrom !== '' ? $dateFrom : null, $dateTo !== '' ? $dateTo : null);
+            } else {
+                $matrix = $this->service->monthlyMatrix($exportMonth, $search);
+                $filters = $this->service->buildExportFiltersForMonth($exportMonth);
+            }
+
+            $storeProfile = $this->service->storeProfileHeader();
+            $fileName = $this->service->exportFileName('jadwal-shift', $filters, $exportType);
+            $tableHtml = $this->service->buildExportMatrixHtml($matrix);
+
+            if ($exportType === 'pdf') {
+                $html = $this->service->renderPdfHtml($storeProfile, 'Laporan Jadwal Shift', $tableHtml, $filters);
+
+                return Pdf::loadHTML($html)
+                    ->setPaper('a3', 'landscape')
+                    ->download($fileName);
+            }
+
+            $html = $this->service->renderExcelHtml($storeProfile, 'Laporan Jadwal Shift', $tableHtml, $filters);
+
+            return response($html, 200, [
+                'Content-Type' => 'application/vnd.ms-excel; charset=UTF-8',
+                'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
+            ]);
+        }
 
         $perPage = $perPage > 0 && $perPage <= 100 ? $perPage : 10;
-        $paginator = $this->service->paginate($search, $perPage);
+        $paginator = $this->service->paginate($search, $perPage, null);
 
         return Inertia::render('HR/JadwalShift/Index', [
             'jadwalShift' => JadwalShiftCollection::toIndex($paginator),

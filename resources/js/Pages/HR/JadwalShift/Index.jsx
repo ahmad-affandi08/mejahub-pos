@@ -24,13 +24,33 @@ import DashboardLayout from "@/layouts/DashboardLayout";
 import Form from "@/Pages/HR/JadwalShift/Form";
 import GenerateForm from "@/Pages/HR/JadwalShift/GenerateForm";
 
+function formatMonthValue(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+
+    return `${year}-${month}`;
+}
+
+function formatDateValue(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+}
+
 export default function Index({ jadwalShift, pegawaiOptions, shiftOptions, filters, flashMessage }) {
     const endpoint = "/hr/jadwal-shift";
     const searchValue = filters?.search ?? "";
+    const exportMonth = formatMonthValue(new Date());
+    const exportRangeStartDefault = formatDateValue(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+    const exportRangeEndDefault = formatDateValue(new Date());
 
     const [openCreate, setOpenCreate] = useState(false);
     const [openGenerate, setOpenGenerate] = useState(false);
     const [editingItem, setEditingItem] = useState(null);
+    const [exportDateFrom, setExportDateFrom] = useState(exportRangeStartDefault);
+    const [exportDateTo, setExportDateTo] = useState(exportRangeEndDefault);
 
     const hasData = (jadwalShift?.data ?? []).length > 0;
 
@@ -51,6 +71,19 @@ export default function Index({ jadwalShift, pegawaiOptions, shiftOptions, filte
         router.post(`${endpoint}/delete`, { id: String(id) }, { preserveScroll: true });
     };
 
+    const buildExportUrl = (type) => {
+        const params = new URLSearchParams();
+        if (searchValue) params.set("search", searchValue);
+
+        if (exportDateFrom) params.set("date_from", exportDateFrom);
+        if (exportDateTo) params.set("date_to", exportDateTo);
+        if (!exportDateFrom && !exportDateTo) params.set("month", exportMonth);
+
+        params.set("export", type);
+
+        return `${endpoint}?${params.toString()}`;
+    };
+
     return (
         <DashboardLayout title="Jadwal Shift">
             <Head title="Jadwal Shift" />
@@ -65,6 +98,23 @@ export default function Index({ jadwalShift, pegawaiOptions, shiftOptions, filte
                         </div>
 
                         <div className="flex flex-wrap gap-2">
+                            <input
+                                type="date"
+                                value={exportDateFrom}
+                                onChange={(event) => setExportDateFrom(event.target.value)}
+                                className="h-10 rounded-lg border px-3 text-sm"
+                                aria-label="Tanggal mulai export"
+                            />
+                            <input
+                                type="date"
+                                value={exportDateTo}
+                                onChange={(event) => setExportDateTo(event.target.value)}
+                                className="h-10 rounded-lg border px-3 text-sm"
+                                aria-label="Tanggal akhir export"
+                            />
+                            <Button type="button" variant="outline" onClick={() => window.open(buildExportUrl("excel"), "_blank")}>Export Excel</Button>
+                            <Button type="button" variant="outline" onClick={() => window.open(buildExportUrl("pdf"), "_blank")}>Export PDF</Button>
+
                             <Dialog open={openGenerate} onOpenChange={setOpenGenerate}>
                                 <DialogTrigger asChild>
                                     <Button variant="outline">Generate Jadwal</Button>
