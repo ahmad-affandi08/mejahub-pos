@@ -135,6 +135,7 @@ const moduleItems = [
 		title: "Report",
 		icon: Grid3X3,
 		items: [
+			{ title: "Import Penjualan", href: "/report/import-penjualan" },
 			{ title: "Laporan Penjualan", href: "/report/laporan-penjualan" },
 			{ title: "Laporan Keuangan", href: "/report/laporan-keuangan" },
 			{ title: "Laporan Hutang", href: "/report/laporan-hutang" },
@@ -257,7 +258,7 @@ export default function DashboardLayout({ title = "Dashboard", children }) {
 								<SidebarMenuButton
 									asChild
 									size="lg"
-									className="h-14 rounded-xl bg-white/5 px-3 hover:bg-white/10 group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:hover:bg-transparent"
+									className="h-14 rounded-xl bg-white/5 px-3 hover:bg-white/10 group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:p-0! group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:hover:bg-transparent"
 								>
 									<Link href="/" className="flex items-center group-data-[collapsible=icon]:justify-center">
 										<Logo
@@ -295,7 +296,7 @@ export default function DashboardLayout({ title = "Dashboard", children }) {
 													tooltip={module.title}
 													isActive={isModuleActive}
 													onClick={() => toggleModule(module.title)}
-													className="rounded-xl px-3 py-2.5 data-[active=true]:bg-white/14 data-[active=true]:text-white hover:bg-white/8 group-data-[collapsible=icon]:!p-1 group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:justify-center"
+													className="rounded-xl px-3 py-2.5 data-[active=true]:bg-white/14 data-[active=true]:text-white hover:bg-white/8 group-data-[collapsible=icon]:p-1! group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:justify-center"
 												>
 													<>
 														<span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-white/10 group-data-[collapsible=icon]:bg-transparent">
