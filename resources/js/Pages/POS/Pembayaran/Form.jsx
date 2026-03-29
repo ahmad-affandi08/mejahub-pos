@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import SearchableSelect from "@/components/shared/SearchableSelect";
 import { Input } from "@/components/ui/input";
 import MoneyText from "@/components/shared/pos/MoneyText";
 
@@ -18,12 +19,9 @@ export default function Form({
             <div className="mt-4 space-y-3">
                 <div>
                     <label className="mb-1 block text-xs font-medium text-slate-500">Metode Bayar</label>
-                    <select
-                        className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm"
+                    <SearchableSelect
                         value={values.isSplitPayment ? "split" : values.metodeBayar}
-                        onChange={(event) => {
-                            const value = event.target.value;
-
+                        onChange={(value) => {
                             if (value === "split") {
                                 onChange("isSplitPayment", true);
                                 return;
@@ -32,12 +30,19 @@ export default function Form({
                             onChange("isSplitPayment", false);
                             onChange("metodeBayar", value);
                         }}
-                    >
-                        <option value="split">Split Payment (Multi Metode)</option>
-                        {options.methods.map((item) => (
-                            <option key={item.kode} value={item.kode}>{item.nama}</option>
-                        ))}
-                    </select>
+                        placeholder="Pilih metode bayar"
+                        searchPlaceholder="Cari metode bayar..."
+                        emptyText="Metode tidak ditemukan"
+                        triggerClassName="h-9 rounded-md border-slate-300 bg-white px-3 text-sm"
+                        options={[
+                            { value: "split", label: "Split Payment (Multi Metode)" },
+                            ...options.methods.map((item) => ({
+                                value: item.kode,
+                                label: item.nama,
+                                keywords: item.kode,
+                            })),
+                        ]}
+                    />
                 </div>
 
                 {values.isSplitPayment ? (
@@ -59,19 +64,25 @@ export default function Form({
 
                         {(values.paymentDetails || []).map((item, index) => (
                             <div key={`split-${index}`} className="grid grid-cols-12 gap-2">
-                                <select
-                                    className="col-span-7 h-9 rounded-md border border-slate-300 bg-white px-2 text-sm"
-                                    value={item.metode_bayar}
-                                    onChange={(event) => {
-                                        const next = [...(values.paymentDetails || [])];
-                                        next[index] = { ...next[index], metode_bayar: event.target.value };
-                                        onChange("paymentDetails", next);
-                                    }}
-                                >
-                                    {options.methods.map((method) => (
-                                        <option key={method.kode} value={method.kode}>{method.nama}</option>
-                                    ))}
-                                </select>
+                                <div className="col-span-7">
+                                    <SearchableSelect
+                                        value={item.metode_bayar}
+                                        onChange={(value) => {
+                                            const next = [...(values.paymentDetails || [])];
+                                            next[index] = { ...next[index], metode_bayar: value };
+                                            onChange("paymentDetails", next);
+                                        }}
+                                        placeholder="Pilih metode"
+                                        searchPlaceholder="Cari metode..."
+                                        emptyText="Metode tidak ditemukan"
+                                        triggerClassName="h-9 rounded-md border-slate-300 bg-white px-2 text-sm"
+                                        options={options.methods.map((method) => ({
+                                            value: method.kode,
+                                            label: method.nama,
+                                            keywords: method.kode,
+                                        }))}
+                                    />
+                                </div>
                                 <Input
                                     className="col-span-4"
                                     type="number"
@@ -113,17 +124,22 @@ export default function Form({
                     </div>
                     <div>
                         <label className="mb-1 block text-xs font-medium text-slate-500">Printer</label>
-                        <select
-                            className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm"
+                        <SearchableSelect
                             value={values.printerId || ""}
-                            onChange={(event) => onChange("printerId", event.target.value)}
+                            onChange={(value) => onChange("printerId", value)}
+                            placeholder="Pilih printer"
+                            searchPlaceholder="Cari printer..."
+                            emptyText="Printer tidak ditemukan"
                             disabled={!options.printers.length}
-                        >
-                            <option value="">Pilih printer</option>
-                            {options.printers.map((printer) => (
-                                <option key={printer.id} value={String(printer.id)}>{printer.nama}</option>
-                            ))}
-                        </select>
+                            triggerClassName="h-9 rounded-md border-slate-300 bg-white px-3 text-sm"
+                            options={[
+                                { value: "", label: "Pilih printer" },
+                                ...options.printers.map((printer) => ({
+                                    value: String(printer.id),
+                                    label: printer.nama,
+                                })),
+                            ]}
+                        />
                     </div>
                 </div>
 

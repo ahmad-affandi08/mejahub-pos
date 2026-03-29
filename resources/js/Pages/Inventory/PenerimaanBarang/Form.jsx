@@ -1,6 +1,7 @@
 import { useForm } from "@inertiajs/react";
 
 import { Button } from "@/components/ui/button";
+import SearchableSelect from "@/components/shared/SearchableSelect";
 import { DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 
@@ -83,23 +84,39 @@ export default function Form({ endpoint, purchaseOrderOptions, supplierOptions, 
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <div className="space-y-1.5">
                     <label className="text-sm font-medium">Purchase Order</label>
-                    <select className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm" value={data.purchase_order_id} onChange={(event) => setData("purchase_order_id", event.target.value)}>
-                        <option value="">Tanpa PO</option>
-                        {purchaseOrderOptions.map((opt) => (
-                            <option key={opt.id} value={opt.id}>{opt.kode}</option>
-                        ))}
-                    </select>
+                    <SearchableSelect
+                        value={data.purchase_order_id}
+                        onChange={(value) => setData("purchase_order_id", value)}
+                        placeholder="Tanpa PO"
+                        searchPlaceholder="Cari nomor PO..."
+                        emptyText="PO tidak ditemukan"
+                        options={[
+                            { value: "", label: "Tanpa PO" },
+                            ...purchaseOrderOptions.map((opt) => ({
+                                value: String(opt.id),
+                                label: opt.kode,
+                            })),
+                        ]}
+                    />
                     {errors.purchase_order_id ? <p className="text-xs text-destructive">{errors.purchase_order_id}</p> : null}
                 </div>
 
                 <div className="space-y-1.5">
                     <label className="text-sm font-medium">Supplier</label>
-                    <select className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm" value={data.supplier_id} onChange={(event) => setData("supplier_id", event.target.value)}>
-                        <option value="">Tanpa supplier</option>
-                        {supplierOptions.map((opt) => (
-                            <option key={opt.id} value={opt.id}>{opt.nama}</option>
-                        ))}
-                    </select>
+                    <SearchableSelect
+                        value={data.supplier_id}
+                        onChange={(value) => setData("supplier_id", value)}
+                        placeholder="Tanpa supplier"
+                        searchPlaceholder="Cari supplier..."
+                        emptyText="Supplier tidak ditemukan"
+                        options={[
+                            { value: "", label: "Tanpa supplier" },
+                            ...supplierOptions.map((opt) => ({
+                                value: String(opt.id),
+                                label: opt.nama,
+                            })),
+                        ]}
+                    />
                     {errors.supplier_id ? <p className="text-xs text-destructive">{errors.supplier_id}</p> : null}
                 </div>
             </div>
@@ -174,24 +191,24 @@ export default function Form({ endpoint, purchaseOrderOptions, supplierOptions, 
                             <Input value={item.purchase_order_item_id || ""} onChange={(event) => updateItem(index, "purchase_order_item_id", event.target.value)} placeholder="PO Item ID (opsional)" />
                         </div>
                         <div className="md:col-span-3">
-                            <select
-                                className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm"
+                            <SearchableSelect
                                 value={item.bahan_baku_id}
-                                onChange={(event) => {
-                                    const bahanId = event.target.value;
+                                onChange={(bahanId) => {
                                     const bahan = resolveBahan(bahanId);
                                     patchItem(index, {
                                         bahan_baku_id: bahanId,
                                         satuan_input: bahan?.default_satuan_beli || bahan?.satuan_kecil || bahan?.satuan || "",
                                     });
                                 }}
-                                required
-                            >
-                                <option value="">Pilih bahan</option>
-                                {bahanBakuOptions.map((opt) => (
-                                    <option key={opt.id} value={opt.id}>{opt.nama}</option>
-                                ))}
-                            </select>
+                                placeholder="Pilih bahan"
+                                searchPlaceholder="Cari bahan baku..."
+                                emptyText="Bahan baku tidak ditemukan"
+                                options={bahanBakuOptions.map((opt) => ({
+                                    value: String(opt.id),
+                                    label: opt.nama,
+                                    keywords: [opt.kode, opt.satuan_kecil || opt.satuan].filter(Boolean).join(" "),
+                                }))}
+                            />
                         </div>
                         <div className="md:col-span-2">
                             <Input

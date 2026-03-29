@@ -1,6 +1,7 @@
 import { useForm } from "@inertiajs/react";
 
 import { Button } from "@/components/ui/button";
+import SearchableSelect from "@/components/shared/SearchableSelect";
 import { DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 
@@ -95,16 +96,20 @@ export default function Form({ mode, endpoint, initialValues, supplierOptions, b
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <div className="space-y-1.5">
                     <label className="text-sm font-medium">Supplier</label>
-                    <select
-                        className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm"
+                    <SearchableSelect
                         value={data.supplier_id}
-                        onChange={(event) => setData("supplier_id", event.target.value)}
-                    >
-                        <option value="">Tanpa supplier</option>
-                        {supplierOptions.map((opt) => (
-                            <option key={opt.id} value={opt.id}>{opt.nama}</option>
-                        ))}
-                    </select>
+                        onChange={(value) => setData("supplier_id", value)}
+                        placeholder="Tanpa supplier"
+                        searchPlaceholder="Cari supplier..."
+                        emptyText="Supplier tidak ditemukan"
+                        options={[
+                            { value: "", label: "Tanpa supplier" },
+                            ...supplierOptions.map((opt) => ({
+                                value: String(opt.id),
+                                label: opt.nama,
+                            })),
+                        ]}
+                    />
                     {errors.supplier_id ? <p className="text-xs text-destructive">{errors.supplier_id}</p> : null}
                 </div>
 
@@ -160,24 +165,24 @@ export default function Form({ mode, endpoint, initialValues, supplierOptions, b
                     return (
                     <div key={index} className="grid grid-cols-1 gap-2 rounded-lg border p-2 md:grid-cols-12">
                         <div className="md:col-span-4">
-                            <select
-                                className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm"
+                            <SearchableSelect
                                 value={item.bahan_baku_id}
-                                onChange={(event) => {
-                                    const bahanId = event.target.value;
+                                onChange={(bahanId) => {
                                     const bahan = resolveBahan(bahanId);
                                     patchItem(index, {
                                         bahan_baku_id: bahanId,
                                         satuan_input: bahan?.default_satuan_beli || bahan?.satuan_kecil || bahan?.satuan || "",
                                     });
                                 }}
-                                required
-                            >
-                                <option value="">Pilih bahan</option>
-                                {bahanBakuOptions.map((opt) => (
-                                    <option key={opt.id} value={opt.id}>{opt.nama}</option>
-                                ))}
-                            </select>
+                                placeholder="Pilih bahan"
+                                searchPlaceholder="Cari bahan baku..."
+                                emptyText="Bahan baku tidak ditemukan"
+                                options={bahanBakuOptions.map((opt) => ({
+                                    value: String(opt.id),
+                                    label: opt.nama,
+                                    keywords: [opt.kode, opt.satuan_kecil || opt.satuan].filter(Boolean).join(" "),
+                                }))}
+                            />
                         </div>
                         <div className="md:col-span-2">
                             <Input

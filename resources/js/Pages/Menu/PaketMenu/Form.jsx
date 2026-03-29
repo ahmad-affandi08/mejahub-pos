@@ -1,6 +1,7 @@
 import { useForm } from "@inertiajs/react";
 
 import { Button } from "@/components/ui/button";
+import SearchableSelect from "@/components/shared/SearchableSelect";
 import { DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 
@@ -62,12 +63,21 @@ export default function Form({ mode, endpoint, initialValues, kategoriOptions, m
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <div className="space-y-1.5">
                     <label className="text-sm font-medium">Kategori Paket</label>
-                    <select className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm" value={data.kategori_menu_id} onChange={(event) => setData("kategori_menu_id", event.target.value)}>
-                        <option value="">Tanpa kategori</option>
-                        {kategoriOptions.map((opt) => (
-                            <option key={opt.id} value={opt.id}>{opt.nama}</option>
-                        ))}
-                    </select>
+                    <SearchableSelect
+                        value={data.kategori_menu_id}
+                        onChange={(value) => setData("kategori_menu_id", value)}
+                        placeholder="Tanpa kategori"
+                        searchPlaceholder="Cari kategori..."
+                        emptyText="Kategori tidak ditemukan"
+                        options={[
+                            { value: "", label: "Tanpa kategori" },
+                            ...kategoriOptions.map((opt) => ({
+                                value: String(opt.id),
+                                label: opt.nama,
+                                keywords: opt.kode || "",
+                            })),
+                        ]}
+                    />
                     {errors.kategori_menu_id ? <p className="text-xs text-destructive">{errors.kategori_menu_id}</p> : null}
                 </div>
 
@@ -114,16 +124,18 @@ export default function Form({ mode, endpoint, initialValues, kategoriOptions, m
                 <div className="space-y-2">
                     {data.item_rows.map((row, index) => (
                         <div key={`row-${index}`} className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_120px_auto]">
-                            <select
-                                className="h-9 rounded-lg border border-input bg-transparent px-3 text-sm"
+                            <SearchableSelect
                                 value={row.data_menu_id}
-                                onChange={(event) => updateRow(index, "data_menu_id", event.target.value)}
-                            >
-                                <option value="">Pilih menu</option>
-                                {menuOptions.map((opt) => (
-                                    <option key={opt.id} value={opt.id}>{opt.nama}</option>
-                                ))}
-                            </select>
+                                onChange={(value) => updateRow(index, "data_menu_id", value)}
+                                placeholder="Pilih menu"
+                                searchPlaceholder="Cari menu..."
+                                emptyText="Menu tidak ditemukan"
+                                options={menuOptions.map((opt) => ({
+                                    value: String(opt.id),
+                                    label: opt.nama,
+                                    keywords: opt.kode || "",
+                                }))}
+                            />
 
                             <Input type="number" min={0.01} step="0.01" value={row.qty} onChange={(event) => updateRow(index, "qty", Number(event.target.value || 1))} />
 

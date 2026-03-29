@@ -1,6 +1,7 @@
 import { useForm } from "@inertiajs/react";
 
 import { Button } from "@/components/ui/button";
+import SearchableSelect from "@/components/shared/SearchableSelect";
 import { DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 
@@ -40,17 +41,18 @@ export default function Form({ mode, endpoint, initialValues, menuOptions, onSuc
         <form onSubmit={submit} className="space-y-4">
             <div className="space-y-1.5">
                 <label className="text-sm font-medium">Menu Induk</label>
-                <select
-                    className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm"
+                <SearchableSelect
                     value={data.data_menu_id}
-                    onChange={(event) => setData("data_menu_id", event.target.value)}
-                    required
-                >
-                    <option value="">Pilih menu</option>
-                    {menuOptions.map((opt) => (
-                        <option key={opt.id} value={opt.id}>{opt.nama}</option>
-                    ))}
-                </select>
+                    onChange={(value) => setData("data_menu_id", value)}
+                    placeholder="Pilih menu"
+                    searchPlaceholder="Cari menu..."
+                    emptyText="Menu tidak ditemukan"
+                    options={menuOptions.map((opt) => ({
+                        value: String(opt.id),
+                        label: opt.nama,
+                        keywords: opt.kode || "",
+                    }))}
+                />
                 {errors.data_menu_id ? <p className="text-xs text-destructive">{errors.data_menu_id}</p> : null}
             </div>
 

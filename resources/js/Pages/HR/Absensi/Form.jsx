@@ -1,6 +1,7 @@
 import { useForm } from "@inertiajs/react";
 
 import { Button } from "@/components/ui/button";
+import SearchableSelect from "@/components/shared/SearchableSelect";
 import { DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -60,16 +61,18 @@ export default function Form({ mode, endpoint, initialValues, pegawaiOptions, on
                 </div>
                 <div className="space-y-1.5">
                     <label className="text-sm font-medium">Pegawai</label>
-                    <select
-                        className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm"
+                    <SearchableSelect
                         value={data.pegawai_id}
-                        onChange={(event) => setData("pegawai_id", event.target.value)}
-                    >
-                        <option value="">Pilih pegawai</option>
-                        {pegawaiOptions.map((pegawai) => (
-                            <option key={pegawai.id} value={pegawai.id}>{pegawai.nama}</option>
-                        ))}
-                    </select>
+                        onChange={(value) => setData("pegawai_id", value)}
+                        placeholder="Pilih pegawai"
+                        searchPlaceholder="Cari pegawai..."
+                        emptyText="Pegawai tidak ditemukan"
+                        options={pegawaiOptions.map((pegawai) => ({
+                            value: String(pegawai.id),
+                            label: pegawai.nama,
+                            keywords: [pegawai.no_identitas, pegawai.jabatan].filter(Boolean).join(" "),
+                        }))}
+                    />
                     {errors.pegawai_id ? <p className="text-xs text-destructive">{errors.pegawai_id}</p> : null}
                 </div>
             </div>

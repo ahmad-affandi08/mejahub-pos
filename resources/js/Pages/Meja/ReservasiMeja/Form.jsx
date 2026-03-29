@@ -1,6 +1,7 @@
 import { useForm } from "@inertiajs/react";
 
 import { Button } from "@/components/ui/button";
+import SearchableSelect from "@/components/shared/SearchableSelect";
 import { DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 
@@ -51,12 +52,18 @@ export default function Form({ mode, endpoint, initialValues, mejaOptions, statu
         <form onSubmit={submit} className="space-y-4">
             <div className="space-y-1.5">
                 <label className="text-sm font-medium">Meja</label>
-                <select className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm" value={data.data_meja_id} onChange={(event) => setData("data_meja_id", event.target.value)} required>
-                    <option value="">Pilih meja</option>
-                    {mejaOptions.map((opt) => (
-                        <option key={opt.id} value={opt.id}>{opt.nama}</option>
-                    ))}
-                </select>
+                <SearchableSelect
+                    value={data.data_meja_id}
+                    onChange={(value) => setData("data_meja_id", value)}
+                    placeholder="Pilih meja"
+                    searchPlaceholder="Cari meja..."
+                    emptyText="Meja tidak ditemukan"
+                    options={mejaOptions.map((opt) => ({
+                        value: String(opt.id),
+                        label: opt.nama,
+                        keywords: [opt.kode, opt.nomor_meja].filter(Boolean).join(" "),
+                    }))}
+                />
                 {errors.data_meja_id ? <p className="text-xs text-destructive">{errors.data_meja_id}</p> : null}
             </div>
 

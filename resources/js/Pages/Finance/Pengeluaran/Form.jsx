@@ -1,6 +1,7 @@
 import { useForm } from "@inertiajs/react";
 
 import { Button } from "@/components/ui/button";
+import SearchableSelect from "@/components/shared/SearchableSelect";
 import { DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -47,9 +48,17 @@ export default function Form({ mode, endpoint, initialValues, categoryOptions = 
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <div className="space-y-1.5">
                     <label className="text-sm font-medium">Kategori Biaya</label>
-                    <select className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm" value={data.kategori_biaya} onChange={(event) => setData("kategori_biaya", event.target.value)}>
-                        {categoryOptions.map((item) => <option key={item} value={item}>{item}</option>)}
-                    </select>
+                    <SearchableSelect
+                        value={data.kategori_biaya}
+                        onChange={(value) => setData("kategori_biaya", value)}
+                        placeholder="Pilih kategori biaya"
+                        searchPlaceholder="Cari kategori biaya..."
+                        emptyText="Kategori tidak ditemukan"
+                        options={categoryOptions.map((item) => ({
+                            value: item,
+                            label: item,
+                        }))}
+                    />
                 </div>
                 <div className="space-y-1.5">
                     <label className="text-sm font-medium">Metode Pembayaran</label>

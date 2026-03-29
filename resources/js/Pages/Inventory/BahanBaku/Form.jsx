@@ -1,6 +1,7 @@
 import { useForm } from "@inertiajs/react";
 
 import { Button } from "@/components/ui/button";
+import SearchableSelect from "@/components/shared/SearchableSelect";
 import { DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 
@@ -52,16 +53,20 @@ export default function Form({ mode, endpoint, initialValues, supplierOptions, o
 
             <div className="space-y-1.5">
                 <label className="text-sm font-medium">Supplier</label>
-                <select
-                    className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm"
+                <SearchableSelect
                     value={data.supplier_id}
-                    onChange={(event) => setData("supplier_id", event.target.value)}
-                >
-                    <option value="">Tanpa supplier</option>
-                    {supplierOptions.map((opt) => (
-                        <option key={opt.id} value={opt.id}>{opt.nama}</option>
-                    ))}
-                </select>
+                    onChange={(value) => setData("supplier_id", value)}
+                    placeholder="Tanpa supplier"
+                    searchPlaceholder="Cari supplier..."
+                    emptyText="Supplier tidak ditemukan"
+                    options={[
+                        { value: "", label: "Tanpa supplier" },
+                        ...supplierOptions.map((opt) => ({
+                            value: String(opt.id),
+                            label: opt.nama,
+                        })),
+                    ]}
+                />
                 {errors.supplier_id ? <p className="text-xs text-destructive">{errors.supplier_id}</p> : null}
             </div>
 

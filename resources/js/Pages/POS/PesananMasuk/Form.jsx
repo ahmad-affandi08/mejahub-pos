@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import SearchableSelect from "@/components/shared/SearchableSelect";
 import MoneyText from "@/components/shared/pos/MoneyText";
 
 export default function Form({
@@ -18,18 +19,22 @@ export default function Form({
             <div className="mt-4 space-y-3">
                 <div>
                     <label className="mb-1 block text-xs font-medium text-slate-500">Meja</label>
-                    <select
-                        className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm"
+                    <SearchableSelect
                         value={values.selectedMeja}
-                        onChange={(event) => onChange("selectedMeja", event.target.value)}
-                    >
-                        <option value="">Takeaway / Tidak pilih meja</option>
-                        {options.meja.map((item) => (
-                            <option key={item.id} value={item.id}>
-                                {item.nama}{item.nomor_meja ? ` (${item.nomor_meja})` : ""}
-                            </option>
-                        ))}
-                    </select>
+                        onChange={(value) => onChange("selectedMeja", value)}
+                        placeholder="Takeaway / Tidak pilih meja"
+                        searchPlaceholder="Cari meja..."
+                        emptyText="Meja tidak ditemukan"
+                        triggerClassName="h-9 rounded-md border-slate-300 bg-white px-3 text-sm"
+                        options={[
+                            { value: "", label: "Takeaway / Tidak pilih meja" },
+                            ...options.meja.map((item) => ({
+                                value: String(item.id),
+                                label: `${item.nama}${item.nomor_meja ? ` (${item.nomor_meja})` : ""}`,
+                                keywords: [item.kode, item.nomor_meja].filter(Boolean).join(" "),
+                            })),
+                        ]}
+                    />
                 </div>
 
                 <div>

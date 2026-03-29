@@ -1,6 +1,7 @@
 import { useForm } from "@inertiajs/react";
 
 import { Button } from "@/components/ui/button";
+import SearchableSelect from "@/components/shared/SearchableSelect";
 import { DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 
@@ -30,12 +31,18 @@ export default function Form({ endpoint, bahanBakuOptions, onSuccess, onCancel }
         <form onSubmit={submit} className="space-y-4">
             <div className="space-y-1.5">
                 <label className="text-sm font-medium">Bahan Baku</label>
-                <select className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm" value={data.bahan_baku_id} onChange={(event) => setData("bahan_baku_id", event.target.value)} required>
-                    <option value="">Pilih bahan</option>
-                    {bahanBakuOptions.map((opt) => (
-                        <option key={opt.id} value={opt.id}>{opt.nama} (Stok: {opt.stok_saat_ini})</option>
-                    ))}
-                </select>
+                <SearchableSelect
+                    value={data.bahan_baku_id}
+                    onChange={(value) => setData("bahan_baku_id", value)}
+                    placeholder="Pilih bahan"
+                    searchPlaceholder="Cari bahan baku..."
+                    emptyText="Bahan baku tidak ditemukan"
+                    options={bahanBakuOptions.map((opt) => ({
+                        value: String(opt.id),
+                        label: `${opt.nama} (Stok: ${opt.stok_saat_ini})`,
+                        keywords: [opt.kode, opt.satuan_kecil || opt.satuan].filter(Boolean).join(" "),
+                    }))}
+                />
             </div>
 
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">

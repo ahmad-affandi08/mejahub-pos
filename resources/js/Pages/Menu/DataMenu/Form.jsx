@@ -1,6 +1,7 @@
 import { useForm } from "@inertiajs/react";
 
 import { Button } from "@/components/ui/button";
+import SearchableSelect from "@/components/shared/SearchableSelect";
 import { DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 
@@ -41,17 +42,18 @@ export default function Form({ mode, endpoint, initialValues, kategoriOptions, o
         <form onSubmit={submit} className="space-y-4">
             <div className="space-y-1.5">
                 <label className="text-sm font-medium">Kategori</label>
-                <select
-                    className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm"
+                <SearchableSelect
                     value={data.kategori_menu_id}
-                    onChange={(event) => setData("kategori_menu_id", event.target.value)}
-                    required
-                >
-                    <option value="">Pilih kategori</option>
-                    {kategoriOptions.map((opt) => (
-                        <option key={opt.id} value={opt.id}>{opt.nama}</option>
-                    ))}
-                </select>
+                    onChange={(value) => setData("kategori_menu_id", value)}
+                    placeholder="Pilih kategori"
+                    searchPlaceholder="Cari kategori..."
+                    emptyText="Kategori tidak ditemukan"
+                    options={kategoriOptions.map((opt) => ({
+                        value: String(opt.id),
+                        label: opt.nama,
+                        keywords: opt.kode || "",
+                    }))}
+                />
                 {errors.kategori_menu_id ? <p className="text-xs text-destructive">{errors.kategori_menu_id}</p> : null}
             </div>
 

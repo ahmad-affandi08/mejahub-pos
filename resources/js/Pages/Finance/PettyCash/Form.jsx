@@ -1,6 +1,7 @@
 import { useForm } from "@inertiajs/react";
 
 import { Button } from "@/components/ui/button";
+import SearchableSelect from "@/components/shared/SearchableSelect";
 import { DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -94,28 +95,30 @@ export default function Form({ mode, endpoint, initialValues, onSuccess, onCance
                         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                             <div className="space-y-1.5">
                                 <label className="text-sm font-medium">Bahan Baku</label>
-                                <select 
-                                    className="h-9 w-full rounded-lg border border-input bg-white px-3 text-sm" 
-                                    value={data.bahan_baku_id} 
-                                    onChange={(e) => setData("bahan_baku_id", e.target.value || "")}
-                                    required
-                                >
-                                    <option value="" disabled>Pilih bahan baku...</option>
-                                    {(window.bahanBakuList || []).map((bahan) => (
-                                        <option key={bahan.id} value={bahan.id}>{bahan.nama} ({bahan.satuan})</option>
-                                    ))}
-                                </select>
+                                <SearchableSelect
+                                    value={data.bahan_baku_id ?? ""}
+                                    onChange={(value) => setData("bahan_baku_id", value || "")}
+                                    placeholder="Pilih bahan baku..."
+                                    searchPlaceholder="Cari bahan baku..."
+                                    emptyText="Bahan baku tidak ditemukan"
+                                    triggerClassName="h-9 border-input bg-white px-3 text-sm"
+                                    options={(window.bahanBakuList || []).map((bahan) => ({
+                                        value: String(bahan.id),
+                                        label: `${bahan.nama} (${bahan.satuan})`,
+                                        keywords: [bahan.kode, bahan.satuan].filter(Boolean).join(" "),
+                                    }))}
+                                />
                             </div>
                             <div className="space-y-1.5">
                                 <label className="text-sm font-medium">Qty Dibeli</label>
-                                <Input 
-                                    type="number" 
-                                    min={0.001} 
-                                    step="0.001" 
+                                <Input
+                                    type="number"
+                                    min={0.001}
+                                    step="0.001"
                                     className="bg-white"
-                                    value={data.qty_bahan || ""} 
-                                    onChange={(event) => setData("qty_bahan", event.target.value)} 
-                                    required 
+                                    value={data.qty_bahan || ""}
+                                    onChange={(event) => setData("qty_bahan", event.target.value)}
+                                    required
                                 />
                             </div>
                         </div>

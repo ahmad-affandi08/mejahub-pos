@@ -1,6 +1,7 @@
 import { useForm } from "@inertiajs/react";
 
 import { Button } from "@/components/ui/button";
+import SearchableSelect from "@/components/shared/SearchableSelect";
 import { DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -58,22 +59,34 @@ export default function Form({ mode, endpoint, initialValues, pegawaiOptions, sh
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <div className="space-y-1.5">
                     <label className="text-sm font-medium">Pegawai</label>
-                    <select className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm" value={data.pegawai_id} onChange={(event) => setData("pegawai_id", event.target.value)} required>
-                        <option value="">Pilih pegawai</option>
-                        {pegawaiOptions.map((item) => (
-                            <option key={item.id} value={item.id}>{item.nama}</option>
-                        ))}
-                    </select>
+                    <SearchableSelect
+                        value={data.pegawai_id}
+                        onChange={(value) => setData("pegawai_id", value)}
+                        placeholder="Pilih pegawai"
+                        searchPlaceholder="Cari pegawai..."
+                        emptyText="Pegawai tidak ditemukan"
+                        options={pegawaiOptions.map((item) => ({
+                            value: String(item.id),
+                            label: item.nama,
+                            keywords: [item.no_identitas, item.jabatan].filter(Boolean).join(" "),
+                        }))}
+                    />
                     {errors.pegawai_id ? <p className="text-xs text-destructive">{errors.pegawai_id}</p> : null}
                 </div>
                 <div className="space-y-1.5">
                     <label className="text-sm font-medium">Shift</label>
-                    <select className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm" value={data.shift_id} onChange={(event) => setData("shift_id", event.target.value)} required>
-                        <option value="">Pilih shift</option>
-                        {shiftOptions.map((item) => (
-                            <option key={item.id} value={item.id}>{item.nama} ({item.jam_masuk} - {item.jam_keluar})</option>
-                        ))}
-                    </select>
+                    <SearchableSelect
+                        value={data.shift_id}
+                        onChange={(value) => setData("shift_id", value)}
+                        placeholder="Pilih shift"
+                        searchPlaceholder="Cari shift..."
+                        emptyText="Shift tidak ditemukan"
+                        options={shiftOptions.map((item) => ({
+                            value: String(item.id),
+                            label: `${item.nama} (${item.jam_masuk} - ${item.jam_keluar})`,
+                            keywords: [item.kode, item.nama].filter(Boolean).join(" "),
+                        }))}
+                    />
                     {errors.shift_id ? <p className="text-xs text-destructive">{errors.shift_id}</p> : null}
                 </div>
             </div>
