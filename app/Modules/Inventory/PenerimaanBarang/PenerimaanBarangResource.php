@@ -34,7 +34,11 @@ class PenerimaanBarangResource extends Controller
 				->orderByDesc('id')
 				->get(),
 			'supplierOptions' => SupplierEntity::query()->select(['id', 'nama'])->where('is_active', true)->orderBy('nama')->get(),
-			'bahanBakuOptions' => BahanBakuEntity::query()->select(['id', 'nama'])->where('is_active', true)->orderBy('nama')->get(),
+			'bahanBakuOptions' => BahanBakuEntity::query()
+				->select(['id', 'nama', 'satuan', 'satuan_kecil', 'satuan_besar', 'konversi_besar_ke_kecil', 'default_satuan_beli'])
+				->where('is_active', true)
+				->orderBy('nama')
+				->get(),
 			'filters' => [
 				'search' => $search,
 				'per_page' => $perPage,
@@ -59,6 +63,8 @@ class PenerimaanBarangResource extends Controller
 			'items.*.purchase_order_item_id' => ['nullable', 'integer', 'exists:inventory_purchase_order_item,id'],
 			'items.*.bahan_baku_id' => ['required', 'integer', 'exists:inventory_bahan_baku,id'],
 			'items.*.qty_diterima' => ['required', 'numeric', 'min:0.001'],
+			'items.*.qty_input' => ['nullable', 'numeric', 'min:0.001'],
+			'items.*.satuan_input' => ['nullable', 'string', 'max:30'],
 			'items.*.harga_satuan' => ['required', 'numeric', 'min:0'],
 			'items.*.catatan' => ['nullable', 'string'],
 		]);

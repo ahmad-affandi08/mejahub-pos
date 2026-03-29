@@ -9,10 +9,15 @@ export default function Form({ mode, endpoint, initialValues, supplierOptions, o
         supplier_id: initialValues?.supplier_id ?? "",
         kode: initialValues?.kode ?? "",
         nama: initialValues?.nama ?? "",
-        satuan: initialValues?.satuan ?? "",
+        satuan_kecil: initialValues?.satuan_kecil ?? initialValues?.satuan ?? "",
+        satuan_besar: initialValues?.satuan_besar ?? "",
+        konversi_besar_ke_kecil: initialValues?.konversi_besar_ke_kecil ?? 1,
+        default_satuan_beli: initialValues?.default_satuan_beli ?? initialValues?.satuan_kecil ?? initialValues?.satuan ?? "",
         harga_beli_terakhir: initialValues?.harga_beli_terakhir ?? 0,
-        stok_minimum: initialValues?.stok_minimum ?? 0,
-        stok_saat_ini: initialValues?.stok_saat_ini ?? 0,
+        stok_minimum_input: initialValues?.stok_minimum ?? 0,
+        stok_minimum_unit: initialValues?.satuan_kecil ?? initialValues?.satuan ?? "",
+        stok_saat_ini_input: initialValues?.stok_saat_ini ?? 0,
+        stok_saat_ini_unit: initialValues?.satuan_kecil ?? initialValues?.satuan ?? "",
         keterangan: initialValues?.keterangan ?? "",
         is_active: initialValues?.is_active ?? true,
     });
@@ -40,6 +45,11 @@ export default function Form({ mode, endpoint, initialValues, supplierOptions, o
 
     return (
         <form onSubmit={submit} className="space-y-4">
+            <div className="rounded-lg border border-dashed bg-muted/30 p-3 text-xs text-muted-foreground">
+                <p className="font-medium text-foreground">Panduan Input Bahan Baku</p>
+                <p>Tentukan satuan kecil sebagai basis stok (contoh: gram). Jika belanja dalam kemasan besar (contoh: kg), isi satuan besar dan konversinya agar PO/penerimaan otomatis dihitung benar.</p>
+            </div>
+
             <div className="space-y-1.5">
                 <label className="text-sm font-medium">Supplier</label>
                 <select
@@ -71,9 +81,37 @@ export default function Form({ mode, endpoint, initialValues, supplierOptions, o
 
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <div className="space-y-1.5">
-                    <label className="text-sm font-medium">Satuan</label>
-                    <Input value={data.satuan} onChange={(event) => setData("satuan", event.target.value)} placeholder="kg, gram, liter, pcs" required />
-                    {errors.satuan ? <p className="text-xs text-destructive">{errors.satuan}</p> : null}
+                    <label className="text-sm font-medium">Satuan Kecil (Basis Stok)</label>
+                    <Input value={data.satuan_kecil} onChange={(event) => setData("satuan_kecil", event.target.value)} placeholder="gram, ml, pcs" required />
+                    {errors.satuan_kecil ? <p className="text-xs text-destructive">{errors.satuan_kecil}</p> : null}
+                </div>
+
+                <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Satuan Besar (Opsional)</label>
+                    <Input value={data.satuan_besar} onChange={(event) => setData("satuan_besar", event.target.value)} placeholder="kg, liter, box" />
+                    {errors.satuan_besar ? <p className="text-xs text-destructive">{errors.satuan_besar}</p> : null}
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Konversi Besar ke Kecil</label>
+                    <Input type="number" min={1} step="0.001" value={data.konversi_besar_ke_kecil} onChange={(event) => setData("konversi_besar_ke_kecil", Number(event.target.value || 1))} />
+                    <p className="text-xs text-muted-foreground">Contoh: 1 kg = 1000 gram, maka isi 1000.</p>
+                    {errors.konversi_besar_ke_kecil ? <p className="text-xs text-destructive">{errors.konversi_besar_ke_kecil}</p> : null}
+                </div>
+
+                <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Default Satuan Beli</label>
+                    <select
+                        className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm"
+                        value={data.default_satuan_beli}
+                        onChange={(event) => setData("default_satuan_beli", event.target.value)}
+                    >
+                        <option value={data.satuan_kecil || ""}>{data.satuan_kecil || "Satuan Kecil"}</option>
+                        {data.satuan_besar ? <option value={data.satuan_besar}>{data.satuan_besar}</option> : null}
+                    </select>
+                    {errors.default_satuan_beli ? <p className="text-xs text-destructive">{errors.default_satuan_beli}</p> : null}
                 </div>
 
                 <div className="space-y-1.5">
@@ -85,22 +123,42 @@ export default function Form({ mode, endpoint, initialValues, supplierOptions, o
 
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <div className="space-y-1.5">
-                    <label className="text-sm font-medium">Stok Minimum</label>
-                    <Input type="number" min={0} step="0.001" value={data.stok_minimum} onChange={(event) => setData("stok_minimum", Number(event.target.value || 0))} />
-                    {errors.stok_minimum ? <p className="text-xs text-destructive">{errors.stok_minimum}</p> : null}
+                    <label className="text-sm font-medium">Stok Minimum (Input)</label>
+                    <div className="grid grid-cols-2 gap-2">
+                        <Input type="number" min={0} step="0.001" value={data.stok_minimum_input} onChange={(event) => setData("stok_minimum_input", Number(event.target.value || 0))} />
+                        <select
+                            className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm"
+                            value={data.stok_minimum_unit}
+                            onChange={(event) => setData("stok_minimum_unit", event.target.value)}
+                        >
+                            <option value={data.satuan_kecil || ""}>{data.satuan_kecil || "Satuan Kecil"}</option>
+                            {data.satuan_besar ? <option value={data.satuan_besar}>{data.satuan_besar}</option> : null}
+                        </select>
+                    </div>
+                    {errors.stok_minimum_input || errors.stok_minimum ? <p className="text-xs text-destructive">{errors.stok_minimum_input || errors.stok_minimum}</p> : null}
                 </div>
 
                 <div className="space-y-1.5">
-                    <label className="text-sm font-medium">Stok Saat Ini</label>
-                    <Input type="number" min={0} step="0.001" value={data.stok_saat_ini} onChange={(event) => setData("stok_saat_ini", Number(event.target.value || 0))} />
-                    {errors.stok_saat_ini ? <p className="text-xs text-destructive">{errors.stok_saat_ini}</p> : null}
+                    <label className="text-sm font-medium">Stok Saat Ini (Input)</label>
+                    <div className="grid grid-cols-2 gap-2">
+                        <Input type="number" min={0} step="0.001" value={data.stok_saat_ini_input} onChange={(event) => setData("stok_saat_ini_input", Number(event.target.value || 0))} />
+                        <select
+                            className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm"
+                            value={data.stok_saat_ini_unit}
+                            onChange={(event) => setData("stok_saat_ini_unit", event.target.value)}
+                        >
+                            <option value={data.satuan_kecil || ""}>{data.satuan_kecil || "Satuan Kecil"}</option>
+                            {data.satuan_besar ? <option value={data.satuan_besar}>{data.satuan_besar}</option> : null}
+                        </select>
+                    </div>
+                    {errors.stok_saat_ini_input || errors.stok_saat_ini ? <p className="text-xs text-destructive">{errors.stok_saat_ini_input || errors.stok_saat_ini}</p> : null}
                 </div>
             </div>
 
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <div className="space-y-1.5">
                     <label className="text-sm font-medium">Keterangan</label>
-                    <Input value={data.keterangan} onChange={(event) => setData("keterangan", event.target.value)} />
+                    <Input value={data.keterangan} onChange={(event) => setData("keterangan", event.target.value)} placeholder="Contoh: simpan di rak kering, supplier utama A" />
                     {errors.keterangan ? <p className="text-xs text-destructive">{errors.keterangan}</p> : null}
                 </div>
 

@@ -21,7 +21,7 @@ function formatIDR(value) {
     }).format(Number(value || 0));
 }
 
-export default function Index({ imports, batches, hppAnalysis, filters, flashMessage }) {
+export default function Index({ imports, batches, hppAnalysis, failedSyncRows, filters, flashMessage }) {
     const endpoint = "/report/import-penjualan";
     const searchValue = filters?.search ?? "";
     const batchFilter = filters?.batch_code ?? "";
@@ -47,6 +47,7 @@ export default function Index({ imports, batches, hppAnalysis, filters, flashMes
     const warningMissingMapping = hppAnalysis?.warnings?.missing_mapping ?? [];
     const warningMissingBom = hppAnalysis?.warnings?.missing_bom ?? [];
     const dailyRecap = hppAnalysis?.daily_recap ?? [];
+    const failedRows = failedSyncRows ?? [];
 
     const submitSearch = (event) => {
         event.preventDefault();
@@ -136,6 +137,35 @@ export default function Index({ imports, batches, hppAnalysis, filters, flashMes
         );
     };
 
+    const syncBatchToPos = (batchCode, onlyFailed = false) => {
+        const message = onlyFailed
+            ? `Sinkron ulang hanya data FAILED dari batch ${batchCode}?`
+            : `Sinkronkan batch ${batchCode} ke transaksi POS utama?`;
+        if (!window.confirm(message)) return;
+
+        router.post(
+            endpoint,
+            {
+                mode: "sync_batch",
+                batch_code: batchCode,
+                only_failed: onlyFailed,
+            },
+            { preserveScroll: true }
+        );
+    };
+
+    const syncAllPendingBatches = () => {
+        if (!window.confirm("Sinkronkan semua batch yang masih pending/failed ke POS utama?")) return;
+
+        router.post(
+            endpoint,
+            {
+                mode: "sync_all_pending",
+            },
+            { preserveScroll: true }
+        );
+    };
+
     return (
         <DashboardLayout title="Import Penjualan">
             <Head title="Import Penjualan" />
@@ -173,7 +203,10 @@ export default function Index({ imports, batches, hppAnalysis, filters, flashMes
                 </section>
 
                 <section className="rounded-3xl border bg-white p-4 shadow-sm md:p-6">
-                    <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-slate-500">Riwayat Batch Import</h2>
+                    <div className="mb-3 flex items-center justify-between gap-2">
+                        <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Riwayat Batch Import</h2>
+                        <Button type="button" size="sm" onClick={syncAllPendingBatches}>Sinkron Semua Pending</Button>
+                    </div>
                     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                         {(batches ?? []).length > 0 ? (
                             batches.map((item) => (
@@ -181,8 +214,11 @@ export default function Index({ imports, batches, hppAnalysis, filters, flashMes
                                     <p className="text-xs text-slate-500">Batch</p>
                                     <p className="font-mono text-sm font-semibold text-slate-900">{item.import_batch_code}</p>
                                     <p className="mt-1 text-xs text-slate-600">Rows: {item.total_rows} | Total: {formatIDR(item.total_penjualan)}</p>
+                                    <p className="mt-1 text-xs text-slate-600">Synced: {item.synced_rows || 0} | Pending: {item.pending_rows || 0} | Failed: {item.failed_rows || 0}</p>
                                     <div className="mt-2 flex gap-2">
                                         <Button type="button" size="sm" variant="outline" onClick={() => openBatch(item.import_batch_code)}>Lihat</Button>
+                                        <Button type="button" size="sm" onClick={() => syncBatchToPos(item.import_batch_code)}>Sinkron ke POS</Button>
+                                        <Button type="button" size="sm" variant="secondary" onClick={() => syncBatchToPos(item.import_batch_code, true)}>Sinkron Ulang Failed</Button>
                                         <Button type="button" size="sm" variant="destructive" onClick={() => removeBatch(item.import_batch_code)}>Hapus Batch</Button>
                                     </div>
                                 </div>
@@ -192,6 +228,39 @@ export default function Index({ imports, batches, hppAnalysis, filters, flashMes
                         )}
                     </div>
                 </section>
+
+                {failedRows.length > 0 ? (
+                    <section className="rounded-3xl border border-rose-200 bg-rose-50 p-4 shadow-sm md:p-6">
+                        <h2 className="text-sm font-semibold uppercase tracking-wider text-rose-700">Diagnostik Gagal Sinkron</h2>
+                        <p className="mt-1 text-xs text-rose-700">Daftar ini menampilkan error aktual per row agar tim bisa cepat perbaiki mapping/menu/metode bayar.</p>
+                        <div className="mt-3 w-full overflow-x-auto">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Batch</TableHead>
+                                        <TableHead>Row</TableHead>
+                                        <TableHead>No Transaksi</TableHead>
+                                        <TableHead>Produk</TableHead>
+                                        <TableHead>Error</TableHead>
+                                        <TableHead>Update</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {failedRows.map((row) => (
+                                        <TableRow key={`failed-${row.id}`}>
+                                            <TableCell className="font-mono text-xs">{row.import_batch_code}</TableCell>
+                                            <TableCell>{row.row_number || "-"}</TableCell>
+                                            <TableCell>{row.no_transaksi || "-"}</TableCell>
+                                            <TableCell className="max-w-80 truncate">{row.produk || "-"}</TableCell>
+                                            <TableCell className="max-w-lg whitespace-normal text-xs text-rose-800">{row.sync_error || "-"}</TableCell>
+                                            <TableCell className="text-xs text-slate-600">{row.updated_at || "-"}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    </section>
+                ) : null}
 
                 <section className="rounded-3xl border bg-white p-4 shadow-sm md:p-6">
                     <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-slate-500">Analisa HPP Estimasi (Berdasarkan Resep BOM)</h2>
@@ -425,6 +494,7 @@ export default function Index({ imports, batches, hppAnalysis, filters, flashMes
                                     <TableHead>Waktu Bayar</TableHead>
                                     <TableHead>Outlet</TableHead>
                                     <TableHead>Produk</TableHead>
+                                    <TableHead>Status Sync</TableHead>
                                     <TableHead>Metode</TableHead>
                                     <TableHead className="text-right">Total</TableHead>
                                 </TableRow>
@@ -438,13 +508,22 @@ export default function Index({ imports, batches, hppAnalysis, filters, flashMes
                                             <TableCell>{item.waktu_bayar || item.waktu_order || "-"}</TableCell>
                                             <TableCell>{item.outlet || "-"}</TableCell>
                                             <TableCell className="max-w-80 truncate">{item.produk || "-"}</TableCell>
+                                            <TableCell>
+                                                {item.sync_status === "synced" ? (
+                                                    <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700">Synced</span>
+                                                ) : item.sync_status === "failed" ? (
+                                                    <span className="rounded-full bg-rose-100 px-2 py-1 text-xs font-semibold text-rose-700" title={item.sync_error || "Sinkron gagal"}>Failed</span>
+                                                ) : (
+                                                    <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-700">Pending</span>
+                                                )}
+                                            </TableCell>
                                             <TableCell>{item.metode_pembayaran || "-"}</TableCell>
                                             <TableCell className="text-right font-semibold">{formatIDR(item.total_penjualan)}</TableCell>
                                         </TableRow>
                                     ))
                                 ) : (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">Belum ada data import.</TableCell>
+                                        <TableCell colSpan={8} className="py-10 text-center text-sm text-muted-foreground">Belum ada data import.</TableCell>
                                     </TableRow>
                                 )}
                             </TableBody>

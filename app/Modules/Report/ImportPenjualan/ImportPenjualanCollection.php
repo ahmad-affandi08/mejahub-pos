@@ -43,6 +43,11 @@ class ImportPenjualanCollection
             'bayar' => $item->bayar,
             'nama_order' => $item->nama_order,
             'is_active' => (bool) $item->is_active,
+            'sync_status' => $item->sync_status,
+            'synced_at' => optional($item->synced_at)?->toDateTimeString(),
+            'sync_error' => $item->sync_error,
+            'pos_pesanan_id' => $item->pos_pesanan_id,
+            'pos_pembayaran_id' => $item->pos_pembayaran_id,
             'created_at' => optional($item->created_at)?->toDateTimeString(),
         ];
     }

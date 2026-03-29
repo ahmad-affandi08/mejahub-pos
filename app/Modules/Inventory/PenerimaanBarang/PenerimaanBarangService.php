@@ -39,7 +39,7 @@ class PenerimaanBarangService
 	public function create(array $payload, ?int $userId = null): PenerimaanBarangEntity
 	{
 		return DB::transaction(function () use ($payload, $userId) {
-			$items = collect($payload['items'] ?? [])->filter(fn ($item) => (float) ($item['qty_diterima'] ?? 0) > 0);
+			$items = collect($payload['items'] ?? []);
 
 			if ($items->isEmpty()) {
 				throw new PosDomainException('Minimal satu item penerimaan wajib diisi.');
@@ -67,6 +67,9 @@ class PenerimaanBarangService
 			]);
 
 			$total = $this->syncItemsAndStock($receipt, $items, $userId);
+			if ($total <= 0) {
+				throw new PosDomainException('Item penerimaan tidak valid. Cek qty dan satuan input.');
+			}
 			$receipt->update(['total' => $total]);
 
 			$statusBayar = $payload['status_pembayaran'] ?? 'unpaid';
@@ -159,9 +162,28 @@ class PenerimaanBarangService
 	private function syncItemsAndStock(PenerimaanBarangEntity $receipt, Collection $items, ?int $userId = null): float
 	{
 		$total = 0;
+		$bahanMap = BahanBakuEntity::query()
+			->whereIn('id', $items->pluck('bahan_baku_id')->filter()->map(fn ($id) => (int) $id)->all())
+			->get(['id', 'satuan', 'satuan_kecil', 'satuan_besar', 'konversi_besar_ke_kecil', 'default_satuan_beli', 'stok_saat_ini'])
+			->keyBy('id');
 
 		foreach ($items as $item) {
-			$qtyDiterima = (float) ($item['qty_diterima'] ?? 0);
+			$bahanId = (int) ($item['bahan_baku_id'] ?? 0);
+			$bahan = $bahanMap->get($bahanId);
+
+			if (!$bahan) {
+				continue;
+			}
+
+			$qtyInput = (float) ($item['qty_input'] ?? $item['qty_diterima'] ?? 0);
+			$satuanInput = trim((string) ($item['satuan_input'] ?? $bahan->default_satuan_beli ?? $bahan->satuan_kecil ?? $bahan->satuan));
+			$konversi = $this->resolveKonversiKeKecil($bahan, $satuanInput);
+			$qtyDiterima = round($qtyInput * $konversi, 3);
+
+			if ($qtyDiterima <= 0) {
+				continue;
+			}
+
 			$hargaSatuan = (float) ($item['harga_satuan'] ?? 0);
 			$subtotal = $qtyDiterima * $hargaSatuan;
 
@@ -172,14 +194,16 @@ class PenerimaanBarangService
 			PenerimaanBarangItemEntity::query()->create([
 				'penerimaan_barang_id' => $receipt->id,
 				'purchase_order_item_id' => $poItemId,
-				'bahan_baku_id' => (int) $item['bahan_baku_id'],
+				'bahan_baku_id' => $bahanId,
 				'qty_diterima' => $qtyDiterima,
+				'qty_input' => $qtyInput,
+				'satuan_input' => $satuanInput,
+				'konversi_ke_kecil' => $konversi,
 				'harga_satuan' => $hargaSatuan,
 				'subtotal' => $subtotal,
 				'catatan' => $item['catatan'] ?? null,
 			]);
 
-			$bahan = BahanBakuEntity::query()->findOrFail((int) $item['bahan_baku_id']);
 			$stokSebelum = (float) $bahan->stok_saat_ini;
 			$stokSesudah = $stokSebelum + $qtyDiterima;
 			$bahan->update([
@@ -215,6 +239,23 @@ class PenerimaanBarangService
 		}
 
 		return $total;
+	}
+
+	private function resolveKonversiKeKecil(BahanBakuEntity $bahan, string $satuanInput): float
+	{
+		$unit = strtolower(trim($satuanInput));
+		$satuanKecil = strtolower(trim((string) ($bahan->satuan_kecil ?: $bahan->satuan)));
+		$satuanBesar = strtolower(trim((string) ($bahan->satuan_besar ?? '')));
+
+		if ($satuanBesar !== '' && $unit === $satuanBesar) {
+			return max(1, (float) ($bahan->konversi_besar_ke_kecil ?? 1));
+		}
+
+		if ($unit === '' || $unit === $satuanKecil) {
+			return 1;
+		}
+
+		return 1;
 	}
 
 	private function syncPurchaseOrderReceiptState(?int $purchaseOrderId): void

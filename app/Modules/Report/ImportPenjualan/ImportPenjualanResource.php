@@ -27,11 +27,13 @@ class ImportPenjualanResource extends Controller
         $perPage = $perPage > 0 && $perPage <= 200 ? $perPage : 20;
         $paginator = $this->service->paginate($search, $batchCode, $perPage);
         $hppAnalysis = $this->service->buildHppAnalysis($batchCode, max(0, $minOmzetLowMargin));
+        $failedSyncRows = $this->service->failedSyncRows($batchCode, 60);
 
         return Inertia::render('Report/ImportPenjualan/Index', [
             'imports' => ImportPenjualanCollection::toIndex($paginator),
             'batches' => $this->service->batchSummaries(12),
             'hppAnalysis' => $hppAnalysis,
+            'failedSyncRows' => $failedSyncRows,
             'filters' => [
                 'search' => $search,
                 'batch_code' => $batchCode,
@@ -60,6 +62,50 @@ class ImportPenjualanResource extends Controller
             return redirect()
                 ->route('report.import-penjualan.index')
                 ->with('success', "Batch {$payload['batch_code']} dihapus. {$deleted} baris terhapus.");
+        }
+
+        if ($mode === 'sync_batch') {
+            $payload = $request->validate([
+                'mode' => ['required', 'in:sync_batch'],
+                'batch_code' => ['required', 'string', 'max:60'],
+                'only_failed' => ['nullable', 'boolean'],
+            ]);
+
+            try {
+                $onlyFailed = (bool) ($payload['only_failed'] ?? false);
+                $result = $this->service->syncBatchToPos((string) $payload['batch_code'], auth()->id(), $onlyFailed);
+            } catch (\Throwable $exception) {
+                return redirect()
+                    ->route('report.import-penjualan.index')
+                    ->with('error', 'Sinkronisasi batch gagal: ' . $exception->getMessage());
+            }
+
+            $modeLabel = $onlyFailed ? 'failed rows' : 'semua pending/failed';
+
+            return redirect()
+                ->route('report.import-penjualan.index', [
+                    'batch_code' => $payload['batch_code'],
+                    'min_omzet_low_margin' => $request->query('min_omzet_low_margin'),
+                ])
+                ->with('success', "Sinkronisasi batch {$result['batch_code']} ({$modeLabel}) selesai. Berhasil: {$result['synced_count']}, gagal: {$result['failed_count']}, sudah tersinkron sebelumnya: {$result['skipped_count']}.");
+        }
+
+        if ($mode === 'sync_all_pending') {
+            $payload = $request->validate([
+                'mode' => ['required', 'in:sync_all_pending'],
+            ]);
+
+            try {
+                $result = $this->service->syncAllPendingBatches(auth()->id(), 40);
+            } catch (\Throwable $exception) {
+                return redirect()
+                    ->route('report.import-penjualan.index')
+                    ->with('error', 'Sinkronisasi semua batch pending gagal: ' . $exception->getMessage());
+            }
+
+            return redirect()
+                ->route('report.import-penjualan.index')
+                ->with('success', "Sinkron semua batch pending selesai. Batch diproses: {$result['total_batches']}, berhasil: {$result['synced_count']}, gagal: {$result['failed_count']}, sudah tersinkron sebelumnya: {$result['skipped_count']}.");
         }
 
         $payload = $request->validate([

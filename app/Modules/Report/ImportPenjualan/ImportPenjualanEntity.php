@@ -23,5 +23,6 @@ class ImportPenjualanEntity extends Model
         'total_penjualan' => 'decimal:2',
         'raw_row' => 'array',
         'is_active' => 'boolean',
+        'synced_at' => 'datetime',
     ];
 }

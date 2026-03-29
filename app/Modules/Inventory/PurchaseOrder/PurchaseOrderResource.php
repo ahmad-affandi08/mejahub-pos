@@ -29,7 +29,11 @@ class PurchaseOrderResource extends Controller
 		return Inertia::render('Inventory/PurchaseOrder/Index', [
 			'purchaseOrders' => PurchaseOrderCollection::toIndex($paginator),
 			'supplierOptions' => SupplierEntity::query()->select(['id', 'nama'])->where('is_active', true)->orderBy('nama')->get(),
-			'bahanBakuOptions' => BahanBakuEntity::query()->select(['id', 'nama'])->where('is_active', true)->orderBy('nama')->get(),
+			'bahanBakuOptions' => BahanBakuEntity::query()
+				->select(['id', 'nama', 'satuan', 'satuan_kecil', 'satuan_besar', 'konversi_besar_ke_kecil', 'default_satuan_beli'])
+				->where('is_active', true)
+				->orderBy('nama')
+				->get(),
 			'filters' => [
 				'search' => $search,
 				'status' => $status,
@@ -52,6 +56,8 @@ class PurchaseOrderResource extends Controller
 			'items' => ['required', 'array', 'min:1'],
 			'items.*.bahan_baku_id' => ['required', 'integer', 'exists:inventory_bahan_baku,id'],
 			'items.*.qty_pesan' => ['required', 'numeric', 'min:0.001'],
+			'items.*.qty_input' => ['nullable', 'numeric', 'min:0.001'],
+			'items.*.satuan_input' => ['nullable', 'string', 'max:30'],
 			'items.*.harga_satuan' => ['required', 'numeric', 'min:0'],
 			'items.*.catatan' => ['nullable', 'string'],
 		]);
@@ -77,6 +83,8 @@ class PurchaseOrderResource extends Controller
 			'items' => ['required', 'array', 'min:1'],
 			'items.*.bahan_baku_id' => ['required', 'integer', 'exists:inventory_bahan_baku,id'],
 			'items.*.qty_pesan' => ['required', 'numeric', 'min:0.001'],
+			'items.*.qty_input' => ['nullable', 'numeric', 'min:0.001'],
+			'items.*.satuan_input' => ['nullable', 'string', 'max:30'],
 			'items.*.harga_satuan' => ['required', 'numeric', 'min:0'],
 			'items.*.catatan' => ['nullable', 'string'],
 		]);

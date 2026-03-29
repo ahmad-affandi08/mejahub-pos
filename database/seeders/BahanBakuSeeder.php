@@ -10,7 +10,6 @@ class BahanBakuSeeder extends Seeder
     public function run(): void
     {
         $bahanBaku = [
-            ['nama' => ':_____________________', 'satuan' => 'PCS'],
             ['nama' => 'Item Material', 'satuan' => 'UNIT'],
             ['nama' => 'Concumption', 'satuan' => 'ORDER'],
             ['nama' => 'Caramel Syrup', 'satuan' => 'ML'],

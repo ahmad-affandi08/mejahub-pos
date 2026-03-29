@@ -19,6 +19,8 @@ class PurchaseOrderItemEntity extends Model
 
     protected $casts = [
         'qty_pesan' => 'decimal:3',
+        'qty_input' => 'decimal:3',
+        'konversi_ke_kecil' => 'decimal:3',
         'qty_diterima' => 'decimal:3',
         'harga_satuan' => 'decimal:2',
         'subtotal' => 'decimal:2',

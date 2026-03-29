@@ -5,7 +5,11 @@ namespace App\Modules\Report\ImportPenjualan;
 use App\Modules\Inventory\BahanBaku\BahanBakuEntity;
 use App\Modules\Inventory\ResepBOM\ResepBOMEntity;
 use App\Modules\Menu\DataMenu\DataMenuEntity;
+use App\Modules\POS\Pembayaran\PembayaranEntity;
+use App\Modules\POS\PesananMasuk\PesananMasukEntity;
+use App\Modules\POS\PesananMasuk\PesananMasukItemEntity;
 use App\Modules\Report\ImportPenjualan\ImportPenjualanEntity;
+use App\Modules\Settings\MetodePembayaran\MetodePembayaranEntity;
 use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\UploadedFile;
@@ -16,6 +20,10 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class ImportPenjualanService
 {
+    private const SYNC_STATUS_PENDING = 'pending';
+    private const SYNC_STATUS_SYNCED = 'synced';
+    private const SYNC_STATUS_FAILED = 'failed';
+
     private const COLUMN_ALIASES = [
         'no_transaksi' => ['no transaksi', 'nomor transaksi', 'no trx', 'no trans'],
         'waktu_order' => ['waktu order', 'waktu transaksi'],
@@ -56,6 +64,9 @@ class ImportPenjualanService
     {
         return ImportPenjualanEntity::query()
             ->selectRaw('import_batch_code, MAX(created_at) as imported_at, COUNT(*) as total_rows, COALESCE(SUM(total_penjualan), 0) as total_penjualan')
+            ->selectRaw("SUM(CASE WHEN sync_status = 'synced' THEN 1 ELSE 0 END) as synced_rows")
+            ->selectRaw("SUM(CASE WHEN sync_status = 'failed' THEN 1 ELSE 0 END) as failed_rows")
+            ->selectRaw("SUM(CASE WHEN sync_status IS NULL OR sync_status = 'pending' THEN 1 ELSE 0 END) as pending_rows")
             ->groupBy('import_batch_code')
             ->orderByDesc('imported_at')
             ->limit($limit)
@@ -65,6 +76,9 @@ class ImportPenjualanService
                 'imported_at' => $row->imported_at,
                 'total_rows' => (int) $row->total_rows,
                 'total_penjualan' => (float) $row->total_penjualan,
+                'synced_rows' => (int) ($row->synced_rows ?? 0),
+                'failed_rows' => (int) ($row->failed_rows ?? 0),
+                'pending_rows' => (int) ($row->pending_rows ?? 0),
             ])
             ->values()
             ->all();
@@ -114,6 +128,7 @@ class ImportPenjualanService
                     'nama_order' => $this->cellValue($row, $headerMap, 'nama_order'),
                     'raw_row' => $row,
                     'is_active' => true,
+                    'sync_status' => self::SYNC_STATUS_PENDING,
                 ]);
 
                 $inserted++;
@@ -125,6 +140,216 @@ class ImportPenjualanService
             'imported' => $inserted,
             'skipped' => $skipped,
         ];
+    }
+
+    public function syncBatchToPos(string $batchCode, ?int $userId = null, bool $onlyFailed = false): array
+    {
+        $batchCode = trim($batchCode);
+        if ($batchCode === '') {
+            throw new \RuntimeException('Batch code wajib diisi.');
+        }
+
+        $rows = ImportPenjualanEntity::query()
+            ->where('import_batch_code', $batchCode)
+            ->where(function ($query) use ($onlyFailed) {
+                if ($onlyFailed) {
+                    $query->where('sync_status', self::SYNC_STATUS_FAILED);
+                    return;
+                }
+
+                $query
+                    ->whereNull('sync_status')
+                    ->orWhereIn('sync_status', [self::SYNC_STATUS_PENDING, self::SYNC_STATUS_FAILED]);
+            })
+            ->orderBy('id')
+            ->get();
+
+        if ($rows->isEmpty()) {
+            return [
+                'batch_code' => $batchCode,
+                'total_rows' => 0,
+                'synced_count' => 0,
+                'failed_count' => 0,
+                'skipped_count' => 0,
+            ];
+        }
+
+        $methodMap = $this->buildPaymentMethodMap();
+        $menuMap = $this->buildMenuMap();
+
+        $syncedCount = 0;
+        $failedCount = 0;
+        $skippedCount = 0;
+
+        foreach ($rows as $row) {
+            try {
+                $externalSyncKey = 'import-penjualan-row-' . $row->id;
+
+                $existingPayment = PembayaranEntity::query()
+                    ->where('external_sync_key', $externalSyncKey)
+                    ->first();
+
+                if ($existingPayment) {
+                    $row->update([
+                        'sync_status' => self::SYNC_STATUS_SYNCED,
+                        'synced_at' => now(),
+                        'sync_error' => null,
+                        'pos_pembayaran_id' => $existingPayment->id,
+                        'pos_pesanan_id' => $existingPayment->pesanan_id,
+                    ]);
+                    $skippedCount++;
+                    continue;
+                }
+
+                DB::transaction(function () use ($row, $externalSyncKey, $methodMap, $menuMap, $userId) {
+                    $items = $this->buildPosItemsForImportRow($row, $menuMap);
+
+                    if (empty($items)) {
+                        throw new \RuntimeException('Semua produk di baris ini belum terpetakan ke Data Menu aktif.');
+                    }
+
+                    $nominalTagihan = (float) ($row->total_penjualan ?? 0);
+                    $waktuBayar = $row->waktu_bayar ?? $row->waktu_order ?? now();
+                    $metodeBayar = $this->resolvePaymentMethodCode((string) ($row->metode_pembayaran ?? ''), $methodMap);
+
+                    $pesanan = PesananMasukEntity::query()->create([
+                        'data_meja_id' => null,
+                        'user_id' => $userId,
+                        'kode' => $this->generateImportOrderCode((int) $row->id),
+                        'nama_pelanggan' => trim((string) ($row->nama_order ?? 'Majoo Import')),
+                        'status' => 'paid',
+                        'subtotal' => $nominalTagihan,
+                        'diskon' => 0,
+                        'pajak' => 0,
+                        'service_charge' => 0,
+                        'total' => $nominalTagihan,
+                        'catatan' => 'Sinkron otomatis dari Import Penjualan batch ' . $row->import_batch_code,
+                        'waktu_pesan' => $row->waktu_order ?? $waktuBayar,
+                        'waktu_bayar' => $waktuBayar,
+                    ]);
+
+                    foreach ($items as $item) {
+                        PesananMasukItemEntity::query()->create([
+                            'pesanan_id' => $pesanan->id,
+                            'data_menu_id' => (int) $item['data_menu_id'],
+                            'nama_menu' => (string) $item['nama_menu'],
+                            'harga_satuan' => (float) $item['harga_satuan'],
+                            'qty' => (int) $item['qty'],
+                            'subtotal' => (float) $item['subtotal'],
+                            'catatan' => 'Sumber: Import Penjualan',
+                        ]);
+                    }
+
+                    $payment = PembayaranEntity::query()->create([
+                        'pesanan_id' => $pesanan->id,
+                        'shift_id' => null,
+                        'user_id' => $userId,
+                        'kode' => $this->generateImportPaymentCode((int) $row->id),
+                        'external_sync_key' => $externalSyncKey,
+                        'source_channel' => 'import_penjualan',
+                        'metode_bayar' => $metodeBayar,
+                        'payment_details' => [],
+                        'nominal_tagihan' => $nominalTagihan,
+                        'nominal_dibayar' => $nominalTagihan,
+                        'kembalian' => 0,
+                        'status' => 'paid',
+                        'catatan' => 'Sinkron otomatis dari Import Penjualan batch ' . $row->import_batch_code,
+                        'waktu_bayar' => $waktuBayar,
+                    ]);
+
+                    $row->update([
+                        'sync_status' => self::SYNC_STATUS_SYNCED,
+                        'synced_at' => now(),
+                        'sync_error' => null,
+                        'pos_pesanan_id' => $pesanan->id,
+                        'pos_pembayaran_id' => $payment->id,
+                    ]);
+                });
+
+                $syncedCount++;
+            } catch (\Throwable $exception) {
+                $failedCount++;
+
+                $row->update([
+                    'sync_status' => self::SYNC_STATUS_FAILED,
+                    'synced_at' => null,
+                    'sync_error' => Str::limit($exception->getMessage(), 1000),
+                ]);
+            }
+        }
+
+        return [
+            'batch_code' => $batchCode,
+            'total_rows' => $rows->count(),
+            'synced_count' => $syncedCount,
+            'failed_count' => $failedCount,
+            'skipped_count' => $skippedCount,
+        ];
+    }
+
+    public function syncAllPendingBatches(?int $userId = null, int $maxBatches = 30): array
+    {
+        $batchCodes = ImportPenjualanEntity::query()
+            ->select('import_batch_code')
+            ->where(function ($query) {
+                $query
+                    ->whereNull('sync_status')
+                    ->orWhereIn('sync_status', [self::SYNC_STATUS_PENDING, self::SYNC_STATUS_FAILED]);
+            })
+            ->groupBy('import_batch_code')
+            ->orderByRaw('MAX(created_at) DESC')
+            ->limit(max(1, min($maxBatches, 100)))
+            ->pluck('import_batch_code')
+            ->filter()
+            ->values()
+            ->all();
+
+        $summary = [
+            'total_batches' => count($batchCodes),
+            'total_rows' => 0,
+            'synced_count' => 0,
+            'failed_count' => 0,
+            'skipped_count' => 0,
+            'batch_results' => [],
+        ];
+
+        foreach ($batchCodes as $batchCode) {
+            $result = $this->syncBatchToPos((string) $batchCode, $userId, false);
+
+            $summary['total_rows'] += (int) ($result['total_rows'] ?? 0);
+            $summary['synced_count'] += (int) ($result['synced_count'] ?? 0);
+            $summary['failed_count'] += (int) ($result['failed_count'] ?? 0);
+            $summary['skipped_count'] += (int) ($result['skipped_count'] ?? 0);
+            $summary['batch_results'][] = $result;
+        }
+
+        return $summary;
+    }
+
+    public function failedSyncRows(string $batchCode = '', int $limit = 50): array
+    {
+        $query = ImportPenjualanEntity::query()
+            ->where('sync_status', self::SYNC_STATUS_FAILED)
+            ->orderByDesc('id')
+            ->limit(max(1, min($limit, 300)));
+
+        if (trim($batchCode) !== '') {
+            $query->where('import_batch_code', $batchCode);
+        }
+
+        return $query
+            ->get(['id', 'import_batch_code', 'row_number', 'no_transaksi', 'produk', 'sync_error', 'updated_at'])
+            ->map(fn ($row) => [
+                'id' => (int) $row->id,
+                'import_batch_code' => (string) $row->import_batch_code,
+                'row_number' => (int) ($row->row_number ?? 0),
+                'no_transaksi' => (string) ($row->no_transaksi ?? ''),
+                'produk' => (string) ($row->produk ?? ''),
+                'sync_error' => (string) ($row->sync_error ?? ''),
+                'updated_at' => optional($row->updated_at)?->toDateTimeString(),
+            ])
+            ->values()
+            ->all();
     }
 
     public function deleteBatch(string $batchCode): int
@@ -582,5 +807,106 @@ class ImportPenjualanService
         });
 
         return $contains ?: null;
+    }
+
+    private function buildPosItemsForImportRow(ImportPenjualanEntity $row, Collection $menuMap): array
+    {
+        $tokens = $this->extractProductTokens((string) ($row->produk ?? ''));
+
+        $mappedMenus = collect($tokens)
+            ->map(function (string $token) use ($menuMap) {
+                $normalized = $this->normalizeProductName($token);
+                if ($normalized === '') {
+                    return null;
+                }
+
+                return $this->resolveMenuForProduct($normalized, $menuMap);
+            })
+            ->filter()
+            ->values();
+
+        if ($mappedMenus->isEmpty()) {
+            return [];
+        }
+
+        $qtyTotal = max(1, $mappedMenus->count());
+        $nominalTotal = (float) ($row->total_penjualan ?? 0);
+        $hargaSatuan = $qtyTotal > 0 ? ($nominalTotal / $qtyTotal) : 0;
+
+        return $mappedMenus
+            ->groupBy('id')
+            ->map(function (Collection $group) use ($hargaSatuan) {
+                $menu = $group->first();
+                $qty = max(1, $group->count());
+
+                return [
+                    'data_menu_id' => (int) $menu['id'],
+                    'nama_menu' => (string) $menu['nama'],
+                    'qty' => $qty,
+                    'harga_satuan' => round($hargaSatuan, 2),
+                    'subtotal' => round($qty * $hargaSatuan, 2),
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    private function buildPaymentMethodMap(): array
+    {
+        $methods = MetodePembayaranEntity::query()
+            ->where('is_active', true)
+            ->get(['kode', 'nama'])
+            ->map(function ($item) {
+                return [
+                    'kode' => (string) $item->kode,
+                    'nama_normalized' => $this->normalizeProductName((string) $item->nama),
+                ];
+            })
+            ->values();
+
+        $defaultCode = (string) (MetodePembayaranEntity::query()
+            ->where('is_active', true)
+            ->orderByDesc('is_default')
+            ->orderBy('urutan')
+            ->value('kode') ?? 'cash');
+
+        return [
+            'default_code' => $defaultCode,
+            'methods' => $methods,
+        ];
+    }
+
+    private function resolvePaymentMethodCode(string $rawMethod, array $methodMap): string
+    {
+        $normalized = $this->normalizeProductName($rawMethod);
+        $methods = collect($methodMap['methods'] ?? []);
+
+        if ($normalized !== '') {
+            $exact = $methods->first(fn ($item) => ($item['nama_normalized'] ?? '') === $normalized);
+            if ($exact) {
+                return (string) $exact['kode'];
+            }
+
+            $contains = $methods->first(function ($item) use ($normalized) {
+                $name = (string) ($item['nama_normalized'] ?? '');
+                return $name !== '' && (str_contains($name, $normalized) || str_contains($normalized, $name));
+            });
+
+            if ($contains) {
+                return (string) $contains['kode'];
+            }
+        }
+
+        return (string) ($methodMap['default_code'] ?? 'cash');
+    }
+
+    private function generateImportOrderCode(int $importRowId): string
+    {
+        return 'IMP-ORD-' . $importRowId;
+    }
+
+    private function generateImportPaymentCode(int $importRowId): string
+    {
+        return 'IMP-PAY-' . $importRowId;
     }
 }

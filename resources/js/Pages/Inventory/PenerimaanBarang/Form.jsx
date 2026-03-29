@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 const emptyItem = {
     purchase_order_item_id: "",
     bahan_baku_id: "",
+    qty_input: 1,
+    satuan_input: "",
     qty_diterima: 1,
     harga_satuan: 0,
     catatan: "",
@@ -49,11 +51,35 @@ export default function Form({ endpoint, purchaseOrderOptions, supplierOptions, 
     };
 
     const updateItem = (index, field, value) => {
-        setData("items", data.items.map((item, i) => (i === index ? { ...item, [field]: value } : item)));
+        setData((prev) => ({
+            ...prev,
+            items: prev.items.map((item, i) => (i === index ? { ...item, [field]: value } : item)),
+        }));
+    };
+
+    const patchItem = (index, patch) => {
+        setData((prev) => ({
+            ...prev,
+            items: prev.items.map((item, i) => (i === index ? { ...item, ...patch } : item)),
+        }));
+    };
+
+    const resolveBahan = (bahanId) => bahanBakuOptions.find((opt) => String(opt.id) === String(bahanId));
+
+    const unitOptions = (bahan) => {
+        if (!bahan) return [];
+        const kecil = bahan.satuan_kecil || bahan.satuan;
+        const besar = bahan.satuan_besar;
+        return [kecil, besar].filter(Boolean);
     };
 
     return (
         <form onSubmit={submit} className="space-y-4">
+            <div className="rounded-lg border border-dashed bg-muted/30 p-3 text-xs text-muted-foreground">
+                <p className="font-medium text-foreground">Panduan Input Penerimaan Barang</p>
+                <p>1) Pilih PO (jika ada) lalu supplier. 2) Isi tanggal terima dan detail pembayaran. 3) Tambah item diterima sesuai qty & satuan aktual saat barang datang.</p>
+            </div>
+
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <div className="space-y-1.5">
                     <label className="text-sm font-medium">Purchase Order</label>
@@ -102,7 +128,7 @@ export default function Form({ endpoint, purchaseOrderOptions, supplierOptions, 
                         <option value="paid">Lunas (Cash)</option>
                     </select>
                 </div>
-                
+
                 {data.status_pembayaran !== "unpaid" && (
                     <div className="space-y-1.5">
                         <label className="text-sm font-medium">Metode Bayar</label>
@@ -113,7 +139,7 @@ export default function Form({ endpoint, purchaseOrderOptions, supplierOptions, 
                         </select>
                     </div>
                 )}
-                
+
                 {data.status_pembayaran === "partial" && (
                     <div className="space-y-1.5">
                         <label className="text-sm font-medium">Nominal DP</label>
@@ -134,14 +160,33 @@ export default function Form({ endpoint, purchaseOrderOptions, supplierOptions, 
                     <p className="text-sm font-semibold">Item Penerimaan</p>
                     <Button type="button" variant="outline" size="sm" onClick={addItem}>Tambah Item</Button>
                 </div>
+                <p className="text-xs text-muted-foreground">Isi jumlah sesuai barang yang benar-benar datang. Sistem otomatis konversi ke satuan stok.</p>
 
-                {data.items.map((item, index) => (
+                {data.items.map((item, index) => {
+                    const bahan = resolveBahan(item.bahan_baku_id);
+                    const satuanKecil = bahan?.satuan_kecil || bahan?.satuan;
+                    const satuanBesar = bahan?.satuan_besar;
+                    const konversi = Number(bahan?.konversi_besar_ke_kecil || 1);
+
+                    return (
                     <div key={index} className="grid grid-cols-1 gap-2 rounded-lg border p-2 md:grid-cols-12">
                         <div className="md:col-span-3">
                             <Input value={item.purchase_order_item_id || ""} onChange={(event) => updateItem(index, "purchase_order_item_id", event.target.value)} placeholder="PO Item ID (opsional)" />
                         </div>
                         <div className="md:col-span-3">
-                            <select className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm" value={item.bahan_baku_id} onChange={(event) => updateItem(index, "bahan_baku_id", event.target.value)} required>
+                            <select
+                                className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm"
+                                value={item.bahan_baku_id}
+                                onChange={(event) => {
+                                    const bahanId = event.target.value;
+                                    const bahan = resolveBahan(bahanId);
+                                    patchItem(index, {
+                                        bahan_baku_id: bahanId,
+                                        satuan_input: bahan?.default_satuan_beli || bahan?.satuan_kecil || bahan?.satuan || "",
+                                    });
+                                }}
+                                required
+                            >
                                 <option value="">Pilih bahan</option>
                                 {bahanBakuOptions.map((opt) => (
                                     <option key={opt.id} value={opt.id}>{opt.nama}</option>
@@ -149,7 +194,34 @@ export default function Form({ endpoint, purchaseOrderOptions, supplierOptions, 
                             </select>
                         </div>
                         <div className="md:col-span-2">
-                            <Input type="number" min={0.001} step="0.001" value={item.qty_diterima} onChange={(event) => updateItem(index, "qty_diterima", Number(event.target.value || 0))} placeholder="Qty" required />
+                            <Input
+                                type="number"
+                                min={0.001}
+                                step="0.001"
+                                value={item.qty_input}
+                                onChange={(event) => {
+                                    const value = Number(event.target.value || 0);
+                                    patchItem(index, {
+                                        qty_input: value,
+                                        qty_diterima: value,
+                                    });
+                                }}
+                                placeholder="Qty"
+                                required
+                            />
+                        </div>
+                        <div className="md:col-span-2">
+                            <select
+                                className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm"
+                                value={item.satuan_input || (bahan?.default_satuan_beli || bahan?.satuan_kecil || bahan?.satuan || "")}
+                                onChange={(event) => updateItem(index, "satuan_input", event.target.value)}
+                                required
+                            >
+                                <option value="">Satuan</option>
+                                {unitOptions(bahan).map((unit) => (
+                                    <option key={`${index}-${unit}`} value={unit}>{unit}</option>
+                                ))}
+                            </select>
                         </div>
                         <div className="md:col-span-2">
                             <Input type="number" min={0} step="0.01" value={item.harga_satuan} onChange={(event) => updateItem(index, "harga_satuan", Number(event.target.value || 0))} placeholder="Harga" required />
@@ -160,8 +232,17 @@ export default function Form({ endpoint, purchaseOrderOptions, supplierOptions, 
                         <div className="md:col-span-1">
                             <Button type="button" variant="destructive" size="sm" onClick={() => removeItem(index)} className="w-full">X</Button>
                         </div>
+
+                        {bahan ? (
+                            <div className="md:col-span-12">
+                                <p className="text-xs text-muted-foreground">
+                                    Konversi bahan ini: 1 {satuanBesar || satuanKecil} = {satuanBesar ? `${konversi} ${satuanKecil}` : `1 ${satuanKecil}`}. Stok akan ditambah dalam {satuanKecil}.
+                                </p>
+                            </div>
+                        ) : null}
                     </div>
-                ))}
+                    );
+                })}
             </div>
 
             <DialogFooter>

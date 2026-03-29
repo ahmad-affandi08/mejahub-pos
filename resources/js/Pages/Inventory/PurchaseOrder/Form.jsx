@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 
 const emptyItem = {
     bahan_baku_id: "",
+    qty_input: 1,
+    satuan_input: "",
     qty_pesan: 1,
     harga_satuan: 0,
     catatan: "",
@@ -21,6 +23,8 @@ export default function Form({ mode, endpoint, initialValues, supplierOptions, b
         items: initialValues?.items?.length
             ? initialValues.items.map((item) => ({
                 bahan_baku_id: item.bahan_baku_id,
+                qty_input: Number(item.qty_input || item.qty_pesan || 0),
+                satuan_input: item.satuan_input || "",
                 qty_pesan: Number(item.qty_pesan || 0),
                 harga_satuan: Number(item.harga_satuan || 0),
                 catatan: item.catatan || "",
@@ -59,14 +63,35 @@ export default function Form({ mode, endpoint, initialValues, supplierOptions, b
     };
 
     const updateItem = (index, field, value) => {
-        setData(
-            "items",
-            data.items.map((item, i) => (i === index ? { ...item, [field]: value } : item))
-        );
+        setData((prev) => ({
+            ...prev,
+            items: prev.items.map((item, i) => (i === index ? { ...item, [field]: value } : item)),
+        }));
+    };
+
+    const patchItem = (index, patch) => {
+        setData((prev) => ({
+            ...prev,
+            items: prev.items.map((item, i) => (i === index ? { ...item, ...patch } : item)),
+        }));
+    };
+
+    const resolveBahan = (bahanId) => bahanBakuOptions.find((opt) => String(opt.id) === String(bahanId));
+
+    const unitOptions = (bahan) => {
+        if (!bahan) return [];
+        const kecil = bahan.satuan_kecil || bahan.satuan;
+        const besar = bahan.satuan_besar;
+        return [kecil, besar].filter(Boolean);
     };
 
     return (
         <form onSubmit={submit} className="space-y-4">
+            <div className="rounded-lg border border-dashed bg-muted/30 p-3 text-xs text-muted-foreground">
+                <p className="font-medium text-foreground">Panduan Input Purchase Order</p>
+                <p>1) Pilih supplier dan tanggal PO. 2) Tambah item lalu pilih bahan terlebih dahulu. 3) Isi qty sesuai satuan yang dipilih (kecil/besar). 4) Isi harga per satuan input.</p>
+            </div>
+
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <div className="space-y-1.5">
                     <label className="text-sm font-medium">Supplier</label>
@@ -115,7 +140,7 @@ export default function Form({ mode, endpoint, initialValues, supplierOptions, b
 
             <div className="space-y-1.5">
                 <label className="text-sm font-medium">Catatan</label>
-                <Input value={data.catatan} onChange={(event) => setData("catatan", event.target.value)} />
+                <Input value={data.catatan} onChange={(event) => setData("catatan", event.target.value)} placeholder="Contoh: kirim bertahap, prioritas urgent" />
                 {errors.catatan ? <p className="text-xs text-destructive">{errors.catatan}</p> : null}
             </div>
 
@@ -124,14 +149,28 @@ export default function Form({ mode, endpoint, initialValues, supplierOptions, b
                     <p className="text-sm font-semibold">Item PO</p>
                     <Button type="button" variant="outline" size="sm" onClick={addItem}>Tambah Item</Button>
                 </div>
+                <p className="text-xs text-muted-foreground">Urutan isi item: pilih bahan, lalu isi qty, pilih satuan, lalu isi harga per satuan. Sistem akan konversi ke satuan stok otomatis.</p>
 
-                {data.items.map((item, index) => (
+                {data.items.map((item, index) => {
+                    const bahan = resolveBahan(item.bahan_baku_id);
+                    const satuanKecil = bahan?.satuan_kecil || bahan?.satuan;
+                    const satuanBesar = bahan?.satuan_besar;
+                    const konversi = Number(bahan?.konversi_besar_ke_kecil || 1);
+
+                    return (
                     <div key={index} className="grid grid-cols-1 gap-2 rounded-lg border p-2 md:grid-cols-12">
                         <div className="md:col-span-4">
                             <select
                                 className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm"
                                 value={item.bahan_baku_id}
-                                onChange={(event) => updateItem(index, "bahan_baku_id", event.target.value)}
+                                onChange={(event) => {
+                                    const bahanId = event.target.value;
+                                    const bahan = resolveBahan(bahanId);
+                                    patchItem(index, {
+                                        bahan_baku_id: bahanId,
+                                        satuan_input: bahan?.default_satuan_beli || bahan?.satuan_kecil || bahan?.satuan || "",
+                                    });
+                                }}
                                 required
                             >
                                 <option value="">Pilih bahan</option>
@@ -145,13 +184,32 @@ export default function Form({ mode, endpoint, initialValues, supplierOptions, b
                                 type="number"
                                 min={0.001}
                                 step="0.001"
-                                value={item.qty_pesan}
-                                onChange={(event) => updateItem(index, "qty_pesan", Number(event.target.value || 0))}
+                                value={item.qty_input}
+                                onChange={(event) => {
+                                    const value = Number(event.target.value || 0);
+                                    patchItem(index, {
+                                        qty_input: value,
+                                        qty_pesan: value,
+                                    });
+                                }}
                                 placeholder="Qty"
                                 required
                             />
                         </div>
-                        <div className="md:col-span-3">
+                        <div className="md:col-span-2">
+                            <select
+                                className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm"
+                                value={item.satuan_input || (bahan?.default_satuan_beli || bahan?.satuan_kecil || bahan?.satuan || "")}
+                                onChange={(event) => updateItem(index, "satuan_input", event.target.value)}
+                                required
+                            >
+                                <option value="">Satuan</option>
+                                {unitOptions(bahan).map((unit) => (
+                                    <option key={`${index}-${unit}`} value={unit}>{unit}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="md:col-span-2">
                             <Input
                                 type="number"
                                 min={0}
@@ -162,14 +220,23 @@ export default function Form({ mode, endpoint, initialValues, supplierOptions, b
                                 required
                             />
                         </div>
-                        <div className="md:col-span-2">
+                        <div className="md:col-span-1">
                             <Input value={item.catatan || ""} onChange={(event) => updateItem(index, "catatan", event.target.value)} placeholder="Catatan" />
                         </div>
                         <div className="md:col-span-1">
                             <Button type="button" variant="destructive" size="sm" onClick={() => removeItem(index)} className="w-full">X</Button>
                         </div>
+
+                        {bahan ? (
+                            <div className="md:col-span-12">
+                                <p className="text-xs text-muted-foreground">
+                                    Konversi bahan ini: 1 {satuanBesar || satuanKecil} = {satuanBesar ? `${konversi} ${satuanKecil}` : `1 ${satuanKecil}`}. Stok disimpan dalam {satuanKecil}.
+                                </p>
+                            </div>
+                        ) : null}
                     </div>
-                ))}
+                    );
+                })}
 
                 {errors.items ? <p className="text-xs text-destructive">{errors.items}</p> : null}
             </div>

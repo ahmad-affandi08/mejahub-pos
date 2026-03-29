@@ -21,6 +21,7 @@ class BahanBakuEntity extends Model
         'harga_beli_terakhir' => 'decimal:2',
         'stok_minimum' => 'decimal:3',
         'stok_saat_ini' => 'decimal:3',
+        'konversi_besar_ke_kecil' => 'decimal:3',
         'is_active' => 'boolean',
     ];
 

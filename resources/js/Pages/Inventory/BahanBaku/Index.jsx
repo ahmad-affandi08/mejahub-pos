@@ -121,7 +121,13 @@ export default function Index({ bahanBaku, supplierOptions, filters, flashMessag
                                             <TableCell>{item.kode || "-"}</TableCell>
                                             <TableCell className="font-medium">{item.nama}</TableCell>
                                             <TableCell>{item.supplier_nama || "-"}</TableCell>
-                                            <TableCell>{item.satuan}</TableCell>
+                                            <TableCell>
+                                                <div className="text-xs leading-tight">
+                                                    <p>Kecil: {item.satuan_kecil || item.satuan || "-"}</p>
+                                                    <p>Besar: {item.satuan_besar || "-"}</p>
+                                                    <p>Konversi: 1 {item.satuan_besar || "besar"} = {item.konversi_besar_ke_kecil || 1} {item.satuan_kecil || item.satuan || "kecil"}</p>
+                                                </div>
+                                            </TableCell>
                                             <TableCell>{formatIDR(item.harga_beli_terakhir)}</TableCell>
                                             <TableCell>{item.stok_saat_ini}</TableCell>
                                             <TableCell>
