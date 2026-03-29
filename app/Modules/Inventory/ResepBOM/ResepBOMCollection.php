@@ -6,6 +6,28 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
 class ResepBOMCollection
 {
+	public static function toMenuCardIndex(LengthAwarePaginator $paginator): array
+	{
+		return [
+			'data' => collect($paginator->items())
+				->map(fn ($item) => [
+					'data_menu_id' => (int) ($item->data_menu_id ?? 0),
+					'menu_nama' => (string) ($item->menu_nama ?? '-'),
+					'menu_kategori_id' => (int) ($item->menu_kategori_id ?? 0),
+					'menu_kategori_nama' => (string) ($item->menu_kategori_nama ?? 'Tanpa kategori'),
+					'total_bahan' => (int) ($item->total_bahan ?? 0),
+				])
+				->values()
+				->all(),
+			'meta' => [
+				'current_page' => $paginator->currentPage(),
+				'last_page' => $paginator->lastPage(),
+				'per_page' => $paginator->perPage(),
+				'total' => $paginator->total(),
+			],
+		];
+	}
+
 	public static function toIndex(LengthAwarePaginator $paginator): array
 	{
 		return [
@@ -29,6 +51,8 @@ class ResepBOMCollection
 			'kode' => $item->kode,
 			'data_menu_id' => $item->data_menu_id,
 			'menu_nama' => $item->menu?->nama,
+			'menu_kategori_id' => $item->menu?->kategori_menu_id,
+			'menu_kategori_nama' => $item->menu?->kategori?->nama,
 			'bahan_baku_id' => $item->bahan_baku_id,
 			'bahan_baku_nama' => $item->bahanBaku?->nama,
 			'qty_kebutuhan' => (float) $item->qty_kebutuhan,

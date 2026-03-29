@@ -58,6 +58,12 @@ if (File::exists($modulesPath)) {
 
                     $resourceRoute->middleware(['auth', 'permission:' . $permissionKey]);
 
+                    if (method_exists($resourceClass, 'storeBulk')) {
+                        Route::post($urlSlug . '/bulk', [$resourceClass, 'storeBulk'])
+                            ->middleware(['auth', 'permission:' . $permissionKey])
+                            ->name($routeName . '.bulk');
+                    }
+
                     Route::post($urlSlug . '/delete', function (Request $request) use ($resourceClass) {
                         $id = (string) $request->input('id', '');
 

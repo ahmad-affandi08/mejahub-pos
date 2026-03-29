@@ -20,7 +20,6 @@ class MenuSeeder extends Seeder
 
         $daftarMenu = [
             ['nama_produk' => 'AIR MINERAL', 'kategori' => 'SOFT DRINK', 'harga_jual' => 7000, 'sku' => 'LIL50'],
-            ['nama_produk' => 'AIR MINERAL', 'kategori' => 'SOFT DRINK', 'harga_jual' => 7000, 'sku' => 'LIL50'],
             ['nama_produk' => 'CAESAR', 'kategori' => 'WESTERN', 'harga_jual' => 31000, 'sku' => 'lil200'],
             ['nama_produk' => 'AMERICANO', 'kategori' => 'COFFEE', 'harga_jual' => 15000, 'sku' => 'LIL27'],
             ['nama_produk' => "AYAM BAKAR LI'L ESCAPE", 'kategori' => 'Maincourse', 'harga_jual' => 26000, 'sku' => 'LIL03'],
