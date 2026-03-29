@@ -25,10 +25,19 @@ class LaporanPenjualanService
 		$topLimit = max(3, min($topLimit, 25));
 
 		$summary = $this->salesSummary($start, $end);
+		$pengeluaran = $this->pengeluaranTotal($start, $end);
+		$pettyCashKeluar = $this->pettyCashOutTotal($start, $end);
+		$totalBebanOperasional = $pengeluaran + $pettyCashKeluar;
+		$expenseBreakdown = $this->expenseBreakdown($start, $end);
 		$topItems = $this->topItems($start, $end, $topLimit);
 		$paymentMethods = $this->paymentMethodBreakdown($start, $end);
 		$payrollVsRevenue = $this->payrollVsRevenue($start, $end, (float) $summary['omzet']);
 		$dailyTrend = $this->dailyTrend($start, $end);
+
+		$summary['total_pengeluaran'] = $pengeluaran;
+		$summary['petty_cash_keluar'] = $pettyCashKeluar;
+		$summary['total_beban_operasional'] = $totalBebanOperasional;
+		$summary['net_omzet_operasional'] = (float) $summary['omzet'] - $totalBebanOperasional;
 
 		return [
 			'filters' => [
@@ -44,6 +53,7 @@ class LaporanPenjualanService
 				],
 			],
 			'summary' => $summary,
+			'expense_breakdown' => $expenseBreakdown,
 			'top_items' => $topItems,
 			'payment_methods' => $paymentMethods,
 			'payroll_vs_revenue' => $payrollVsRevenue,
@@ -54,6 +64,7 @@ class LaporanPenjualanService
 	public function buildExportTableHtml(array $report): string
 	{
 		$summary = $report['summary'] ?? [];
+		$expenseBreakdown = $report['expense_breakdown'] ?? [];
 		$topItems = $report['top_items'] ?? [];
 		$paymentMethods = $report['payment_methods'] ?? [];
 		$payroll = $report['payroll_vs_revenue'] ?? [];
@@ -65,6 +76,10 @@ class LaporanPenjualanService
 			. '<tr><th>Rata-rata Transaksi</th><td>' . $this->formatCurrency((float) ($summary['rata_rata_transaksi'] ?? 0)) . '</td></tr>'
 			. '<tr><th>Total Dibayar</th><td>' . $this->formatCurrency((float) ($summary['nominal_dibayar'] ?? 0)) . '</td></tr>'
 			. '<tr><th>Total Kembalian</th><td>' . $this->formatCurrency((float) ($summary['kembalian'] ?? 0)) . '</td></tr>'
+			. '<tr><th>Pengeluaran</th><td>' . $this->formatCurrency((float) ($summary['total_pengeluaran'] ?? 0)) . '</td></tr>'
+			. '<tr><th>Petty Cash Keluar</th><td>' . $this->formatCurrency((float) ($summary['petty_cash_keluar'] ?? 0)) . '</td></tr>'
+			. '<tr><th>Total Beban Operasional</th><td>' . $this->formatCurrency((float) ($summary['total_beban_operasional'] ?? 0)) . '</td></tr>'
+			. '<tr><th>Net Omzet Operasional</th><td>' . $this->formatCurrency((float) ($summary['net_omzet_operasional'] ?? 0)) . '</td></tr>'
 			. '</tbody></table>';
 
 		if (!empty($topItems)) {
@@ -86,9 +101,15 @@ class LaporanPenjualanService
 			. '<tr><th>Rasio Payroll</th><td>' . number_format((float) ($payroll['rasio_persen'] ?? 0), 2, ',', '.') . '%</td></tr>'
 			. '</tbody></table>';
 
+		if (!empty($expenseBreakdown)) {
+			$html .= '<div class="section-title">Breakdown Pengeluaran</div><table><thead><tr><th>Kategori</th><th style="text-align:right;">Jumlah</th><th style="text-align:right;">Nominal</th></tr></thead><tbody>';
+			foreach ($expenseBreakdown as $item) { $html .= '<tr><td>' . e($item['kategori'] ?? '-') . '</td><td style="text-align:right;">' . (int) ($item['jumlah'] ?? 0) . '</td><td style="text-align:right;">' . $this->formatCurrency((float) ($item['total_nominal'] ?? 0)) . '</td></tr>'; }
+			$html .= '</tbody></table>';
+		}
+
 		if (!empty($dailyTrend)) {
-			$html .= '<div class="section-title">Tren Harian</div><table><thead><tr><th>Tanggal</th><th style="text-align:right;">Transaksi</th><th style="text-align:right;">Omzet</th></tr></thead><tbody>';
-			foreach ($dailyTrend as $item) { $html .= '<tr><td>' . e($item['tanggal'] ?? '-') . '</td><td style="text-align:right;">' . (int) ($item['jumlah_transaksi'] ?? 0) . '</td><td style="text-align:right;">' . $this->formatCurrency((float) ($item['omzet'] ?? 0)) . '</td></tr>'; }
+			$html .= '<div class="section-title">Tren Harian</div><table><thead><tr><th>Tanggal</th><th style="text-align:right;">Transaksi</th><th style="text-align:right;">Omzet</th><th style="text-align:right;">Pengeluaran</th><th style="text-align:right;">Petty Cash Keluar</th><th style="text-align:right;">Net</th></tr></thead><tbody>';
+			foreach ($dailyTrend as $item) { $html .= '<tr><td>' . e($item['tanggal'] ?? '-') . '</td><td style="text-align:right;">' . (int) ($item['jumlah_transaksi'] ?? 0) . '</td><td style="text-align:right;">' . $this->formatCurrency((float) ($item['omzet'] ?? 0)) . '</td><td style="text-align:right;">' . $this->formatCurrency((float) ($item['pengeluaran'] ?? 0)) . '</td><td style="text-align:right;">' . $this->formatCurrency((float) ($item['petty_cash_keluar'] ?? 0)) . '</td><td style="text-align:right;">' . $this->formatCurrency((float) ($item['net_omzet_operasional'] ?? 0)) . '</td></tr>'; }
 			$html .= '</tbody></table>';
 		}
 
@@ -279,6 +300,27 @@ class LaporanPenjualanService
 			->get();
 
 		$indexed = $rows->keyBy('tanggal');
+		$pengeluaranByDate = DB::table('finance_pengeluaran')
+			->whereNull('deleted_at')
+			->where('is_active', true)
+			->where('status_approval', 'approved')
+			->whereBetween('tanggal', [$start->toDateString(), $end->toDateString()])
+			->selectRaw('DATE(tanggal) as tanggal, COALESCE(SUM(nominal), 0) as total_pengeluaran')
+			->groupByRaw('DATE(tanggal)')
+			->pluck('total_pengeluaran', 'tanggal')
+			->all();
+
+		$pettyCashByDate = DB::table('finance_petty_cash')
+			->whereNull('deleted_at')
+			->where('is_active', true)
+			->where('status_approval', 'approved')
+			->where('jenis_arus', 'out')
+			->whereBetween('tanggal', [$start->toDateString(), $end->toDateString()])
+			->selectRaw('DATE(tanggal) as tanggal, COALESCE(SUM(nominal), 0) as total_petty_cash')
+			->groupByRaw('DATE(tanggal)')
+			->pluck('total_petty_cash', 'tanggal')
+			->all();
+
 		$period = CarbonPeriod::create($start->copy()->startOfDay(), '1 day', $end->copy()->startOfDay());
 
 		$result = [];
@@ -286,11 +328,18 @@ class LaporanPenjualanService
 		foreach ($period as $date) {
 			$key = $date->toDateString();
 			$item = $indexed->get($key);
+			$pengeluaran = (float) ($pengeluaranByDate[$key] ?? 0);
+			$pettyCashKeluar = (float) ($pettyCashByDate[$key] ?? 0);
+			$omzet = (float) ($item->omzet ?? 0);
 
 			$result[] = [
 				'tanggal' => $key,
 				'jumlah_transaksi' => (int) ($item->jumlah_transaksi ?? 0),
-				'omzet' => (float) ($item->omzet ?? 0),
+				'omzet' => $omzet,
+				'pengeluaran' => $pengeluaran,
+				'petty_cash_keluar' => $pettyCashKeluar,
+				'total_beban_operasional' => $pengeluaran + $pettyCashKeluar,
+				'net_omzet_operasional' => $omzet - $pengeluaran - $pettyCashKeluar,
 			];
 		}
 
@@ -308,5 +357,66 @@ class LaporanPenjualanService
 		} catch (\Throwable) {
 			return null;
 		}
+	}
+
+	private function pengeluaranTotal(Carbon $start, Carbon $end): float
+	{
+		return (float) DB::table('finance_pengeluaran')
+			->whereNull('deleted_at')
+			->where('is_active', true)
+			->where('status_approval', 'approved')
+			->whereBetween('tanggal', [$start->toDateString(), $end->toDateString()])
+			->sum('nominal');
+	}
+
+	private function pettyCashOutTotal(Carbon $start, Carbon $end): float
+	{
+		return (float) DB::table('finance_petty_cash')
+			->whereNull('deleted_at')
+			->where('is_active', true)
+			->where('status_approval', 'approved')
+			->where('jenis_arus', 'out')
+			->whereBetween('tanggal', [$start->toDateString(), $end->toDateString()])
+			->sum('nominal');
+	}
+
+	private function expenseBreakdown(Carbon $start, Carbon $end): array
+	{
+		$items = DB::table('finance_pengeluaran')
+			->whereNull('deleted_at')
+			->where('is_active', true)
+			->where('status_approval', 'approved')
+			->whereBetween('tanggal', [$start->toDateString(), $end->toDateString()])
+			->selectRaw('kategori_biaya, COUNT(*) as jumlah, COALESCE(SUM(nominal), 0) as total_nominal')
+			->groupBy('kategori_biaya')
+			->get()
+			->map(fn ($row) => [
+				'kategori' => (string) ($row->kategori_biaya ?? 'Lainnya'),
+				'jumlah' => (int) $row->jumlah,
+				'total_nominal' => (float) $row->total_nominal,
+			]);
+
+		$pettyCashRows = (int) DB::table('finance_petty_cash')
+			->whereNull('deleted_at')
+			->where('is_active', true)
+			->where('status_approval', 'approved')
+			->where('jenis_arus', 'out')
+			->whereBetween('tanggal', [$start->toDateString(), $end->toDateString()])
+			->count();
+
+		$pettyCashTotal = $this->pettyCashOutTotal($start, $end);
+
+		if ($pettyCashRows > 0 || $pettyCashTotal > 0) {
+			$items->push([
+				'kategori' => 'Petty Cash',
+				'jumlah' => $pettyCashRows,
+				'total_nominal' => (float) $pettyCashTotal,
+			]);
+		}
+
+		return $items
+			->sortByDesc('total_nominal')
+			->values()
+			->all();
 	}
 }

@@ -13,7 +13,16 @@ class LaporanPenjualanCollection
 				'rata_rata_transaksi' => (float) ($dashboard['summary']['rata_rata_transaksi'] ?? 0),
 				'nominal_dibayar' => (float) ($dashboard['summary']['nominal_dibayar'] ?? 0),
 				'kembalian' => (float) ($dashboard['summary']['kembalian'] ?? 0),
+				'total_pengeluaran' => (float) ($dashboard['summary']['total_pengeluaran'] ?? 0),
+				'petty_cash_keluar' => (float) ($dashboard['summary']['petty_cash_keluar'] ?? 0),
+				'total_beban_operasional' => (float) ($dashboard['summary']['total_beban_operasional'] ?? 0),
+				'net_omzet_operasional' => (float) ($dashboard['summary']['net_omzet_operasional'] ?? 0),
 			],
+			'expense_breakdown' => collect($dashboard['expense_breakdown'] ?? [])->map(fn ($item) => [
+				'kategori' => (string) ($item['kategori'] ?? 'Lainnya'),
+				'jumlah' => (int) ($item['jumlah'] ?? 0),
+				'total_nominal' => (float) ($item['total_nominal'] ?? 0),
+			])->values()->all(),
 			'top_items' => collect($dashboard['top_items'] ?? [])->map(fn ($item) => [
 				'nama_menu' => (string) ($item['nama_menu'] ?? '-'),
 				'total_qty' => (int) ($item['total_qty'] ?? 0),
@@ -35,6 +44,10 @@ class LaporanPenjualanCollection
 				'tanggal' => (string) ($item['tanggal'] ?? ''),
 				'jumlah_transaksi' => (int) ($item['jumlah_transaksi'] ?? 0),
 				'omzet' => (float) ($item['omzet'] ?? 0),
+				'pengeluaran' => (float) ($item['pengeluaran'] ?? 0),
+				'petty_cash_keluar' => (float) ($item['petty_cash_keluar'] ?? 0),
+				'total_beban_operasional' => (float) ($item['total_beban_operasional'] ?? 0),
+				'net_omzet_operasional' => (float) ($item['net_omzet_operasional'] ?? 0),
 			])->values()->all(),
 		];
 	}
