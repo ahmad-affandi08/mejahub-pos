@@ -58,8 +58,8 @@ class PenerimaanBarangService
 				'nomor_surat_jalan' => $payload['nomor_surat_jalan'] ?? null,
 				'tanggal_terima' => $payload['tanggal_terima'] ?? now()->toDateString(),
 				'status' => $payload['status'] ?? 'received',
-				'status_pembayaran' => $payload['status_pembayaran'] ?? 'unpaid',
-				'metode_pembayaran' => $payload['metode_pembayaran'] ?? null,
+				'status_pembayaran' => 'unpaid',
+				'metode_pembayaran' => null,
 				'akun_kas_id' => $payload['akun_kas_id'] ?? null,
 				'jatuh_tempo' => $payload['jatuh_tempo'] ?? null,
 				'total' => 0,
@@ -70,12 +70,43 @@ class PenerimaanBarangService
 			if ($total <= 0) {
 				throw new PosDomainException('Item penerimaan tidak valid. Cek qty dan satuan input.');
 			}
-			$receipt->update(['total' => $total]);
 
-			$statusBayar = $payload['status_pembayaran'] ?? 'unpaid';
+			$requestedStatusBayar = strtolower(trim((string) ($payload['status_pembayaran'] ?? 'unpaid')));
+			$requestedStatusBayar = in_array($requestedStatusBayar, ['unpaid', 'partial', 'paid'], true)
+				? $requestedStatusBayar
+				: 'unpaid';
+
+			$metodePembayaran = $this->normalizeMetodePembayaran($payload['metode_pembayaran'] ?? null);
 			$nominalDibayar = (float) ($payload['jumlah_dibayar'] ?? 0);
 
-			if ($statusBayar === 'unpaid' || $statusBayar === 'partial') {
+			if ($requestedStatusBayar === 'paid') {
+				$nominalDibayar = $total;
+			}
+
+			if ($requestedStatusBayar === 'unpaid') {
+				$nominalDibayar = 0;
+			}
+
+			$nominalDibayar = max(0, min($nominalDibayar, $total));
+			$sisaHutang = max(0, $total - $nominalDibayar);
+
+			$effectiveStatusBayar = $requestedStatusBayar;
+
+			if ($sisaHutang <= 0) {
+				$effectiveStatusBayar = 'paid';
+			} elseif ($nominalDibayar > 0) {
+				$effectiveStatusBayar = 'partial';
+			} else {
+				$effectiveStatusBayar = 'unpaid';
+			}
+
+			$receipt->update([
+				'total' => $total,
+				'status_pembayaran' => $effectiveStatusBayar,
+				'metode_pembayaran' => $effectiveStatusBayar === 'unpaid' ? null : $metodePembayaran,
+			]);
+
+			if (in_array($effectiveStatusBayar, ['unpaid', 'partial'], true)) {
 				$hutang = \App\Modules\Finance\Hutang\HutangEntity::create([
 					'kode' => 'AP-' . strtoupper(Str::random(10)),
 					'supplier_id' => $payload['supplier_id'] ?? null,
@@ -84,8 +115,8 @@ class PenerimaanBarangService
 					'tanggal_hutang' => $receipt->tanggal_terima,
 					'jatuh_tempo' => $payload['jatuh_tempo'] ?? null,
 					'nominal_hutang' => $total,
-					'sisa_hutang' => $total - $nominalDibayar,
-					'status' => $statusBayar,
+					'sisa_hutang' => $sisaHutang,
+					'status' => $effectiveStatusBayar,
 					'catatan' => 'Hutang otomatis dari Penerimaan ' . $kode,
 					'created_by' => $userId,
 				]);
@@ -96,7 +127,7 @@ class PenerimaanBarangService
 						'hutang_id' => $hutang->id,
 						'tanggal_bayar' => $receipt->tanggal_terima,
 						'nominal_bayar' => $nominalDibayar,
-						'metode_pembayaran' => $payload['metode_pembayaran'] ?? 'kas',
+						'metode_pembayaran' => $metodePembayaran,
 						'akun_kas_id' => $payload['akun_kas_id'] ?? null,
 						'referensi' => $kode,
 						'catatan' => 'DP Penerimaan Barang',
@@ -109,6 +140,25 @@ class PenerimaanBarangService
 
 			return $receipt->load(['supplier:id,nama', 'purchaseOrder:id,kode', 'items.bahanBaku:id,nama']);
 		});
+	}
+
+	private function normalizeMetodePembayaran(string|null $method): string
+	{
+		$value = strtolower(trim((string) $method));
+
+		if (in_array($value, ['cash', 'tunai', 'kas'], true)) {
+			return 'kas';
+		}
+
+		if (in_array($value, ['transfer', 'transfer_bank', 'bank', 'ewallet', 'qris', 'debit', 'credit'], true)) {
+			return 'bank';
+		}
+
+		if ($value === 'petty_cash') {
+			return 'petty_cash';
+		}
+
+		return 'kas';
 	}
 
 	public function delete(int $id): void

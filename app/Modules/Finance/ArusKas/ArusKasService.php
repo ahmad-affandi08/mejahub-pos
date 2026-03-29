@@ -314,7 +314,7 @@ class ArusKasService
 
 	private function resolveAkunByPaymentMethod(string $method): string
 	{
-		$cashCodes = ['cash', 'tunai'];
+		$cashCodes = ['cash', 'tunai', 'kas', 'petty_cash'];
 
 		return in_array($method, $cashCodes, true) ? 'kas' : 'bank';
 	}

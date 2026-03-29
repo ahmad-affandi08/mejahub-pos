@@ -7,6 +7,57 @@
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
 </p>
 
+## Mejahub POS Quick Start
+
+### Prasyarat
+
+- PHP 8.2+
+- Composer
+- Node.js 20+
+- MySQL/MariaDB (opsional untuk testing jika `pdo_sqlite` tidak tersedia)
+
+### Instalasi
+
+```bash
+cp .env.example .env
+composer install
+npm install
+php artisan key:generate
+php artisan migrate --seed
+npm run build
+```
+
+### Jalankan lokal
+
+```bash
+php artisan serve
+npm run dev
+```
+
+### Setup Testing (Penting)
+
+Project ini punya safety guard di `tests/TestCase.php`:
+
+- Jika `pdo_sqlite` tidak tersedia, test akan fallback ke `TEST_DB_*`.
+- Nama `TEST_DB_DATABASE` wajib mengandung kata `test`, jika tidak maka test di-skip demi keamanan.
+
+Langkah yang disarankan:
+
+```bash
+cp .env.testing.example .env.testing
+php artisan test
+```
+
+Contoh aman (tanpa foreign key juga tetap kompatibel):
+
+- `TEST_DB_CONNECTION=mysql`
+- `TEST_DB_DATABASE=mejahub_test`
+
+### Catatan Arsitektur
+
+- Routing module didaftarkan dinamis dari folder `app/Modules`.
+- Permission menggunakan format key: `module.feature.access`.
+
 ## About Laravel
 
 Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:

@@ -142,7 +142,7 @@ export default function Form({ endpoint, purchaseOrderOptions, supplierOptions, 
                     <select className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm" value={data.status_pembayaran} onChange={(e) => setData("status_pembayaran", e.target.value)}>
                         <option value="unpaid">Belum Bayar (Hutang)</option>
                         <option value="partial">Bayar Sebagian (DP)</option>
-                        <option value="paid">Lunas (Cash)</option>
+                        <option value="paid">Lunas</option>
                     </select>
                 </div>
 
@@ -151,8 +151,8 @@ export default function Form({ endpoint, purchaseOrderOptions, supplierOptions, 
                         <label className="text-sm font-medium">Metode Bayar</label>
                         <select className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm" value={data.metode_pembayaran} onChange={(e) => setData("metode_pembayaran", e.target.value)}>
                             <option value="kas">Kas Tunai</option>
-                            <option value="transfer_bank">Transfer Bank</option>
-                            <option value="ewallet">E-Wallet</option>
+                            <option value="bank">Bank / Transfer</option>
+                            <option value="petty_cash">Petty Cash</option>
                         </select>
                     </div>
                 )}

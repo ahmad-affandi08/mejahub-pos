@@ -21,6 +21,43 @@ Route::get('/login', function () {
 
 $modulesPath = app_path('Modules');
 
+$resourceActions = ['index', 'create', 'store', 'show', 'edit', 'update', 'destroy'];
+$actionsWithRouteParam = ['show', 'edit', 'update', 'destroy'];
+
+$hasAction = static function (string $resourceClass, string $action): bool {
+    return method_exists($resourceClass, $action);
+};
+
+$isRouteParamCompatible = static function (string $resourceClass, string $action) use ($actionsWithRouteParam): bool {
+    if (!method_exists($resourceClass, $action)) {
+        return false;
+    }
+
+    if (!in_array($action, $actionsWithRouteParam, true)) {
+        return true;
+    }
+
+    try {
+        $method = new \ReflectionMethod($resourceClass, $action);
+    } catch (\Throwable) {
+        return false;
+    }
+
+    $routeBindableCount = 0;
+
+    foreach ($method->getParameters() as $parameter) {
+        $type = $parameter->getType();
+
+        if ($type instanceof \ReflectionNamedType && !$type->isBuiltin()) {
+            continue;
+        }
+
+        $routeBindableCount++;
+    }
+
+    return $routeBindableCount >= 1;
+};
+
 if (File::exists($modulesPath)) {
     $modules = File::directories($modulesPath);
 
@@ -38,61 +75,82 @@ if (File::exists($modulesPath)) {
 
             if (File::exists($feature . '/' . $featureName . 'Resource.php')) {
 
+                    $availableActions = array_values(array_filter(
+                        $resourceActions,
+                        static fn (string $action): bool => $isRouteParamCompatible($resourceClass, $action)
+                    ));
+
+                    if ($availableActions === []) {
+                        continue;
+                    }
+
                 $urlSlug = $moduleSlug . '/' . $featureSlug;
 
                 $routeName = $moduleSlug . '.' . $featureSlug;
 
-                $resourceRoute = Route::resource($urlSlug, $resourceClass)
-                    ->parameters([$urlSlug => 'id'])
-                    ->names($routeName);
+                    $resourceKey = Str::afterLast($urlSlug, '/');
 
-                if (Str::lower($moduleName) === 'auth' && method_exists($resourceClass, 'destroy')) {
-                    Route::delete($urlSlug, [$resourceClass, 'destroy'])
-                        ->name($routeName . '.logout');
+                    $isAuthModule = Str::lower($moduleName) === 'auth';
 
-                    Route::get($moduleSlug . '/logout', [$resourceClass, 'destroy'])
-                        ->name($moduleSlug . '.logout');
-                }
-
-                if (Str::lower($moduleName) !== 'auth') {
-                    $permissionKey = $moduleSlug . '.' . $featureSlug . '.access';
-
-                    $resourceRoute->middleware(['auth', 'permission:' . $permissionKey]);
-
-                    if (method_exists($resourceClass, 'storeBulk')) {
-                        Route::post($urlSlug . '/bulk', [$resourceClass, 'storeBulk'])
-                            ->middleware(['auth', 'permission:' . $permissionKey])
-                            ->name($routeName . '.bulk');
+                    if ($isAuthModule) {
+                        // Auth module only needs index/store resource routes; logout is handled explicitly below.
+                        $availableActions = array_values(array_intersect($availableActions, ['index', 'store']));
                     }
 
-                    Route::post($urlSlug . '/delete', function (Request $request) use ($resourceClass) {
-                        $id = (string) $request->input('id', '');
+                    if ($availableActions === []) {
+                        continue;
+                    }
 
-                        if (trim($id) === '') {
-                            abort(422, 'Parameter id wajib diisi.');
+                $resourceRoute = Route::resource($urlSlug, $resourceClass)
+                        ->only($availableActions)
+                        ->parameters([$resourceKey => 'id'])
+                        ->names($routeName);
+
+                    if ($isAuthModule && $hasAction($resourceClass, 'destroy')) {
+                        Route::delete($urlSlug, [$resourceClass, 'destroy'])
+                            ->name($routeName . '.logout');
+
+                        Route::get($moduleSlug . '/logout', [$resourceClass, 'destroy'])
+                            ->name($moduleSlug . '.logout');
+                    }
+
+                    if (!$isAuthModule) {
+                        $permissionKey = $moduleSlug . '.' . $featureSlug . '.access';
+
+                        $resourceRoute->middleware(['auth', 'permission:' . $permissionKey]);
+
+                        if ($hasAction($resourceClass, 'storeBulk')) {
+                            Route::post($urlSlug . '/bulk', [$resourceClass, 'storeBulk'])
+                                ->middleware(['auth', 'permission:' . $permissionKey])
+                                ->name($routeName . '.bulk');
                         }
 
-                        return app($resourceClass)->destroy((int) $id);
-                    })
-                        ->middleware(['auth', 'permission:' . $permissionKey])
-                        ->name($routeName . '.delete');
+                        if (in_array('destroy', $availableActions, true)) {
+                            Route::post($urlSlug . '/delete', function (Request $request) use ($resourceClass) {
+                                $validated = $request->validate([
+                                    'id' => ['required', 'integer', 'min:1'],
+                                ]);
 
-                    Route::delete($urlSlug, function (Request $request) use ($resourceClass) {
-                        $id = (string) $request->input('id', '');
+                                return app($resourceClass)->destroy((int) $validated['id']);
+                            })
+                                ->middleware(['auth', 'permission:' . $permissionKey])
+                                ->name($routeName . '.delete');
 
-                        if (trim($id) === '') {
-                            abort(422, 'Parameter id wajib diisi.');
+                            Route::delete($urlSlug, function (Request $request) use ($resourceClass) {
+                                $validated = $request->validate([
+                                    'id' => ['required', 'integer', 'min:1'],
+                                ]);
+
+                                return app($resourceClass)->destroy((int) $validated['id']);
+                            })
+                                ->middleware(['auth', 'permission:' . $permissionKey])
+                                ->name($routeName . '.destroy-by-body');
                         }
-
-                        return app($resourceClass)->destroy((int) $id);
-                    })
-                        ->middleware(['auth', 'permission:' . $permissionKey])
-                        ->name($routeName . '.destroy-by-body');
+                    }
                 }
             }
         }
     }
-}
 
 Route::middleware(['auth', 'permission:inventory.bahan-baku.access'])->group(function () {
     Route::get('inventory/bahan-baku/export/pdf', [BahanBakuResource::class, 'exportPdf'])
