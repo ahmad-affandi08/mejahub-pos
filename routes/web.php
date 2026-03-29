@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Inventory\BahanBaku\BahanBakuResource;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
@@ -92,3 +93,11 @@ if (File::exists($modulesPath)) {
         }
     }
 }
+
+Route::middleware(['auth', 'permission:inventory.bahan-baku.access'])->group(function () {
+    Route::get('inventory/bahan-baku/export/pdf', [BahanBakuResource::class, 'exportPdf'])
+        ->name('inventory.bahan-baku.export-pdf');
+
+    Route::get('inventory/bahan-baku/export/excel', [BahanBakuResource::class, 'exportExcel'])
+        ->name('inventory.bahan-baku.export-excel');
+});

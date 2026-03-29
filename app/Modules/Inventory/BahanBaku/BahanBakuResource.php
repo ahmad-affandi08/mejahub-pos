@@ -4,6 +4,8 @@ namespace App\Modules\Inventory\BahanBaku;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Inventory\Supplier\SupplierEntity;
+use App\Support\ReportExportTrait;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -11,6 +13,8 @@ use Inertia\Response;
 
 class BahanBakuResource extends Controller
 {
+	use ReportExportTrait;
+
 	public function __construct(private readonly BahanBakuService $service)
 	{
 	}
@@ -153,6 +157,87 @@ class BahanBakuResource extends Controller
 		return redirect()
 			->route('inventory.bahan-baku.index')
 			->with('success', 'Bahan baku berhasil dihapus.');
+	}
+
+	public function exportPdf(Request $request)
+	{
+		$search = trim((string) $request->query('search', ''));
+		$rows = $this->service->listForExport($search);
+		$filters = [
+			'period_type' => 'custom',
+			'effective_range' => [
+				'start' => now()->toDateString(),
+				'end' => now()->toDateString(),
+				'label' => 'Master Bahan Baku (' . now()->isoFormat('DD MMM YYYY') . ')',
+			],
+		];
+
+		$storeProfile = $this->storeProfileHeader();
+		$tableHtml = $this->buildExportTableHtml($rows);
+		$html = $this->renderPdfHtml($storeProfile, 'Data Bahan Baku', $tableHtml, $filters);
+		$fileName = $this->exportFileName('bahan-baku', $filters, 'pdf');
+
+		return Pdf::loadHTML($html)
+			->setPaper('a4', 'landscape')
+			->download($fileName);
+	}
+
+	public function exportExcel(Request $request)
+	{
+		$search = trim((string) $request->query('search', ''));
+		$rows = $this->service->listForExport($search);
+		$filters = [
+			'period_type' => 'custom',
+			'effective_range' => [
+				'start' => now()->toDateString(),
+				'end' => now()->toDateString(),
+				'label' => 'Master Bahan Baku (' . now()->isoFormat('DD MMM YYYY') . ')',
+			],
+		];
+
+		$storeProfile = $this->storeProfileHeader();
+		$tableHtml = $this->buildExportTableHtml($rows);
+		$html = $this->renderExcelHtml($storeProfile, 'Data Bahan Baku', $tableHtml, $filters);
+		$fileName = $this->exportFileName('bahan-baku', $filters, 'excel');
+
+		return response($html, 200, [
+			'Content-Type' => 'application/vnd.ms-excel; charset=UTF-8',
+			'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
+		]);
+	}
+
+	private function buildExportTableHtml($rows): string
+	{
+		$html = '<div class="section-title">Data Bahan Baku</div>';
+		$html .= '<table><thead><tr>'
+			. '<th>Kode</th>'
+			. '<th>Nama Bahan</th>'
+			. '<th>Supplier</th>'
+			. '<th>Satuan Besar</th>'
+			. '<th>Satuan Kecil</th>'
+			. '<th>Konversi</th>'
+			. '<th>Stok Saat Ini</th>'
+			. '<th>Stok Minimum</th>'
+			. '<th>Status</th>'
+			. '</tr></thead><tbody>';
+
+		foreach ($rows as $item) {
+			$html .= '<tr>'
+				. '<td>' . e((string) ($item->kode ?? '-')) . '</td>'
+				. '<td>' . e((string) $item->nama) . '</td>'
+				. '<td>' . e((string) ($item->supplier?->nama ?? '-')) . '</td>'
+				. '<td>' . e((string) ($item->satuan_besar ?: '-')) . '</td>'
+				. '<td>' . e((string) ($item->satuan_kecil ?: $item->satuan ?: '-')) . '</td>'
+				. '<td>' . e((string) ((float) ($item->konversi_besar_ke_kecil ?? 1))) . '</td>'
+				. '<td>' . e((string) ((float) $item->stok_saat_ini)) . '</td>'
+				. '<td>' . e((string) ((float) $item->stok_minimum)) . '</td>'
+				. '<td>' . e($item->is_active ? 'Aktif' : 'Nonaktif') . '</td>'
+				. '</tr>';
+		}
+
+		$html .= '</tbody></table>';
+
+		return $html;
 	}
 
 	private function toBaseUnitQty(array $payload, float $qtyInput, string $unitInput): float

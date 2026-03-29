@@ -27,6 +27,7 @@ import Form from "@/Pages/Inventory/BahanBaku/Form";
 export default function Index({ bahanBaku, supplierOptions, filters, flashMessage }) {
     const endpoint = "/inventory/bahan-baku";
     const searchValue = filters?.search ?? "";
+    const exportQuery = searchValue ? `?search=${encodeURIComponent(searchValue)}` : "";
 
     const [openCreate, setOpenCreate] = useState(false);
     const [editingItem, setEditingItem] = useState(null);
@@ -70,25 +71,34 @@ export default function Index({ bahanBaku, supplierOptions, filters, flashMessag
                             <p className="mt-1 text-sm text-slate-600">Kelola stok bahan baku untuk operasional kitchen.</p>
                         </div>
 
-                        <Dialog open={openCreate} onOpenChange={setOpenCreate}>
-                            <DialogTrigger asChild>
-                                <Button>Tambah Bahan Baku</Button>
-                            </DialogTrigger>
-                            <DialogContent className="sm:max-w-xl">
-                                <DialogHeader>
-                                    <DialogTitle>Tambah Bahan Baku</DialogTitle>
-                                    <DialogDescription>Lengkapi data bahan baku dan stok awal.</DialogDescription>
-                                </DialogHeader>
-                                <Form
-                                    mode="create"
-                                    endpoint={endpoint}
-                                    initialValues={null}
-                                    supplierOptions={supplierOptions}
-                                    onSuccess={() => setOpenCreate(false)}
-                                    onCancel={() => setOpenCreate(false)}
-                                />
-                            </DialogContent>
-                        </Dialog>
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                            <Button variant="outline" asChild>
+                                <a href={`/inventory/bahan-baku/export/pdf${exportQuery}`}>Export PDF</a>
+                            </Button>
+                            <Button variant="outline" asChild>
+                                <a href={`/inventory/bahan-baku/export/excel${exportQuery}`}>Export Excel</a>
+                            </Button>
+
+                            <Dialog open={openCreate} onOpenChange={setOpenCreate}>
+                                <DialogTrigger asChild>
+                                    <Button>Tambah Bahan Baku</Button>
+                                </DialogTrigger>
+                                <DialogContent className="sm:max-w-xl">
+                                    <DialogHeader>
+                                        <DialogTitle>Tambah Bahan Baku</DialogTitle>
+                                        <DialogDescription>Lengkapi data bahan baku dan stok awal.</DialogDescription>
+                                    </DialogHeader>
+                                    <Form
+                                        mode="create"
+                                        endpoint={endpoint}
+                                        initialValues={null}
+                                        supplierOptions={supplierOptions}
+                                        onSuccess={() => setOpenCreate(false)}
+                                        onCancel={() => setOpenCreate(false)}
+                                    />
+                                </DialogContent>
+                            </Dialog>
+                        </div>
                     </div>
                 </section>
 

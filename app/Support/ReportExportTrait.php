@@ -72,6 +72,33 @@ trait ReportExportTrait
 	private function buildBaseExportHtml(array $sp, string $title, string $tableHtml, array $filters, bool $forExcel): string
 	{
 		$rangeLabel = (string) ($filters['effective_range']['label'] ?? '-');
+		if ($forExcel) {
+			$brand = !empty($sp['nama_brand']) ? (string) $sp['nama_brand'] : '';
+			$colspan = $this->resolveExcelColspan($tableHtml);
+			$blankCells = str_repeat('<td style="border:none;"></td>', max(0, $colspan - 1));
+			return '<html><head><meta charset="UTF-8" />'
+				. '<title>' . e($title) . '</title>'
+				. '<style>'
+				. 'body{font-family:Arial,sans-serif;font-size:12pt;color:#0f172a;margin:10px;}'
+				. 'table{width:100%;border-collapse:collapse;}'
+				. 'th,td{border:1px solid #111827;padding:4px 6px;font-size:12pt;vertical-align:top;}'
+				. 'th{background:#e2e8f0;text-align:left;font-weight:700;}'
+				. 'div.section-title{font-size:12pt;font-weight:700;margin:10px 0 6px;text-align:left;}'
+				. '</style></head><body>'
+				. '<table border="0" cellpadding="0" cellspacing="0">'
+				. '<tr><td style="border:none;"></td>' . $blankCells . '</tr>'
+				. '<tr><td colspan="' . $colspan . '" align="center" style="border:none;font-size:12pt;font-weight:bold;">' . e((string) ($sp['nama_toko'] ?? 'Mejahub POS')) . '</td></tr>'
+				. ($brand !== '' ? '<tr><td colspan="' . $colspan . '" align="center" style="border:none;font-size:12pt;">' . e($brand) . '</td></tr>' : '')
+				. '<tr><td colspan="' . $colspan . '" align="center" style="border:none;font-size:12pt;">Alamat: ' . e((string) ($sp['alamat_lengkap'] ?? '-')) . '</td></tr>'
+				. '<tr><td colspan="' . $colspan . '" align="center" style="border:none;font-size:12pt;">Telepon: ' . e((string) ($sp['telepon'] ?? '-')) . ' | Email: ' . e((string) ($sp['email'] ?? '-')) . '</td></tr>'
+				. (!empty($sp['npwp']) ? '<tr><td colspan="' . $colspan . '" align="center" style="border:none;font-size:12pt;">NPWP: ' . e((string) $sp['npwp']) . '</td></tr>' : '')
+				. '<tr><td colspan="' . $colspan . '" align="center" style="border:none;font-size:12pt;font-weight:bold;">' . e($title) . ' | Periode: ' . e($rangeLabel) . '</td></tr>'
+				. '<tr><td colspan="' . $colspan . '" style="border:none;">&nbsp;</td></tr>'
+				. '</table>'
+				. $tableHtml
+				. '</body></html>';
+		}
+
 		$headerStyle = $forExcel ? '' : 'style="font-family: \'Times New Roman\', Arial, sans-serif; font-size: 11pt; color: #0f172a;"';
 		$brand = !empty($sp['nama_brand']) ? (string) $sp['nama_brand'] : null;
 
@@ -111,5 +138,13 @@ trait ReportExportTrait
 	protected function formatCurrency(float $value): string
 	{
 		return 'Rp ' . number_format($value, 0, ',', '.');
+	}
+
+	private function resolveExcelColspan(string $tableHtml): int
+	{
+		preg_match_all('/<th\b/i', $tableHtml, $matches);
+		$count = count($matches[0] ?? []);
+
+		return max(1, $count);
 	}
 }

@@ -179,8 +179,9 @@ class BahanBakuSeeder extends Seeder
 
         $insertData = [];
         $now = now();
-        foreach ($bahanBaku as $item) {
+        foreach ($bahanBaku as $index => $item) {
             $insertData[] = [
+            'kode' => 'BB-' . str_pad((string) ($index + 1), 4, '0', STR_PAD_LEFT),
                 'nama' => $item['nama'],
                 'satuan' => $item['satuan'],
                 'harga_beli_terakhir' => 0,
