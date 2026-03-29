@@ -20,6 +20,8 @@ class MenuSeeder extends Seeder
 
         $daftarMenu = [
             ['nama_produk' => 'AIR MINERAL', 'kategori' => 'SOFT DRINK', 'harga_jual' => 7000, 'sku' => 'LIL50'],
+            ['nama_produk' => 'AIR MINERAL', 'kategori' => 'SOFT DRINK', 'harga_jual' => 7000, 'sku' => 'LIL50'],
+            ['nama_produk' => 'CAESAR', 'kategori' => 'WESTERN', 'harga_jual' => 31000, 'sku' => 'lil200'],
             ['nama_produk' => 'AMERICANO', 'kategori' => 'COFFEE', 'harga_jual' => 15000, 'sku' => 'LIL27'],
             ['nama_produk' => "AYAM BAKAR LI'L ESCAPE", 'kategori' => 'Maincourse', 'harga_jual' => 26000, 'sku' => 'LIL03'],
             ['nama_produk' => "AYAM GORENG LI'L ESCAPE", 'kategori' => 'Maincourse', 'harga_jual' => 26000, 'sku' => 'LIL04'],
@@ -36,7 +38,7 @@ class MenuSeeder extends Seeder
             ['nama_produk' => 'CORDON BLEU', 'kategori' => 'WESTERN', 'harga_jual' => 33000, 'sku' => 'LIL02'],
             ['nama_produk' => 'CREAMY CRISPY CHICKEN MUSHROOM', 'kategori' => 'Maincourse', 'harga_jual' => 22000, 'sku' => 'LIL11'],
             ['nama_produk' => 'DONAT KENTANG', 'kategori' => 'PASTRY', 'harga_jual' => 8000, 'sku' => 'LIL23'],
-            ['nama_produk' => 'FETUCINE CARBONARA', 'kategori' => 'PASTA', 'harga_jual' => 19000, 'sku' => 'LIL10'],
+            ['nama_produk' => 'FETTUCINE CARBONARA', 'kategori' => 'PASTA', 'harga_jual' => 19000, 'sku' => 'LIL10'],
             ['nama_produk' => 'Filter Coffe', 'kategori' => 'COFFEE', 'harga_jual' => 15000, 'sku' => 'LIL64'],
             ['nama_produk' => 'FRENCH FRIES', 'kategori' => 'SNACK', 'harga_jual' => 13000, 'sku' => 'LIL51'],
             ['nama_produk' => 'GRILLED CHICKEN STEAK', 'kategori' => 'WESTERN', 'harga_jual' => 29000, 'sku' => 'LIL16'],
@@ -59,7 +61,7 @@ class MenuSeeder extends Seeder
             ['nama_produk' => 'MATCHA', 'kategori' => 'Non Coffee', 'harga_jual' => 22000, 'sku' => 'LIL36'],
             ['nama_produk' => 'MIE GORENG LIL ESCAPE', 'kategori' => 'Maincourse', 'harga_jual' => 19000, 'sku' => 'LIL72'],
             ['nama_produk' => 'MINERAL NESTLE', 'kategori' => 'SOFT DRINK', 'harga_jual' => 6000, 'sku' => 'LIL66'],
-            ['nama_produk' => 'MIX LIL ESCAPE', 'kategori' => 'SNACK', 'harga_jual' => 24000, 'sku' => 'LIL18'],
+            ['nama_produk' => "MIX LI'L ESCAPE", 'kategori' => 'SNACK', 'harga_jual' => 24000, 'sku' => 'LIL18'],
             ['nama_produk' => 'MOCHACINO', 'kategori' => 'COFFEE', 'harga_jual' => 19000, 'sku' => 'LIL30'],
             ['nama_produk' => 'MONT BLACK COFFEE', 'kategori' => 'MOCKTAIL COFFE', 'harga_jual' => 25000, 'sku' => 'LIL49'],
             ['nama_produk' => "NASI GORENG LI'L ESCAPE", 'kategori' => 'Maincourse', 'harga_jual' => 22000, 'sku' => 'LIL05'],

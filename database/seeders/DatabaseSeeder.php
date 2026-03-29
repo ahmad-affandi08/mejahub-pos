@@ -24,6 +24,9 @@ class DatabaseSeeder extends Seeder
             MenuSeeder::class,
             SettingsSeeder::class,
             BahanBakuSeeder::class,
+            ResepBOMSeeder::class,
+            ResepBOMMakananSeeder::class,
+            DataPegawaiKhususSeeder::class,
         ]);
     }
 }
