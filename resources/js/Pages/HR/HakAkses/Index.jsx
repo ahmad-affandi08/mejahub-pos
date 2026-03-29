@@ -1,4 +1,5 @@
 import { Head, router } from "@inertiajs/react";
+import PaginationSelect from "@/components/shared/pagination/PaginationSelect";
 import { useMemo, useState } from "react";
 
 import DashboardLayout from "@/layouts/DashboardLayout";
@@ -196,30 +197,12 @@ export default function Index({ hakAkses, userOptions, permissionCatalog, filter
                     </div>
 
                     {hakAkses?.meta ? (
-                        <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
-                            <span>
-                                Halaman {hakAkses.meta.current_page} dari {hakAkses.meta.last_page} | Total {hakAkses.meta.total} data
-                            </span>
-
-                            <div className="flex gap-2">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={hakAkses.meta.current_page <= 1}
-                                    onClick={() => goPage(hakAkses.meta.current_page - 1)}
-                                >
-                                    Sebelumnya
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={hakAkses.meta.current_page >= hakAkses.meta.last_page}
-                                    onClick={() => goPage(hakAkses.meta.current_page + 1)}
-                                >
-                                    Berikutnya
-                                </Button>
-                            </div>
-                        </div>
+                        <PaginationSelect
+                            currentPage={hakAkses?.meta?.current_page ?? 1}
+                            lastPage={hakAkses?.meta?.last_page ?? 1}
+                            total={hakAkses?.meta?.total ?? 0}
+                            onPageChange={goPage}
+                        />
                     ) : null}
                 </section>
             </div>

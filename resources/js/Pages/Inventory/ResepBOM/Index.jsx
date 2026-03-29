@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import Form from "@/Pages/Inventory/ResepBOM/Form";
+import PaginationSelect from "@/components/shared/pagination/PaginationSelect";
 
 export default function Index({ resepBOM, menuOptions, bahanBakuOptions, categoryOptions, filters, flashMessage }) {
     const endpoint = "/inventory/resep-b-o-m";
@@ -157,13 +158,12 @@ export default function Index({ resepBOM, menuOptions, bahanBakuOptions, categor
                             <div className="col-span-full rounded-xl border py-12 text-center text-sm text-muted-foreground">Belum ada data resep BOM.</div>
                         )}
                     </div>
-                    <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
-                        <span>Halaman {resepBOM.meta.current_page} dari {resepBOM.meta.last_page} | Total {resepBOM.meta.total} menu</span>
-                        <div className="flex gap-2">
-                            <Button variant="outline" size="sm" disabled={resepBOM.meta.current_page <= 1} onClick={() => goPage(resepBOM.meta.current_page - 1)}>Sebelumnya</Button>
-                            <Button variant="outline" size="sm" disabled={resepBOM.meta.current_page >= resepBOM.meta.last_page} onClick={() => goPage(resepBOM.meta.current_page + 1)}>Berikutnya</Button>
-                        </div>
-                    </div>
+                    <PaginationSelect
+                        currentPage={resepBOM?.meta?.current_page ?? 1}
+                        lastPage={resepBOM?.meta?.last_page ?? 1}
+                        total={resepBOM?.meta?.total ?? 0}
+                        onPageChange={goPage}
+                    />
                 </section>
             </div>
         </DashboardLayout>

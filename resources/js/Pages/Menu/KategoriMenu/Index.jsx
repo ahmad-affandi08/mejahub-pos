@@ -1,4 +1,5 @@
 import { Head, router } from "@inertiajs/react";
+import PaginationSelect from "@/components/shared/pagination/PaginationSelect";
 import { useMemo, useState } from "react";
 
 import DashboardLayout from "@/layouts/DashboardLayout";
@@ -176,30 +177,12 @@ export default function Index({ kategoriMenu, filters, flashMessage }) {
                         </TableBody>
                     </Table>
 
-                    <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
-                        <span>
-                            Halaman {kategoriMenu.meta.current_page} dari {kategoriMenu.meta.last_page} | Total {kategoriMenu.meta.total} data
-                        </span>
-
-                        <div className="flex gap-2">
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                disabled={kategoriMenu.meta.current_page <= 1}
-                                onClick={() => goPage(kategoriMenu.meta.current_page - 1)}
-                            >
-                                Sebelumnya
-                            </Button>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                disabled={kategoriMenu.meta.current_page >= kategoriMenu.meta.last_page}
-                                onClick={() => goPage(kategoriMenu.meta.current_page + 1)}
-                            >
-                                Berikutnya
-                            </Button>
-                        </div>
-                    </div>
+                    <PaginationSelect
+                        currentPage={kategoriMenu?.meta?.current_page ?? 1}
+                        lastPage={kategoriMenu?.meta?.last_page ?? 1}
+                        total={kategoriMenu?.meta?.total ?? 0}
+                        onPageChange={goPage}
+                    />
                 </section>
             </div>
         </DashboardLayout>

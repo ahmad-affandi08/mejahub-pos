@@ -1,4 +1,5 @@
 import { Head, router } from "@inertiajs/react";
+import PaginationSelect from "@/components/shared/pagination/PaginationSelect";
 import { useState } from "react";
 
 import { formatIDR } from "@/components/shared/pos/format";
@@ -164,13 +165,12 @@ export default function Index({ salaryTemplates, pegawaiOptions, filters, flashM
                         </TableBody>
                     </Table>
 
-                    <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
-                        <span>Halaman {salaryTemplates.meta.current_page} dari {salaryTemplates.meta.last_page} | Total {salaryTemplates.meta.total} data</span>
-                        <div className="flex gap-2">
-                            <Button variant="outline" size="sm" disabled={salaryTemplates.meta.current_page <= 1} onClick={() => goPage(salaryTemplates.meta.current_page - 1)}>Sebelumnya</Button>
-                            <Button variant="outline" size="sm" disabled={salaryTemplates.meta.current_page >= salaryTemplates.meta.last_page} onClick={() => goPage(salaryTemplates.meta.current_page + 1)}>Berikutnya</Button>
-                        </div>
-                    </div>
+                    <PaginationSelect
+                        currentPage={salaryTemplates?.meta?.current_page ?? 1}
+                        lastPage={salaryTemplates?.meta?.last_page ?? 1}
+                        total={salaryTemplates?.meta?.total ?? 0}
+                        onPageChange={goPage}
+                    />
                 </section>
             </div>
         </DashboardLayout>

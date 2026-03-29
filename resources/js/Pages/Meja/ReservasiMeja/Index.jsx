@@ -1,4 +1,5 @@
 import { Head, router } from "@inertiajs/react";
+import PaginationSelect from "@/components/shared/pagination/PaginationSelect";
 import { useMemo, useState } from "react";
 
 import DashboardLayout from "@/layouts/DashboardLayout";
@@ -165,13 +166,12 @@ export default function Index({ reservasiMeja, mejaOptions, statusOptions, filte
                         </Table>
                     </div>
 
-                    <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
-                        <span>Halaman {reservasiMeja.meta.current_page} dari {reservasiMeja.meta.last_page} | Total {reservasiMeja.meta.total} data</span>
-                        <div className="flex gap-2">
-                            <Button variant="outline" size="sm" disabled={reservasiMeja.meta.current_page <= 1} onClick={() => goPage(reservasiMeja.meta.current_page - 1)}>Sebelumnya</Button>
-                            <Button variant="outline" size="sm" disabled={reservasiMeja.meta.current_page >= reservasiMeja.meta.last_page} onClick={() => goPage(reservasiMeja.meta.current_page + 1)}>Berikutnya</Button>
-                        </div>
-                    </div>
+                    <PaginationSelect
+                        currentPage={reservasiMeja?.meta?.current_page ?? 1}
+                        lastPage={reservasiMeja?.meta?.last_page ?? 1}
+                        total={reservasiMeja?.meta?.total ?? 0}
+                        onPageChange={goPage}
+                    />
                 </section>
             </div>
         </DashboardLayout>

@@ -1,4 +1,5 @@
 import { Head, router } from "@inertiajs/react";
+import PaginationSelect from "@/components/shared/pagination/PaginationSelect";
 
 import { formatIDR } from "@/components/shared/pos/format";
 import TableToolbar from "@/components/shared/table/TableToolbar";
@@ -80,17 +81,7 @@ export default function Index({ memberships, filters, flashMessage }) {
                         </TableBody>
                     </Table>
 
-                    <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
-                        <span>Halaman {currentPage} dari {lastPage} | Total {total} data</span>
-                        <div className="flex gap-2">
-                            <Button variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => goPage(currentPage - 1)}>
-                                Sebelumnya
-                            </Button>
-                            <Button variant="outline" size="sm" disabled={currentPage >= lastPage} onClick={() => goPage(currentPage + 1)}>
-                                Berikutnya
-                            </Button>
-                        </div>
-                    </div>
+                    <PaginationSelect currentPage={currentPage} lastPage={lastPage} total={total} onPageChange={goPage} />
                 </section>
             </div>
         </DashboardLayout>

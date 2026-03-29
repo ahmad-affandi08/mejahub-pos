@@ -1,4 +1,5 @@
 import { Head, router } from "@inertiajs/react";
+import PaginationSelect from "@/components/shared/pagination/PaginationSelect";
 import { useMemo, useState } from "react";
 
 import DashboardLayout from "@/layouts/DashboardLayout";
@@ -162,13 +163,12 @@ export default function Index({ dataMenu, kategoriOptions, filters, flashMessage
                         </Table>
                     </div>
 
-                    <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
-                        <span>Halaman {dataMenu.meta.current_page} dari {dataMenu.meta.last_page} | Total {dataMenu.meta.total} data</span>
-                        <div className="flex gap-2">
-                            <Button variant="outline" size="sm" disabled={dataMenu.meta.current_page <= 1} onClick={() => goPage(dataMenu.meta.current_page - 1)}>Sebelumnya</Button>
-                            <Button variant="outline" size="sm" disabled={dataMenu.meta.current_page >= dataMenu.meta.last_page} onClick={() => goPage(dataMenu.meta.current_page + 1)}>Berikutnya</Button>
-                        </div>
-                    </div>
+                    <PaginationSelect
+                        currentPage={dataMenu?.meta?.current_page ?? 1}
+                        lastPage={dataMenu?.meta?.last_page ?? 1}
+                        total={dataMenu?.meta?.total ?? 0}
+                        onPageChange={goPage}
+                    />
                 </section>
             </div>
         </DashboardLayout>

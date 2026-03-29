@@ -1,4 +1,5 @@
 import { Head, router, useForm } from "@inertiajs/react";
+import PaginationSelect from "@/components/shared/pagination/PaginationSelect";
 
 import TableToolbar from "@/components/shared/table/TableToolbar";
 import { Button } from "@/components/ui/button";
@@ -530,13 +531,12 @@ export default function Index({ imports, batches, hppAnalysis, failedSyncRows, f
                         </Table>
                     </div>
 
-                    <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
-                        <span>Halaman {imports.meta.current_page} dari {imports.meta.last_page} | Total {imports.meta.total} data</span>
-                        <div className="flex gap-2">
-                            <Button variant="outline" size="sm" disabled={imports.meta.current_page <= 1} onClick={() => goPage(imports.meta.current_page - 1)}>Sebelumnya</Button>
-                            <Button variant="outline" size="sm" disabled={imports.meta.current_page >= imports.meta.last_page} onClick={() => goPage(imports.meta.current_page + 1)}>Berikutnya</Button>
-                        </div>
-                    </div>
+                    <PaginationSelect
+                        currentPage={imports?.meta?.current_page ?? 1}
+                        lastPage={imports?.meta?.last_page ?? 1}
+                        total={imports?.meta?.total ?? 0}
+                        onPageChange={goPage}
+                    />
                 </section>
             </div>
         </DashboardLayout>

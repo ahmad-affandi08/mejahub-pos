@@ -1,4 +1,5 @@
 import { Head, router } from "@inertiajs/react";
+import PaginationSelect from "@/components/shared/pagination/PaginationSelect";
 import { useState } from "react";
 
 import POSStatusBadge from "@/components/shared/pos/POSStatusBadge";
@@ -122,13 +123,12 @@ export default function Index({ wasteLogs, bahanBakuOptions, filters, flashMessa
                         </Table>
                     </div>
 
-                    <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
-                        <span>Halaman {wasteLogs.meta.current_page} dari {wasteLogs.meta.last_page} | Total {wasteLogs.meta.total} data</span>
-                        <div className="flex gap-2">
-                            <Button variant="outline" size="sm" disabled={wasteLogs.meta.current_page <= 1} onClick={() => goPage(wasteLogs.meta.current_page - 1)}>Sebelumnya</Button>
-                            <Button variant="outline" size="sm" disabled={wasteLogs.meta.current_page >= wasteLogs.meta.last_page} onClick={() => goPage(wasteLogs.meta.current_page + 1)}>Berikutnya</Button>
-                        </div>
-                    </div>
+                    <PaginationSelect
+                        currentPage={wasteLogs?.meta?.current_page ?? 1}
+                        lastPage={wasteLogs?.meta?.last_page ?? 1}
+                        total={wasteLogs?.meta?.total ?? 0}
+                        onPageChange={goPage}
+                    />
                 </section>
             </div>
         </DashboardLayout>

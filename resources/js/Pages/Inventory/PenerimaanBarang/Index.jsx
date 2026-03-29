@@ -1,4 +1,5 @@
 import { Head, router } from "@inertiajs/react";
+import PaginationSelect from "@/components/shared/pagination/PaginationSelect";
 import { useState } from "react";
 
 import POSStatusBadge from "@/components/shared/pos/POSStatusBadge";
@@ -138,13 +139,12 @@ export default function Index({ penerimaanBarang, purchaseOrderOptions, supplier
                         </Table>
                     </div>
 
-                    <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
-                        <span>Halaman {penerimaanBarang.meta.current_page} dari {penerimaanBarang.meta.last_page} | Total {penerimaanBarang.meta.total} data</span>
-                        <div className="flex gap-2">
-                            <Button variant="outline" size="sm" disabled={penerimaanBarang.meta.current_page <= 1} onClick={() => goPage(penerimaanBarang.meta.current_page - 1)}>Sebelumnya</Button>
-                            <Button variant="outline" size="sm" disabled={penerimaanBarang.meta.current_page >= penerimaanBarang.meta.last_page} onClick={() => goPage(penerimaanBarang.meta.current_page + 1)}>Berikutnya</Button>
-                        </div>
-                    </div>
+                    <PaginationSelect
+                        currentPage={penerimaanBarang?.meta?.current_page ?? 1}
+                        lastPage={penerimaanBarang?.meta?.last_page ?? 1}
+                        total={penerimaanBarang?.meta?.total ?? 0}
+                        onPageChange={goPage}
+                    />
                 </section>
             </div>
         </DashboardLayout>

@@ -1,4 +1,5 @@
 import { Head, router } from "@inertiajs/react";
+import PaginationSelect from "@/components/shared/pagination/PaginationSelect";
 import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -229,13 +230,12 @@ export default function Index({ recycleBin, moduleOptions, filters, flashMessage
                         </Table>
                     </div>
 
-                    <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
-                        <span>Halaman {recycleBin.meta.current_page} dari {recycleBin.meta.last_page} | Total {recycleBin.meta.total} data</span>
-                        <div className="flex gap-2">
-                            <Button variant="outline" size="sm" disabled={recycleBin.meta.current_page <= 1} onClick={() => goPage(recycleBin.meta.current_page - 1)}>Sebelumnya</Button>
-                            <Button variant="outline" size="sm" disabled={recycleBin.meta.current_page >= recycleBin.meta.last_page} onClick={() => goPage(recycleBin.meta.current_page + 1)}>Berikutnya</Button>
-                        </div>
-                    </div>
+                            <PaginationSelect
+                                currentPage={recycleBin?.meta?.current_page ?? 1}
+                                lastPage={recycleBin?.meta?.last_page ?? 1}
+                                total={recycleBin?.meta?.total ?? 0}
+                                onPageChange={goPage}
+                            />
                 </section>
             </div>
         </DashboardLayout>

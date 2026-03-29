@@ -1,4 +1,5 @@
 import { Head, router } from "@inertiajs/react";
+import PaginationSelect from "@/components/shared/pagination/PaginationSelect";
 
 import { formatIDR } from "@/components/shared/pos/format";
 import { Button } from "@/components/ui/button";
@@ -196,29 +197,12 @@ export default function Index({ report, filters }) {
                         </Table>
                     </div>
 
-                    <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
-                        <span>
-                            Halaman {mutationMeta.current_page ?? 1} dari {mutationMeta.last_page ?? 1} | Total {mutationMeta.total ?? 0} mutasi
-                        </span>
-                        <div className="flex gap-2">
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                disabled={(mutationMeta.current_page ?? 1) <= 1}
-                                onClick={() => goPage((mutationMeta.current_page ?? 1) - 1)}
-                            >
-                                Sebelumnya
-                            </Button>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                disabled={(mutationMeta.current_page ?? 1) >= (mutationMeta.last_page ?? 1)}
-                                onClick={() => goPage((mutationMeta.current_page ?? 1) + 1)}
-                            >
-                                Berikutnya
-                            </Button>
-                        </div>
-                    </div>
+                    <PaginationSelect
+                        currentPage={mutationMeta?.current_page ?? 1}
+                        lastPage={mutationMeta?.last_page ?? 1}
+                        total={mutationMeta?.total ?? 0}
+                        onPageChange={goPage}
+                    />
                 </section>
             </div>
         </DashboardLayout>
