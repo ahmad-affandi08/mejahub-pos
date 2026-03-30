@@ -1,5 +1,5 @@
 import { Link, router, usePage } from "@inertiajs/react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
 	CircleDollarSign,
 	ChevronDown,
@@ -163,6 +163,8 @@ const moduleItems = [
 	},
 ];
 
+const SIDEBAR_SCROLL_STORAGE_KEY = "mejahub.dashboard.sidebar.scrollTop";
+
 export default function DashboardLayout({ title = "Dashboard", children }) {
 	const { url, props } = usePage();
 	const userName = props?.auth?.user?.name ?? "Pengguna";
@@ -222,6 +224,7 @@ export default function DashboardLayout({ title = "Dashboard", children }) {
 
 		return initialState;
 	});
+	const sidebarContentRef = useRef(null);
 
 	useEffect(() => {
 		setOpenModules((prev) => {
@@ -243,6 +246,49 @@ export default function DashboardLayout({ title = "Dashboard", children }) {
 			...prev,
 			[title]: !prev[title],
 		}));
+	};
+
+	useEffect(() => {
+		if (typeof window === "undefined") {
+			return;
+		}
+
+		const container = sidebarContentRef.current;
+		if (!container) {
+			return;
+		}
+
+		const savedValue = window.sessionStorage.getItem(SIDEBAR_SCROLL_STORAGE_KEY);
+		if (!savedValue) {
+			return;
+		}
+
+		const nextScrollTop = Number(savedValue);
+		if (!Number.isFinite(nextScrollTop) || nextScrollTop < 0) {
+			return;
+		}
+
+		window.requestAnimationFrame(() => {
+			if (sidebarContentRef.current) {
+				sidebarContentRef.current.scrollTop = nextScrollTop;
+			}
+		});
+	}, [url]);
+
+	const handleSidebarScroll = () => {
+		if (typeof window === "undefined") {
+			return;
+		}
+
+		const container = sidebarContentRef.current;
+		if (!container) {
+			return;
+		}
+
+		window.sessionStorage.setItem(
+			SIDEBAR_SCROLL_STORAGE_KEY,
+			String(container.scrollTop)
+		);
 	};
 
 	return (
@@ -273,7 +319,11 @@ export default function DashboardLayout({ title = "Dashboard", children }) {
 						</SidebarMenu>
 					</SidebarHeader>
 
-					<SidebarContent className="bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_48%),linear-gradient(180deg,rgba(255,255,255,0.03)_0%,rgba(255,255,255,0)_100%)]">
+					<SidebarContent
+						ref={sidebarContentRef}
+						onScroll={handleSidebarScroll}
+						className="bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_48%),linear-gradient(180deg,rgba(255,255,255,0.03)_0%,rgba(255,255,255,0)_100%)]"
+					>
 						<SidebarGroup>
 							<SidebarGroupLabel className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-sidebar-foreground/65">
 								MENU
