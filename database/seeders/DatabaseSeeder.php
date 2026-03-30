@@ -24,7 +24,6 @@ class DatabaseSeeder extends Seeder
             MenuSeeder::class,
             SettingsSeeder::class,
             DataPegawaiKhususSeeder::class,
-            \Database\Seeders\PengaturanGajiPokokSeeder::class,
             \Database\Seeders\PengaturanGajiSeeder::class,
         ]);
     }

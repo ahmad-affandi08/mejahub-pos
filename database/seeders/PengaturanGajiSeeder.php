@@ -26,6 +26,21 @@ class PengaturanGajiSeeder extends Seeder
             ['nama' => 'ARIF', 'gaji_pokok' => 1200000, 'lembur_per_jam' => 5000, 'potongan_per_izin' => 0, 'bonus' => 0, 'is_active' => true],
         ];
 
+        $defaultByJabatan = [
+            'kitchen' => 1700000,
+            'waiters' => 1200000,
+            'kasir' => 1500000,
+            'barista' => 1400000,
+            'dishwasher' => 1200000,
+            'manajer' => 2000000,
+        ];
+
+        // compute default lembur per jam as gaji_pokok / 240 (consistent with existing seeds)
+        $defaultLemburByJabatan = [];
+        foreach ($defaultByJabatan as $k => $gaji) {
+            $defaultLemburByJabatan[$k] = round(((float) $gaji) / 240, 2);
+        }
+
         foreach ($rows as $row) {
             $name = trim($row['nama']);
 
@@ -84,13 +99,20 @@ class PengaturanGajiSeeder extends Seeder
                 continue;
             }
 
+            // determine default lembur_per_jam from jabatan if not provided
+            $jabatanKey = strtolower(trim((string) $pegawai->jabatan));
+            $computedLembur = $defaultLemburByJabatan[$jabatanKey] ?? 0;
+            $lemburPerJam = isset($row['lembur_per_jam']) && (float) $row['lembur_per_jam'] > 0
+                ? (float) $row['lembur_per_jam']
+                : $computedLembur;
+
             PengaturanGajiEntity::query()->updateOrCreate(
                 ['pegawai_id' => $pegawai->id],
                 [
                     'gaji_pokok' => (float) $row['gaji_pokok'],
                     'kebijakan_penggajian' => [
                         'aktifkan_kebijakan' => true,
-                        'lembur_per_jam' => (float) ($row['lembur_per_jam'] ?? 0),
+                        'lembur_per_jam' => $lemburPerJam,
                         'lembur_min_menit' => 60,
                         'potong_izin' => (float) ($row['potongan_per_izin'] ?? 0) > 0,
                         'potongan_per_izin' => (float) ($row['potongan_per_izin'] ?? 0),
@@ -145,15 +167,30 @@ class PengaturanGajiSeeder extends Seeder
                 continue;
             }
 
+            $jabatanKeyFound = strtolower(trim((string) $found->jabatan));
+            $computedLemburFound = $defaultLemburByJabatan[$jabatanKeyFound] ?? 0;
+
             PengaturanGajiEntity::query()->create([
                 'pegawai_id' => (int) $found->id,
                 'gaji_pokok' => (float) $gajiPokok,
-                'kebijakan_penggajian' => null,
+                'kebijakan_penggajian' => [
+                    'aktifkan_kebijakan' => true,
+                    'lembur_per_jam' => $computedLemburFound,
+                    'lembur_min_menit' => 60,
+                    'potong_izin' => false,
+                    'potongan_per_izin' => 0,
+                    'potong_sakit' => false,
+                    'potongan_per_sakit' => 0,
+                    'potong_alpha' => true,
+                    'potongan_per_alpha' => 0,
+                    'potong_terlambat' => false,
+                    'potongan_per_terlambat' => 0,
+                ],
                 'catatan' => 'Auto-seed gaji pokok berdasarkan jabatan untuk nama pendek.',
                 'is_active' => true,
             ]);
 
-            $this->command->info("Pengaturan gaji (default jabatan) dibuat untuk: {$found->nama} — gaji_pokok: {$gajiPokok}");
+            $this->command->info("Pengaturan gaji (default jabatan) dibuat untuk: {$found->nama} — gaji_pokok: {$gajiPokok}, lembur_per_jam: {$computedLemburFound}");
         }
     }
 }
