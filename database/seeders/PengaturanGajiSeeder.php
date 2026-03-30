@@ -108,5 +108,52 @@ class PengaturanGajiSeeder extends Seeder
 
             $this->command->info("Pengaturan gaji dibuat/diperbarui untuk: {$name}");
         }
+
+        // Jika ada nama tertentu yang belum punya pengaturan, seed berdasarkan jabatan
+        $ensureByName = ['RAGIL', 'RIAN', 'ANANDA'];
+
+        $defaultByJabatan = [
+            'kitchen' => 1700000,
+            'waiters' => 1200000,
+            'kasir' => 1500000,
+            'barista' => 1400000,
+            'dishwasher' => 1200000,
+            'manajer' => 2000000,
+        ];
+
+        foreach ($ensureByName as $shortName) {
+            $found = DataPegawaiEntity::query()
+                ->whereRaw('LOWER(nama) LIKE ?', ['%' . mb_strtolower($shortName) . '%'])
+                ->first();
+
+            if (! $found) {
+                $this->command->warn("Tidak menemukan pegawai untuk nama pendek: {$shortName}");
+                continue;
+            }
+
+            $exists = PengaturanGajiEntity::query()->where('pegawai_id', $found->id)->exists();
+            if ($exists) {
+                $this->command->info("Pengaturan sudah ada untuk: {$found->nama}");
+                continue;
+            }
+
+            $jabatanKey = strtolower(trim((string) $found->jabatan));
+            $gajiPokok = $defaultByJabatan[$jabatanKey] ?? null;
+
+            if ($gajiPokok === null) {
+                $this->command->warn("Tidak ada default gaji untuk jabatan: {$found->jabatan} (pegawai: {$found->nama})");
+                continue;
+            }
+
+            PengaturanGajiEntity::query()->create([
+                'pegawai_id' => (int) $found->id,
+                'gaji_pokok' => (float) $gajiPokok,
+                'kebijakan_penggajian' => null,
+                'catatan' => 'Auto-seed gaji pokok berdasarkan jabatan untuk nama pendek.',
+                'is_active' => true,
+            ]);
+
+            $this->command->info("Pengaturan gaji (default jabatan) dibuat untuk: {$found->nama} — gaji_pokok: {$gajiPokok}");
+        }
     }
 }
