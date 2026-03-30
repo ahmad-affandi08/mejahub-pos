@@ -461,17 +461,39 @@ class JadwalShiftService
 
     public function generate(array $payload): int
     {
+        // Logic will be changed to delegate or keep as is. Actually, if we just use generateDraft & saveBulk, we might not even need 'generate' anymore if we replace the UI completely.
+        $drafts = $this->generateDraft($payload);
+        if ($payload['skip_existing'] ?? true) {
+            // filter out existing
+            $existing = JadwalShiftEntity::query()
+                ->whereIn('pegawai_id', collect($drafts)->pluck('pegawai_id')->unique())
+                ->whereIn('tanggal', collect($drafts)->pluck('tanggal')->unique())
+                ->get()
+                ->groupBy(fn($i) => $i->pegawai_id . '#' . $i->tanggal);
+            
+            $drafts = array_filter($drafts, function($d) use ($existing) {
+                return !isset($existing[$d['pegawai_id'] . '#' . $d['tanggal']]);
+            });
+        }
+        return $this->saveBulk($drafts);
+    }
+
+    public function generateDraft(array $payload): array
+    {
         $startDate = Carbon::parse($payload['tanggal_mulai'])->startOfDay();
         $endDate = Carbon::parse($payload['tanggal_selesai'])->startOfDay();
         $days = $this->normalizeWeekdays($payload['hari_kerja'] ?? []);
         $pegawaiIds = collect($payload['pegawai_ids'] ?? [])->map(fn ($id) => (int) $id)->filter()->values();
         $pegawaiByJabatan = $this->buildPegawaiGroupByJabatan($pegawaiIds);
+        
+        $pegawaiList = DataPegawaiEntity::query()->whereIn('id', $pegawaiIds)->get()->keyBy('id');
+        
         $shiftSlots = $this->getShiftSlotMap();
         $useFormula = (bool) ($payload['use_formula'] ?? true);
         $generateLibur = (bool) ($payload['generate_libur'] ?? true);
 
         if ($pegawaiByJabatan->isEmpty() || empty($shiftSlots) || empty($days)) {
-            return 0;
+            return [];
         }
 
         $workingDates = [];
@@ -482,7 +504,7 @@ class JadwalShiftService
         }
 
         if ($workingDates === []) {
-            return 0;
+            return [];
         }
 
         $targetOffCount = intdiv(count($workingDates), 7);
@@ -494,8 +516,7 @@ class JadwalShiftService
             $weekdayIndexes
         );
 
-        $skipExisting = (bool) ($payload['skip_existing'] ?? true);
-        $created = 0;
+        $drafts = [];
 
         foreach ($workingDates as $dayOffset => $dateString) {
 
@@ -509,46 +530,93 @@ class JadwalShiftService
                 foreach ($pegawaiInJabatan as $pegawaiId) {
                     $pegawaiId = (int) $pegawaiId;
 
-                    $exists = JadwalShiftEntity::query()
-                        ->where('pegawai_id', $pegawaiId)
-                        ->whereDate('tanggal', $dateString)
-                        ->exists();
-
-                    if ($exists && $skipExisting) {
-                        continue;
-                    }
-
-                    if ($exists && !$skipExisting) {
-                        JadwalShiftEntity::query()
-                            ->where('pegawai_id', $pegawaiId)
-                            ->whereDate('tanggal', $dateString)
-                            ->delete();
-                    }
-
                     $shiftId = $assignments[$pegawaiId] ?? null;
+                    
+                    // Override with pola_shift if exists
+                    $pegawai = $pegawaiList->get($pegawaiId);
+                    if ($pegawai && is_array($pegawai->pola_shift)) {
+                        $dayOfWeek = (int) Carbon::parse($dateString)->dayOfWeekIso;
+                        if (array_key_exists($dayOfWeek, $pegawai->pola_shift)) {
+                            $shiftId = $pegawai->pola_shift[$dayOfWeek] ?: null;
+                        }
+                    }
+
                     $isLibur = $shiftId === null;
 
                     if ($isLibur && !$generateLibur) {
                         continue;
                     }
 
-                    JadwalShiftEntity::query()->create([
-                        'kode' => $this->generateCode($payload['kode_prefix'] ?? null, $dateString, $pegawaiId),
+                    $drafts[] = [
                         'pegawai_id' => $pegawaiId,
-                        'shift_id' => $shiftId,
                         'tanggal' => $dateString,
-                        'status' => $isLibur ? 'libur' : ($payload['status'] ?? 'published'),
-                        'sumber_jadwal' => 'generate',
-                        'catatan' => $payload['catatan'] ?? null,
-                        'is_active' => true,
-                    ]);
-
-                    $created++;
+                        'shift_id' => $shiftId,
+                    ];
                 }
             }
         }
 
-        return $created;
+        return $drafts;
+    }
+
+    public function copyDraft(array $payload): array
+    {
+        $sourceStart = Carbon::parse($payload['tanggal_mulai_sumber'])->startOfDay();
+        $sourceEnd = Carbon::parse($payload['tanggal_selesai_sumber'])->startOfDay();
+        $targetStart = Carbon::parse($payload['tanggal_mulai_tujuan'])->startOfDay();
+
+        $pegawaiIds = collect($payload['pegawai_ids'] ?? [])->map(fn ($id) => (int) $id)->filter()->values();
+
+        $sourceJadwal = JadwalShiftEntity::query()
+            ->when($pegawaiIds->isNotEmpty(), fn($q) => $q->whereIn('pegawai_id', $pegawaiIds))
+            ->whereDate('tanggal', '>=', $sourceStart->toDateString())
+            ->whereDate('tanggal', '<=', $sourceEnd->toDateString())
+            ->orderBy('tanggal')
+            ->get();
+
+        $drafts = [];
+
+        foreach ($sourceJadwal as $item) {
+            $sourceDate = Carbon::parse($item->tanggal)->startOfDay();
+            $offset = $sourceStart->diffInDays($sourceDate); // absolute difference in days
+            $targetDate = $targetStart->copy()->addDays($offset);
+
+            $drafts[] = [
+                'pegawai_id' => $item->pegawai_id,
+                'tanggal' => $targetDate->toDateString(),
+                'shift_id' => $item->shift_id,
+            ];
+        }
+
+        return $drafts;
+    }
+
+    public function saveBulk(array $items): int
+    {
+        $saved = 0;
+        foreach ($items as $item) {
+            JadwalShiftEntity::query()
+                ->where('pegawai_id', $item['pegawai_id'])
+                ->where('tanggal', $item['tanggal'])
+                ->delete();
+
+            $isLibur = empty($item['shift_id']);
+
+            JadwalShiftEntity::query()->create([
+                'kode' => $this->generateCode(null, $item['tanggal'], $item['pegawai_id']),
+                'pegawai_id' => $item['pegawai_id'],
+                'shift_id' => $isLibur ? null : $item['shift_id'],
+                'tanggal' => $item['tanggal'],
+                'status' => $isLibur ? 'libur' : 'published',
+                'sumber_jadwal' => 'generate',
+                'catatan' => null,
+                'is_active' => true,
+            ]);
+
+            $saved++;
+        }
+
+        return $saved;
     }
 
     private function buildPegawaiGroupByJabatan(Collection $pegawaiIds): Collection

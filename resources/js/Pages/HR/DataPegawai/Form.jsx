@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 
-export default function Form({ mode, endpoint, initialValues, onSuccess, onCancel }) {
+export default function Form({ mode, endpoint, initialValues, shiftOptions, onSuccess, onCancel }) {
 	const { data, setData, post, transform, processing, errors, reset } = useForm({
 		no_identitas: initialValues?.no_identitas ?? "",
 		nama: initialValues?.nama ?? "",
@@ -14,6 +14,9 @@ export default function Form({ mode, endpoint, initialValues, onSuccess, onCance
 		email: initialValues?.email ?? "",
 		password: "",
 		is_active: initialValues?.is_active ?? true,
+		pola_shift: initialValues?.pola_shift || {
+			1: "", 2: "", 3: "", 4: "", 5: "", 6: "", 7: ""
+		},
 	});
 
 	const submit = (event) => {
@@ -134,6 +137,30 @@ export default function Form({ mode, endpoint, initialValues, onSuccess, onCance
 					<option value="0">Nonaktif</option>
 				</select>
 				{errors.is_active ? <p className="text-xs text-destructive">{errors.is_active}</p> : null}
+			</div>
+
+			<div className="rounded-xl border border-dashed border-cyan-300 bg-cyan-50/50 p-3">
+				<p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-cyan-700">Pola Shift Mingguan (Opsional)</p>
+				<div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+					{[1, 2, 3, 4, 5, 6, 7].map((dayCode) => {
+						const labels = {1: "Senin", 2: "Selasa", 3: "Rabu", 4: "Kamis", 5: "Jumat", 6: "Sabtu", 7: "Minggu"};
+						return (
+							<div key={dayCode} className="space-y-1">
+								<label className="text-xs font-medium text-slate-700">{labels[dayCode]}</label>
+								<select 
+									className="w-full text-xs h-8 rounded border bg-white px-2 cursor-pointer"
+									value={data.pola_shift[dayCode] || ""}
+									onChange={(e) => setData("pola_shift", {...data.pola_shift, [dayCode]: e.target.value ? parseInt(e.target.value) : ""})}
+								>
+									<option value="">-- Libur / Rotasi --</option>
+									{shiftOptions?.map(s => (
+										<option key={s.id} value={s.id}>{s.nama} ({s.jam_masuk})</option>
+									))}
+								</select>
+							</div>
+						)
+					})}
+				</div>
 			</div>
 
 			<DialogFooter>

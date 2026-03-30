@@ -25,6 +25,8 @@ import {
 import DashboardLayout from "@/layouts/DashboardLayout";
 import Form from "@/Pages/HR/JadwalShift/Form";
 import GenerateForm from "@/Pages/HR/JadwalShift/GenerateForm";
+import CopyScheduleForm from "@/Pages/HR/JadwalShift/CopyScheduleForm";
+import DraftReviewMatrix from "@/Pages/HR/JadwalShift/DraftReviewMatrix";
 
 function formatMonthValue(date) {
     const year = date.getFullYear();
@@ -50,6 +52,8 @@ export default function Index({ jadwalShift, pegawaiOptions, shiftOptions, filte
 
     const [openCreate, setOpenCreate] = useState(false);
     const [openGenerate, setOpenGenerate] = useState(false);
+    const [openCopy, setOpenCopy] = useState(false);
+    const [drafts, setDrafts] = useState(null);
     const [editingItem, setEditingItem] = useState(null);
     const [exportDateFrom, setExportDateFrom] = useState(exportRangeStartDefault);
     const [exportDateTo, setExportDateTo] = useState(exportRangeEndDefault);
@@ -128,7 +132,31 @@ export default function Index({ jadwalShift, pegawaiOptions, shiftOptions, filte
                                         <DialogTitle>Generate Jadwal Shift</DialogTitle>
                                         <DialogDescription>Buat jadwal otomatis untuk banyak pegawai berdasarkan jabatan, tanggal, dan hari kerja.</DialogDescription>
                                     </DialogHeader>
-                                    <GenerateForm endpoint={endpoint} pegawaiOptions={pegawaiOptions} onSuccess={() => setOpenGenerate(false)} onCancel={() => setOpenGenerate(false)} />
+                                    <GenerateForm endpoint={endpoint} pegawaiOptions={pegawaiOptions} onSuccess={(draftData) => { setDrafts(draftData); setOpenGenerate(false); }} onCancel={() => setOpenGenerate(false)} />
+                                </DialogContent>
+                            </Dialog>
+
+                            <Dialog open={openCopy} onOpenChange={setOpenCopy}>
+                                <DialogTrigger asChild>
+                                    <Button variant="outline">Salin Jadwal</Button>
+                                </DialogTrigger>
+                                <DialogContent className="sm:max-w-2xl">
+                                    <DialogHeader>
+                                        <DialogTitle>Salin Jadwal dari Minggu Lalu</DialogTitle>
+                                        <DialogDescription>Tarik data jadwal pada rentang periode sebelumnya, dan pindahkan ke periode minggu/bulan depan.</DialogDescription>
+                                    </DialogHeader>
+                                    <CopyScheduleForm endpoint={endpoint} pegawaiOptions={pegawaiOptions} onSuccess={(draftData) => { setDrafts(draftData); setOpenCopy(false); }} onCancel={() => setOpenCopy(false)} />
+                                </DialogContent>
+                            </Dialog>
+
+                            <Dialog open={!!drafts} onOpenChange={(open) => { if (!open) setDrafts(null); }}>
+                                <DialogContent className="sm:max-w-[90vw] max-h-[90vh] overflow-hidden flex flex-col">
+                                    <DialogHeader>
+                                        <DialogTitle>Review Draft Jadwal</DialogTitle>
+                                    </DialogHeader>
+                                    {drafts && (
+                                        <DraftReviewMatrix drafts={drafts} pegawaiOptions={pegawaiOptions} shiftOptions={shiftOptions} endpoint={endpoint} onSuccess={() => { setDrafts(null); window.location.reload(); }} onCancel={() => setDrafts(null)} />
+                                    )}
                                 </DialogContent>
                             </Dialog>
 

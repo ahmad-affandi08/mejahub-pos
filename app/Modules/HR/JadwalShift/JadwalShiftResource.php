@@ -78,8 +78,22 @@ class JadwalShiftResource extends Controller
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request): RedirectResponse|\Illuminate\Http\JsonResponse
     {
+        if ($request->boolean('is_copy')) {
+            $payload = $request->validate([
+                'tanggal_mulai_sumber' => ['required', 'date'],
+                'tanggal_selesai_sumber' => ['required', 'date', 'after_or_equal:tanggal_mulai_sumber'],
+                'tanggal_mulai_tujuan' => ['required', 'date'],
+                'pegawai_ids' => ['nullable', 'array'],
+                'pegawai_ids.*' => ['integer', 'exists:data_pegawai,id'],
+            ]);
+
+            return response()->json([
+                'drafts' => $this->service->copyDraft($payload)
+            ]);
+        }
+
         $isGenerate = $request->boolean('generate_mode');
 
         if ($isGenerate) {
@@ -97,7 +111,14 @@ class JadwalShiftResource extends Controller
                 'skip_existing' => ['nullable', 'boolean'],
                 'use_formula' => ['nullable', 'boolean'],
                 'generate_libur' => ['nullable', 'boolean'],
+                'is_draft' => ['nullable', 'boolean'],
             ]);
+
+            if ($request->boolean('is_draft')) {
+                return response()->json([
+                    'drafts' => $this->service->generateDraft($payload)
+                ]);
+            }
 
             $created = $this->service->generate($payload);
 
@@ -136,6 +157,20 @@ class JadwalShiftResource extends Controller
         $this->service->update($id, $payload);
 
         return redirect()->route('hr.jadwal-shift.index')->with('success', 'Jadwal shift berhasil diperbarui.');
+    }
+
+    public function storeBulk(Request $request): HttpResponse
+    {
+        $payload = $request->validate([
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.pegawai_id' => ['required', 'integer', 'exists:data_pegawai,id'],
+            'items.*.tanggal' => ['required', 'date'],
+            'items.*.shift_id' => ['nullable', 'integer', 'exists:pengaturan_shift,id'],
+        ]);
+
+        $this->service->saveBulk($payload['items']);
+
+        return response()->json(['message' => 'Draft jadwal berhasil disimpan.']);
     }
 
     public function destroy(int $id): RedirectResponse

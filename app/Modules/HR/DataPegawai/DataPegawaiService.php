@@ -37,6 +37,7 @@ class DataPegawaiService
                 'nomor_telepon' => $payload['nomor_telepon'] ?? null,
                 'alamat' => $payload['alamat'] ?? null,
                 'is_active' => (bool) ($payload['is_active'] ?? true),
+                'pola_shift' => $payload['pola_shift'] ?? null,
             ]);
         });
     }
@@ -56,6 +57,7 @@ class DataPegawaiService
                 'nomor_telepon' => $payload['nomor_telepon'] ?? null,
                 'alamat' => $payload['alamat'] ?? null,
                 'is_active' => (bool) ($payload['is_active'] ?? true),
+                'pola_shift' => $payload['pola_shift'] ?? null,
             ]);
 
             return $pegawai->refresh()->load('user:id,name,email');

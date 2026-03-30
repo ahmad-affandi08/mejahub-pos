@@ -19,6 +19,7 @@ class DataPegawaiEntity extends Model
 
     protected $casts = [
         'is_active' => 'boolean',
+        'pola_shift' => 'array',
     ];
 
     public function user(): BelongsTo

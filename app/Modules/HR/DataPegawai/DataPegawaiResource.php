@@ -8,6 +8,8 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
+use App\Modules\HR\PengaturanShift\PengaturanShiftEntity;
+
 class DataPegawaiResource extends Controller
 {
 	public function __construct(private readonly DataPegawaiService $service)
@@ -25,6 +27,7 @@ class DataPegawaiResource extends Controller
 
 		return Inertia::render('HR/DataPegawai/Index', [
 			'pegawai' => DataPegawaiCollection::toIndex($paginator),
+			'shiftOptions' => PengaturanShiftEntity::query()->select(['id', 'nama', 'jam_masuk', 'jam_keluar'])->where('is_active', true)->orderBy('nama')->get(),
 			'filters' => [
 				'search' => $search,
 				'per_page' => $perPage,
@@ -46,6 +49,7 @@ class DataPegawaiResource extends Controller
 			'email' => ['nullable', 'email', 'max:255', 'unique:users,email'],
 			'password' => ['nullable', 'required_with:email', 'string', 'min:8'],
 			'is_active' => ['nullable', 'boolean'],
+			'pola_shift' => ['nullable', 'array'],
 		]);
 
 		$payload['is_active'] = (bool) ($payload['is_active'] ?? true);
@@ -71,6 +75,7 @@ class DataPegawaiResource extends Controller
 			'email' => ['nullable', 'email', 'max:255', 'unique:users,email,' . $userId],
 			'password' => ['nullable', 'string', 'min:8'],
 			'is_active' => ['nullable', 'boolean'],
+			'pola_shift' => ['nullable', 'array'],
 		]);
 
 		$payload['is_active'] = (bool) ($payload['is_active'] ?? true);

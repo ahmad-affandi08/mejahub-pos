@@ -53,13 +53,22 @@ export default function GenerateForm({ endpoint, pegawaiOptions, onSuccess, onCa
         setData("hari_kerja", [...current, day]);
     };
 
-    const submit = (event) => {
+    const submit = async (event) => {
         event.preventDefault();
 
-        post(endpoint, {
-            preserveScroll: true,
-            onSuccess: () => onSuccess?.(),
-        });
+        try {
+            const response = await window.axios.post(endpoint, {
+                ...data,
+                is_draft: true,
+            });
+
+            if (response.data && response.data.drafts) {
+                onSuccess?.(response.data.drafts);
+            }
+        } catch (error) {
+            console.error("Gagal generate draft", error);
+            // Handle error response or display validation message if setup using Inertia hooks
+        }
     };
 
     const selectAllPegawai = () => {
@@ -173,7 +182,7 @@ export default function GenerateForm({ endpoint, pegawaiOptions, onSuccess, onCa
 
             <DialogFooter className="sticky bottom-0 border-t bg-white pt-3">
                 <Button type="button" variant="outline" onClick={onCancel}>Batal</Button>
-                <Button type="submit" disabled={processing}>{processing ? "Generate..." : "Generate Jadwal"}</Button>
+                <Button type="submit">Preview Draft Jadwal</Button>
             </DialogFooter>
         </form>
     );
