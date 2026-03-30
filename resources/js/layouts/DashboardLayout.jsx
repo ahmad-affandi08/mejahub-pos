@@ -254,22 +254,22 @@ export default function DashboardLayout({ title = "Dashboard", children }) {
 				>
 					<SidebarHeader className="border-b border-white/10 p-3 group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:border-none">
 						<SidebarMenu>
-							<SidebarMenuItem>
-								<SidebarMenuButton
-									asChild
-									size="lg"
-									className="h-14 rounded-xl bg-white/5 px-3 hover:bg-white/10 group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:p-0! group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:hover:bg-transparent"
-								>
-									<Link href="/" className="flex items-center group-data-[collapsible=icon]:justify-center">
-										<Logo
-											className="w-full group-data-[collapsible=icon]:w-6 group-data-[collapsible=icon]:h-6"
-											textClassName="text-3xl text-sidebar-foreground group-data-[collapsible=icon]:hidden"
-											iconClassName="h-4 w-4 translate-y-[1px] group-data-[collapsible=icon]:h-6 group-data-[collapsible=icon]:w-6 group-data-[collapsible=icon]:translate-y-0"
-											accentClassName="text-sidebar-primary"
-										/>
-									</Link>
-								</SidebarMenuButton>
-							</SidebarMenuItem>
+								<SidebarMenuItem>
+									<SidebarMenuButton
+										asChild
+										size="lg"
+										className="h-14 rounded-xl bg-white/5 px-3 hover:bg-white/10 group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:p-0! group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:hover:bg-transparent"
+									>
+										<Link href="/" className="flex items-center justify-center">
+											<Logo
+												className="w-full group-data-[collapsible=icon]:w-6 group-data-[collapsible=icon]:h-6"
+												textClassName="text-3xl text-sidebar-foreground group-data-[collapsible=icon]:hidden"
+												iconClassName="h-4 w-4 translate-y-[1px] group-data-[collapsible=icon]:h-6 group-data-[collapsible=icon]:w-6 group-data-[collapsible=icon]:translate-y-0"
+												accentClassName="text-sidebar-primary"
+											/>
+										</Link>
+									</SidebarMenuButton>
+								</SidebarMenuItem>
 						</SidebarMenu>
 					</SidebarHeader>
 

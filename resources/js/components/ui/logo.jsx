@@ -5,9 +5,9 @@ import { Coffee } from "lucide-react";
 
 export function Logo({ className, textClassName, iconClassName, accentClassName }) {
     return (
-        <div className={cn("flex items-center", className)}>
+        <div className={cn("flex items-center justify-center", className)}>
             <h1
-                className={cn("inline-flex items-center gap-1 text-5xl text-secondary", textClassName)}
+                className={cn("inline-flex items-center justify-center gap-1 text-5xl text-secondary text-center", textClassName)}
                 style={{ fontFamily: "var(--font-lobster-two)" }}
             >
                 Meja

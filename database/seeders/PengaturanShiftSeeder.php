@@ -19,19 +19,19 @@ class PengaturanShiftSeeder extends Seeder
 
 		$rows = [
 			[
-				'kode' => 'SHIFT-PAGI',
+				'kode' => 'P1',
 				'nama' => 'Pagi',
 				'jam_masuk' => '08:00:00',
 				'jam_keluar' => '15:00:00',
 			],
 			[
-				'kode' => 'SHIFT-MIDDLE',
-				'nama' => 'middle',
+				'kode' => 'M1',
+				'nama' => 'Middle',
 				'jam_masuk' => '12:00:00',
 				'jam_keluar' => '20:00:00',
 			],
 			[
-				'kode' => 'SHIFT-SORE',
+				'kode' => 'S1',
 				'nama' => 'Sore',
 				'jam_masuk' => '15:00:00',
 				'jam_keluar' => '23:00:00',
