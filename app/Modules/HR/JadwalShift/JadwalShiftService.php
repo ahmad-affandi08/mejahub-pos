@@ -925,8 +925,14 @@ class JadwalShiftService
 
     private function normalizePayload(array $payload, bool $isGenerate): array
     {
+        $kode = $payload['kode'] ?? null;
+
+        if (empty($kode) && !empty($payload['tanggal']) && !empty($payload['pegawai_id'])) {
+            $kode = $this->generateCode(null, $payload['tanggal'], (int) $payload['pegawai_id']);
+        }
+
         return [
-            'kode' => $payload['kode'] ?? null,
+            'kode' => $kode,
             'pegawai_id' => $payload['pegawai_id'] ?? null,
             'shift_id' => $payload['shift_id'] ?? null,
             'tanggal' => $payload['tanggal'],
