@@ -29,9 +29,55 @@ class PengaturanGajiSeeder extends Seeder
         foreach ($rows as $row) {
             $name = trim($row['nama']);
 
-            $pegawai = DataPegawaiEntity::query()
-                ->whereRaw('LOWER(nama) = ?', [mb_strtolower($name)])
-                ->first();
+            $find = function (string $name) {
+                $normalized = mb_strtolower(preg_replace('/\s+/', ' ', $name));
+
+                // 1) exact match (case-insensitive)
+                $one = DataPegawaiEntity::query()
+                    ->whereRaw('LOWER(nama) = ?', [$normalized])
+                    ->first();
+
+                if ($one) {
+                    return $one;
+                }
+
+                // 2) LIKE match
+                $like = DataPegawaiEntity::query()
+                    ->whereRaw('LOWER(nama) LIKE ?', ['%' . $normalized . '%'])
+                    ->get();
+
+                if ($like->count() === 1) {
+                    return $like->first();
+                }
+
+                if ($like->count() > 1) {
+                    // multiple matches — return first but warn
+                    $this->command->warn("Beberapa pegawai cocok untuk '{$name}' — menggunakan: {$like->first()->nama}");
+                    return $like->first();
+                }
+
+                // 3) token fallback: try first token
+                $tokens = preg_split('/\s+/', $normalized);
+                if (! empty($tokens)) {
+                    $first = $tokens[0];
+                    $tokenMatch = DataPegawaiEntity::query()
+                        ->whereRaw('LOWER(nama) LIKE ?', ['%' . $first . '%'])
+                        ->get();
+
+                    if ($tokenMatch->count() === 1) {
+                        return $tokenMatch->first();
+                    }
+
+                    if ($tokenMatch->count() > 1) {
+                        $this->command->warn("Beberapa pegawai cocok untuk token '{$first}' — menggunakan: {$tokenMatch->first()->nama}");
+                        return $tokenMatch->first();
+                    }
+                }
+
+                return null;
+            };
+
+            $pegawai = $find($name);
 
             if (! $pegawai) {
                 $this->command->warn("Pegawai tidak ditemukan: {$name} — lewati.");
