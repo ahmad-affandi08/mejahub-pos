@@ -22,7 +22,7 @@ class PengaturanGajiSeeder extends Seeder
             ['nama' => 'IRFAN', 'gaji_pokok' => 1400000, 'lembur_per_jam' => 5833.33, 'potongan_per_izin' => 0, 'bonus' => 0, 'is_active' => true],
             ['nama' => 'ESSA', 'gaji_pokok' => 1300000, 'lembur_per_jam' => 5416.67, 'potongan_per_izin' => 0, 'bonus' => 0, 'is_active' => true],
             ['nama' => 'RISMA', 'gaji_pokok' => 1200000, 'lembur_per_jam' => 5000, 'potongan_per_izin' => 40000, 'bonus' => 100000, 'is_active' => true],
-            ['nama' => 'AIFAH', 'gaji_pokok' => 1200000, 'lembur_per_jam' => 5000, 'potongan_per_izin' => 0, 'bonus' => 0, 'is_active' => true],
+            ['nama' => 'AFIFAH', 'gaji_pokok' => 1200000, 'lembur_per_jam' => 5000, 'potongan_per_izin' => 0, 'bonus' => 0, 'is_active' => true],
             ['nama' => 'ARIF', 'gaji_pokok' => 1200000, 'lembur_per_jam' => 5000, 'potongan_per_izin' => 0, 'bonus' => 0, 'is_active' => true],
         ];
 
