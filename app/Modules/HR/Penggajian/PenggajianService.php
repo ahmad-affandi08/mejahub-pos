@@ -120,10 +120,26 @@ class PenggajianService
                 ? (bool) ($policy['potong_terlambat'] ?? false)
                 : $includeTerlambatPenalty;
 
+            // resolve gaji pokok early so deductions that depend on it can be calculated
+            $gajiPokok = $this->resolveGajiPokokPegawai(
+                (int) $pegawai->id,
+                $pegawai->jabatan,
+                $gajiPokokPerPegawai,
+                $gajiPokokPerJabatan,
+                $gajiPokokDefault,
+            );
+
+            // per-day rate: divide monthly base by expected work days (avoid division by zero)
+            $perDayRate = $expectedWorkDays > 0 ? ((float) $gajiPokok) / $expectedWorkDays : 0;
+
             $potonganTambahan = 0;
 
             if ($potongIzin) {
-                $potonganTambahan += $potonganPerIzin * $rekap['jumlah_izin'];
+                if ($potonganPerIzin > 0) {
+                    $potonganTambahan += $potonganPerIzin * $rekap['jumlah_izin'];
+                } else {
+                    $potonganTambahan += $perDayRate * $rekap['jumlah_izin'];
+                }
             }
 
             if ($potongSakit) {
@@ -131,7 +147,11 @@ class PenggajianService
             }
 
             if ($potongAlpha) {
-                $potonganTambahan += $potonganPerAlpha * $rekap['jumlah_alpha'];
+                if ($potonganPerAlpha > 0) {
+                    $potonganTambahan += $potonganPerAlpha * $rekap['jumlah_alpha'];
+                } else {
+                    $potonganTambahan += $perDayRate * $rekap['jumlah_alpha'];
+                }
             }
 
             if ($potongTerlambat) {
@@ -160,13 +180,7 @@ class PenggajianService
                 $lemburNominal = $totalLemburJam * (float) ($policy['lembur_per_jam'] ?? 0);
             }
 
-            $gajiPokok = $this->resolveGajiPokokPegawai(
-                (int) $pegawai->id,
-                $pegawai->jabatan,
-                $gajiPokokPerPegawai,
-                $gajiPokokPerJabatan,
-                $gajiPokokDefault,
-            );
+            // gajiPokok already resolved above
 
             $basePayload = [
                 'kode' => $this->generateKode($payload['kode_prefix'] ?? null, $periode, (int) $pegawai->id),
