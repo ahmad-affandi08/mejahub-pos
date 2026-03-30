@@ -4,6 +4,7 @@ namespace App\Modules\Finance\ArusKas;
 
 use App\Modules\HR\Penggajian\PenggajianEntity;
 use App\Modules\POS\Pembayaran\PembayaranEntity;
+use App\Support\PaymentMethodCatalog;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
 class ArusKasService
@@ -314,9 +315,7 @@ class ArusKasService
 
 	private function resolveAkunByPaymentMethod(string $method): string
 	{
-		$cashCodes = ['cash', 'tunai', 'kas', 'petty_cash'];
-
-		return in_array($method, $cashCodes, true) ? 'kas' : 'bank';
+		return PaymentMethodCatalog::resolveFinanceAccountByMethod($method);
 	}
 
 	private function accountBalance(string $jenisAkun, ?string $untilDate = null): float

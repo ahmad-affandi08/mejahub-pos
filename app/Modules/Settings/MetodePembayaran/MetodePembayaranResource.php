@@ -3,6 +3,7 @@
 namespace App\Modules\Settings\MetodePembayaran;
 
 use App\Http\Controllers\Controller;
+use App\Support\PaymentMethodCatalog;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -39,7 +40,7 @@ class MetodePembayaranResource extends Controller
 		$payload = $request->validate([
 			'kode' => ['required', 'string', 'max:30', 'unique:settings_metode_pembayaran,kode'],
 			'nama' => ['required', 'string', 'max:100'],
-			'tipe' => ['required', 'string', 'in:cash,digital,card,transfer,ewallet,other'],
+			'tipe' => ['required', 'string', PaymentMethodCatalog::inRule(PaymentMethodCatalog::SETTINGS_TYPE_CODES)],
 			'provider' => ['nullable', 'string', 'max:100'],
 			'nomor_rekening' => ['nullable', 'string', 'max:80'],
 			'atas_nama' => ['nullable', 'string', 'max:100'],
@@ -70,7 +71,7 @@ class MetodePembayaranResource extends Controller
 		$payload = $request->validate([
 			'kode' => ['required', 'string', 'max:30', 'unique:settings_metode_pembayaran,kode,' . $id],
 			'nama' => ['required', 'string', 'max:100'],
-			'tipe' => ['required', 'string', 'in:cash,digital,card,transfer,ewallet,other'],
+			'tipe' => ['required', 'string', PaymentMethodCatalog::inRule(PaymentMethodCatalog::SETTINGS_TYPE_CODES)],
 			'provider' => ['nullable', 'string', 'max:100'],
 			'nomor_rekening' => ['nullable', 'string', 'max:80'],
 			'atas_nama' => ['nullable', 'string', 'max:100'],

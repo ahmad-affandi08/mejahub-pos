@@ -3,6 +3,7 @@
 namespace App\Modules\Finance\Pengeluaran;
 
 use App\Http\Controllers\Controller;
+use App\Support\PaymentMethodCatalog;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -43,7 +44,7 @@ class PengeluaranResource extends Controller
 			'kode' => ['nullable', 'string', 'max:40', 'unique:finance_pengeluaran,kode'],
 			'tanggal' => ['required', 'date'],
 			'kategori_biaya' => ['required', 'string', 'max:80'],
-			'metode_pembayaran' => ['required', 'in:kas,bank'],
+			'metode_pembayaran' => ['required', PaymentMethodCatalog::inRule(PaymentMethodCatalog::FINANCE_METHOD_CODES)],
 			'nominal' => ['required', 'numeric', 'min:0'],
 			'status_approval' => ['nullable', 'in:draft,submitted,approved,rejected'],
 			'deskripsi' => ['required', 'string', 'max:255'],
@@ -89,7 +90,7 @@ class PengeluaranResource extends Controller
 		$payload = $request->validate([
 			'tanggal' => ['required', 'date'],
 			'kategori_biaya' => ['required', 'string', 'max:80'],
-			'metode_pembayaran' => ['required', 'in:kas,bank'],
+			'metode_pembayaran' => ['required', PaymentMethodCatalog::inRule(PaymentMethodCatalog::FINANCE_METHOD_CODES)],
 			'nominal' => ['required', 'numeric', 'min:0'],
 			'deskripsi' => ['required', 'string', 'max:255'],
 			'vendor_nama' => ['nullable', 'string', 'max:120'],

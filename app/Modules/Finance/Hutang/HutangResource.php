@@ -2,6 +2,7 @@
 
 namespace App\Modules\Finance\Hutang;
 
+use App\Support\PaymentMethodCatalog;
 use Inertia\Inertia;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
@@ -36,7 +37,7 @@ class HutangResource extends Controller
     {
         $request->validate([
             'nominal_bayar' => 'required|numeric|min:1',
-            'metode_pembayaran' => 'required|string',
+            'metode_pembayaran' => ['required', PaymentMethodCatalog::inRule(PaymentMethodCatalog::FINANCE_METHOD_CODES)],
             'tanggal_bayar' => 'required|date',
         ]);
 

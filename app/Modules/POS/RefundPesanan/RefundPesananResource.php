@@ -3,6 +3,7 @@
 namespace App\Modules\POS\RefundPesanan;
 
 use App\Http\Controllers\Controller;
+use App\Support\PaymentMethodCatalog;
 use App\Support\ApiResponder;
 use App\Support\PosDomainException;
 use Illuminate\Http\JsonResponse;
@@ -63,7 +64,7 @@ class RefundPesananResource extends Controller
 		$payload = $request->validate([
 			'pesanan_id' => ['required', 'integer', 'exists:pos_pesanan,id'],
 			'nominal' => ['nullable', 'numeric', 'min:0'],
-			'metode' => ['required', 'string', 'in:cash,transfer,qris,debit,credit'],
+			'metode' => ['required', 'string', PaymentMethodCatalog::inRule(PaymentMethodCatalog::POS_REFUND_METHOD_CODES)],
 			'alasan' => ['required', 'string'],
 		]);
 

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Modules\Inventory\BahanBaku\BahanBakuEntity;
 use App\Modules\Inventory\PurchaseOrder\PurchaseOrderEntity;
 use App\Modules\Inventory\Supplier\SupplierEntity;
+use App\Support\PaymentMethodCatalog;
 use App\Support\PosDomainException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -59,7 +60,7 @@ class PenerimaanBarangResource extends Controller
 			'tanggal_terima' => ['nullable', 'date'],
 			'status' => ['nullable', 'string', 'in:received,partial,rejected'],
 			'status_pembayaran' => ['nullable', 'string', 'in:unpaid,partial,paid'],
-			'metode_pembayaran' => ['nullable', 'string', 'max:40', 'in:kas,bank,petty_cash,cash,tunai,transfer,transfer_bank,ewallet,qris,debit,credit'],
+			'metode_pembayaran' => ['nullable', 'string', 'max:40', PaymentMethodCatalog::inRule(array_merge(PaymentMethodCatalog::FINANCE_METHOD_CODES, PaymentMethodCatalog::POS_REFUND_METHOD_CODES, ['tunai', 'transfer_bank']))],
 			'akun_kas_id' => ['nullable', 'integer'],
 			'jatuh_tempo' => ['nullable', 'date'],
 			'jumlah_dibayar' => ['nullable', 'numeric', 'min:0'],

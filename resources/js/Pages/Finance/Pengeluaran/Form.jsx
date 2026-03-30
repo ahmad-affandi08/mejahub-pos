@@ -5,6 +5,7 @@ import SearchableSelect from "@/components/shared/SearchableSelect";
 import { DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { financeMethodOptions } from "@/constants/paymentMethods";
 
 export default function Form({ mode, endpoint, initialValues, categoryOptions = [], onSuccess, onCancel }) {
     const { data, setData, post, transform, processing, errors } = useForm({
@@ -63,8 +64,9 @@ export default function Form({ mode, endpoint, initialValues, categoryOptions = 
                 <div className="space-y-1.5">
                     <label className="text-sm font-medium">Metode Pembayaran</label>
                     <select className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm" value={data.metode_pembayaran} onChange={(event) => setData("metode_pembayaran", event.target.value)}>
-                        <option value="kas">Kas</option>
-                        <option value="bank">Bank</option>
+                        {financeMethodOptions.map((item) => (
+                            <option key={item.value} value={item.value}>{item.label}</option>
+                        ))}
                     </select>
                 </div>
             </div>

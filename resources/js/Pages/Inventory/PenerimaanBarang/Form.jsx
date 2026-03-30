@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import SearchableSelect from "@/components/shared/SearchableSelect";
 import { DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { financeMethodOptions } from "@/constants/paymentMethods";
 
 const emptyItem = {
     purchase_order_item_id: "",
@@ -150,9 +151,9 @@ export default function Form({ endpoint, purchaseOrderOptions, supplierOptions, 
                     <div className="space-y-1.5">
                         <label className="text-sm font-medium">Metode Bayar</label>
                         <select className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm" value={data.metode_pembayaran} onChange={(e) => setData("metode_pembayaran", e.target.value)}>
-                            <option value="kas">Kas Tunai</option>
-                            <option value="bank">Bank / Transfer</option>
-                            <option value="petty_cash">Petty Cash</option>
+                            {financeMethodOptions.map((item) => (
+                                <option key={item.value} value={item.value}>{item.label}</option>
+                            ))}
                         </select>
                     </div>
                 )}

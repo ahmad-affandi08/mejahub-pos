@@ -33,6 +33,7 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import DashboardLayout from "@/layouts/DashboardLayout";
+import { financeMethodOptions } from "@/constants/paymentMethods";
 
 export default function HutangIndex({ data, filters, flashMessage }) {
     const endpoint = "/finance/hutang";
@@ -284,10 +285,9 @@ export default function HutangIndex({ data, filters, flashMessage }) {
                                     <SelectValue placeholder="Pilih Metode" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="kas">Kas Tunai</SelectItem>
-                                    <SelectItem value="transfer_bank">Transfer Bank</SelectItem>
-                                    <SelectItem value="ewallet">E-Wallet</SelectItem>
-                                    <SelectItem value="petty_cash">Petty Cash</SelectItem>
+                                    {financeMethodOptions.map((item) => (
+                                        <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
+                                    ))}
                                 </SelectContent>
                             </Select>
                             {errors.metode_pembayaran && (

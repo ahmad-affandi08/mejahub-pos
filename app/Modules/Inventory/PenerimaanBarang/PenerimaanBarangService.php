@@ -3,9 +3,11 @@
 namespace App\Modules\Inventory\PenerimaanBarang;
 
 use App\Modules\Inventory\BahanBaku\BahanBakuEntity;
+use App\Modules\Finance\ArusKas\ArusKasService;
 use App\Modules\Inventory\MutasiStok\MutasiStokService;
 use App\Modules\Inventory\PurchaseOrder\PurchaseOrderEntity;
 use App\Modules\Inventory\PurchaseOrder\PurchaseOrderItemEntity;
+use App\Support\PaymentMethodCatalog;
 use App\Support\PosDomainException;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
@@ -14,7 +16,10 @@ use Illuminate\Support\Str;
 
 class PenerimaanBarangService
 {
-	public function __construct(private readonly MutasiStokService $mutasiStokService)
+	public function __construct(
+		private readonly MutasiStokService $mutasiStokService,
+		private readonly ArusKasService $arusKasService,
+	)
 	{
 	}
 
@@ -76,7 +81,7 @@ class PenerimaanBarangService
 				? $requestedStatusBayar
 				: 'unpaid';
 
-			$metodePembayaran = $this->normalizeMetodePembayaran($payload['metode_pembayaran'] ?? null);
+			$metodePembayaran = PaymentMethodCatalog::normalizeFinanceMethod($payload['metode_pembayaran'] ?? null);
 			$nominalDibayar = (float) ($payload['jumlah_dibayar'] ?? 0);
 
 			if ($requestedStatusBayar === 'paid') {
@@ -136,29 +141,25 @@ class PenerimaanBarangService
 				}
 			}
 
+			if ($nominalDibayar > 0) {
+				$this->arusKasService->upsertSourceJournal('penerimaan_barang_payment', $receipt->id, [
+					'tanggal' => optional($receipt->tanggal_terima)?->toDateString() ?? now()->toDateString(),
+					'jenis_akun' => PaymentMethodCatalog::resolveFinanceAccountByMethod($metodePembayaran),
+					'jenis_arus' => 'out',
+					'referensi_kode' => $receipt->kode . '-PAY',
+					'kategori' => 'pembelian_bahan_baku',
+					'deskripsi' => 'Pembayaran penerimaan barang ' . $receipt->kode,
+					'nominal' => $nominalDibayar,
+					'status' => 'posted',
+					'created_by' => $userId,
+					'catatan' => $payload['catatan'] ?? null,
+				], true);
+			}
+
 			$this->syncPurchaseOrderReceiptState($receipt->purchase_order_id);
 
 			return $receipt->load(['supplier:id,nama', 'purchaseOrder:id,kode', 'items.bahanBaku:id,nama']);
 		});
-	}
-
-	private function normalizeMetodePembayaran(string|null $method): string
-	{
-		$value = strtolower(trim((string) $method));
-
-		if (in_array($value, ['cash', 'tunai', 'kas'], true)) {
-			return 'kas';
-		}
-
-		if (in_array($value, ['transfer', 'transfer_bank', 'bank', 'ewallet', 'qris', 'debit', 'credit'], true)) {
-			return 'bank';
-		}
-
-		if ($value === 'petty_cash') {
-			return 'petty_cash';
-		}
-
-		return 'kas';
 	}
 
 	public function delete(int $id): void
@@ -202,6 +203,7 @@ class PenerimaanBarangService
 			}
 
 			PenerimaanBarangItemEntity::query()->where('penerimaan_barang_id', $receipt->id)->delete();
+			$this->arusKasService->deleteSourceJournals('penerimaan_barang_payment', $receipt->id);
 			$poId = $receipt->purchase_order_id;
 			$receipt->delete();
 

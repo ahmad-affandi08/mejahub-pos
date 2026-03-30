@@ -1,14 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import MoneyText from "@/components/shared/pos/MoneyText";
-
-const methods = [
-    { value: "cash", label: "Cash" },
-    { value: "transfer", label: "Transfer" },
-    { value: "qris", label: "QRIS" },
-    { value: "debit", label: "Debit" },
-    { value: "credit", label: "Credit" },
-];
+import { refundMethodOptions } from "@/constants/paymentMethods";
 
 export default function Form({ values, state, onChange, onSubmit }) {
     return (
@@ -27,7 +20,7 @@ export default function Form({ values, state, onChange, onSubmit }) {
                         value={values.metode}
                         onChange={(event) => onChange("metode", event.target.value)}
                     >
-                        {methods.map((item) => (
+                        {refundMethodOptions.map((item) => (
                             <option key={item.value} value={item.value}>{item.label}</option>
                         ))}
                     </select>

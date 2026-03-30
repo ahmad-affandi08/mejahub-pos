@@ -125,6 +125,12 @@ if (File::exists($modulesPath)) {
                                 ->name($routeName . '.bulk');
                         }
 
+                        if ($hasAction($resourceClass, 'storePayment')) {
+                            Route::post($urlSlug . '/{id}/payment', [$resourceClass, 'storePayment'])
+                                ->middleware(['auth', 'permission:' . $permissionKey])
+                                ->name($routeName . '.payment');
+                        }
+
                         if (in_array('destroy', $availableActions, true)) {
                             Route::post($urlSlug . '/delete', function (Request $request) use ($resourceClass) {
                                 $validated = $request->validate([
