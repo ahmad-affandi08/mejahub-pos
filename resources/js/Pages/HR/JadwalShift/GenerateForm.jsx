@@ -1,4 +1,5 @@
 import { useForm } from "@inertiajs/react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
@@ -16,6 +17,8 @@ const dayOptions = [
 ];
 
 export default function GenerateForm({ endpoint, pegawaiOptions, onSuccess, onCancel }) {
+    const [showPegawaiList, setShowPegawaiList] = useState(false);
+
     const { data, setData, post, processing, errors } = useForm({
         generate_mode: true,
         pegawai_ids: [],
@@ -26,6 +29,8 @@ export default function GenerateForm({ endpoint, pegawaiOptions, onSuccess, onCa
         kode_prefix: "JDL",
         catatan: "",
         skip_existing: true,
+        use_formula: true,
+        generate_libur: true,
     });
 
     const togglePegawai = (pegawaiId) => {
@@ -57,10 +62,18 @@ export default function GenerateForm({ endpoint, pegawaiOptions, onSuccess, onCa
         });
     };
 
+    const selectAllPegawai = () => {
+        setData("pegawai_ids", pegawaiOptions.map((item) => item.id));
+    };
+
+    const clearPegawai = () => {
+        setData("pegawai_ids", []);
+    };
+
     return (
-        <form onSubmit={submit} className="space-y-4">
+        <form onSubmit={submit} className="max-h-[72vh] space-y-4 overflow-y-auto pr-1">
             <div className="rounded-xl border border-cyan-200 bg-cyan-50 px-3 py-2 text-xs text-cyan-800">
-                Shift akan dipilih otomatis oleh sistem berdasarkan jabatan dan jumlah karyawan terpilih.
+                Formula akan mengatur Waiters, Kitchen, dan Barista mendapatkan sekitar 4 kali libur per 30 hari kerja, dengan pola sebelum dan sesudah libur sesuai aturan operasional.
             </div>
 
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -90,15 +103,35 @@ export default function GenerateForm({ endpoint, pegawaiOptions, onSuccess, onCa
             </div>
 
             <div className="space-y-1.5">
-                <label className="text-sm font-medium">Pilih Pegawai</label>
-                <div className="max-h-40 space-y-2 overflow-y-auto rounded-lg border p-2">
-                    {pegawaiOptions.map((pegawai) => (
-                        <label key={pegawai.id} className="flex items-center gap-2 text-sm">
-                            <input type="checkbox" checked={data.pegawai_ids.includes(pegawai.id)} onChange={() => togglePegawai(pegawai.id)} />
-                            <span>{pegawai.nama} {pegawai.jabatan ? `(${pegawai.jabatan})` : ""}</span>
-                        </label>
-                    ))}
+                <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium">Pilih Pegawai</label>
+                    <button
+                        type="button"
+                        className="text-xs font-medium text-cyan-700 hover:underline"
+                        onClick={() => setShowPegawaiList((value) => !value)}
+                    >
+                        {showPegawaiList ? "Sembunyikan List" : "Tampilkan List"}
+                    </button>
                 </div>
+                <div className="flex items-center justify-between rounded-lg border px-3 py-2 text-xs">
+                    <span>
+                        Terpilih {data.pegawai_ids.length} dari {pegawaiOptions.length} pegawai
+                    </span>
+                    <div className="flex items-center gap-3">
+                        <button type="button" className="font-medium text-cyan-700 hover:underline" onClick={selectAllPegawai}>Pilih semua</button>
+                        <button type="button" className="font-medium text-slate-600 hover:underline" onClick={clearPegawai}>Kosongkan</button>
+                    </div>
+                </div>
+                {showPegawaiList ? (
+                    <div className="max-h-44 space-y-2 overflow-y-auto rounded-lg border p-2">
+                        {pegawaiOptions.map((pegawai) => (
+                            <label key={pegawai.id} className="flex items-center gap-2 text-sm">
+                                <input type="checkbox" checked={data.pegawai_ids.includes(pegawai.id)} onChange={() => togglePegawai(pegawai.id)} />
+                                <span>{pegawai.nama} {pegawai.jabatan ? `(${pegawai.jabatan})` : ""}</span>
+                            </label>
+                        ))}
+                    </div>
+                ) : null}
                 {errors.pegawai_ids ? <p className="text-xs text-destructive">{errors.pegawai_ids}</p> : null}
             </div>
 
@@ -116,12 +149,29 @@ export default function GenerateForm({ endpoint, pegawaiOptions, onSuccess, onCa
                 </div>
             </div>
 
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Mode Generate</label>
+                    <select className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm" value={data.use_formula ? "1" : "0"} onChange={(event) => setData("use_formula", event.target.value === "1")}>
+                        <option value="1">Formula Operasional (P1/M1/S1)</option>
+                        <option value="0">Rotasi Biasa</option>
+                    </select>
+                </div>
+                <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Generate Libur Otomatis</label>
+                    <select className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm" value={data.generate_libur ? "1" : "0"} onChange={(event) => setData("generate_libur", event.target.value === "1")}>
+                        <option value="1">Ya</option>
+                        <option value="0">Tidak</option>
+                    </select>
+                </div>
+            </div>
+
             <div className="space-y-1.5">
                 <label className="text-sm font-medium">Catatan</label>
                 <Textarea value={data.catatan} onChange={(event) => setData("catatan", event.target.value)} rows={2} />
             </div>
 
-            <DialogFooter>
+            <DialogFooter className="sticky bottom-0 border-t bg-white pt-3">
                 <Button type="button" variant="outline" onClick={onCancel}>Batal</Button>
                 <Button type="submit" disabled={processing}>{processing ? "Generate..." : "Generate Jadwal"}</Button>
             </DialogFooter>

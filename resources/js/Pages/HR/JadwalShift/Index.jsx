@@ -120,7 +120,7 @@ export default function Index({ jadwalShift, pegawaiOptions, shiftOptions, filte
                                 <DialogTrigger asChild>
                                     <Button variant="outline">Generate Jadwal</Button>
                                 </DialogTrigger>
-                                <DialogContent className="sm:max-w-2xl">
+                                <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-hidden">
                                     <DialogHeader>
                                         <DialogTitle>Generate Jadwal Shift</DialogTitle>
                                         <DialogDescription>Buat jadwal otomatis untuk banyak pegawai berdasarkan jabatan, tanggal, dan hari kerja.</DialogDescription>

@@ -95,6 +95,8 @@ class JadwalShiftResource extends Controller
                 'kode_prefix' => ['nullable', 'string', 'max:20'],
                 'catatan' => ['nullable', 'string'],
                 'skip_existing' => ['nullable', 'boolean'],
+                'use_formula' => ['nullable', 'boolean'],
+                'generate_libur' => ['nullable', 'boolean'],
             ]);
 
             $created = $this->service->generate($payload);

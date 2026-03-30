@@ -14,6 +14,16 @@ class JadwalShiftService
 {
     use ReportExportTrait;
 
+    private const SHIFT_SLOT_KEYS = ['PAGI', 'SIANG', 'SORE'];
+
+    private const SHIFT_CODE_ALIASES_BY_SLOT = [
+        'PAGI' => ['P1', 'PAGI'],
+        'SIANG' => ['S3', 'M1', 'SIANG', 'MIDDLE'],
+        'SORE' => ['S1', 'S2', 'SORE', 'CLOSING', 'TUTUP'],
+    ];
+
+    private const ROLES_WITH_OFF_PLAN = ['waiters', 'kitchen', 'barista', 'dishwasher'];
+
     public function paginate(string $search = '', int $perPage = 10, ?string $month = null): LengthAwarePaginator
     {
         return $this->baseQuery($search, $month)
@@ -114,7 +124,7 @@ class JadwalShiftService
         $jadwal = JadwalShiftEntity::query()
             ->with([
                 'pegawai:id,nama,jabatan',
-                'shift:id,nama,jam_masuk,jam_keluar',
+                'shift:id,kode,nama,jam_masuk,jam_keluar',
             ])
             ->whereBetween('tanggal', [$start->toDateString(), $end->toDateString()])
             ->when($search !== '', function ($query) use ($search) {
@@ -140,6 +150,7 @@ class JadwalShiftService
         $palette = ['#DBEAFE', '#D1FAE5', '#FEF3C7', '#FCE7F3', '#E0E7FF', '#FEE2E2', '#E2E8F0', '#CCFBF1', '#F5D0FE', '#CFFAFE'];
         $shiftLegends = [];
         $shiftMap = [];
+        $shiftCodeColorMap = [];
         $shiftIndex = 0;
 
         foreach ($jadwal as $item) {
@@ -153,9 +164,17 @@ class JadwalShiftService
                 continue;
             }
 
-            $code = 'S' . ($shiftIndex + 1);
-            $color = $palette[$shiftIndex % count($palette)];
-            $shiftIndex++;
+            $code = strtoupper(trim((string) ($shift->kode ?? '')));
+            if ($code === '') {
+                $code = 'SHIFT-' . (string) $shift->id;
+            }
+
+            if (!isset($shiftCodeColorMap[$code])) {
+                $shiftCodeColorMap[$code] = $palette[$shiftIndex % count($palette)];
+                $shiftIndex++;
+            }
+
+            $color = $shiftCodeColorMap[$code];
 
             $timeLabel = trim(((string) $shift->jam_masuk) . ' - ' . ((string) $shift->jam_keluar), ' -');
 
@@ -359,7 +378,7 @@ class JadwalShiftService
         return JadwalShiftEntity::query()
             ->with([
                 'pegawai:id,nama',
-                'shift:id,nama,jam_masuk,jam_keluar',
+                'shift:id,kode,nama,jam_masuk,jam_keluar',
             ])
             ->when(is_string($month) && trim($month) !== '', function ($query) use ($month) {
                 [$start, $end] = $this->resolveMonthRange($month);
@@ -430,7 +449,7 @@ class JadwalShiftService
 
         return $entity->refresh()->load([
             'pegawai:id,nama',
-            'shift:id,nama,jam_masuk,jam_keluar',
+            'shift:id,kode,nama,jam_masuk,jam_keluar',
         ]);
     }
 
@@ -447,32 +466,52 @@ class JadwalShiftService
         $days = $this->normalizeWeekdays($payload['hari_kerja'] ?? []);
         $pegawaiIds = collect($payload['pegawai_ids'] ?? [])->map(fn ($id) => (int) $id)->filter()->values();
         $pegawaiByJabatan = $this->buildPegawaiGroupByJabatan($pegawaiIds);
-        $shiftIds = $this->getActiveShiftIds();
+        $shiftSlots = $this->getShiftSlotMap();
+        $useFormula = (bool) ($payload['use_formula'] ?? true);
+        $generateLibur = (bool) ($payload['generate_libur'] ?? true);
 
-        if ($pegawaiByJabatan->isEmpty() || empty($shiftIds) || empty($days)) {
+        if ($pegawaiByJabatan->isEmpty() || empty($shiftSlots) || empty($days)) {
             return 0;
         }
 
+        $workingDates = [];
+        for ($date = $startDate->copy(); $date->lte($endDate); $date->addDay()) {
+            if (in_array((int) $date->dayOfWeekIso, $days, true)) {
+                $workingDates[] = $date->toDateString();
+            }
+        }
+
+        if ($workingDates === []) {
+            return 0;
+        }
+
+        $targetOffCount = intdiv(count($workingDates), 7);
+        $weekdayIndexes = $this->weekdayIndexesFromWorkingDates($workingDates);
+        $offPlanByPegawai = $this->buildOffPlanByPegawai(
+            $pegawaiByJabatan,
+            count($workingDates),
+            $targetOffCount,
+            $weekdayIndexes
+        );
+
         $skipExisting = (bool) ($payload['skip_existing'] ?? true);
         $created = 0;
-        $dayOffset = 0;
 
-        for ($date = $startDate->copy(); $date->lte($endDate); $date->addDay()) {
-            $weekday = (int) $date->dayOfWeekIso;
+        foreach ($workingDates as $dayOffset => $dateString) {
 
-            if (!in_array($weekday, $days, true)) {
-                continue;
-            }
+            $assignments = $useFormula
+                ? $this->buildFormulaAssignments($pegawaiByJabatan, $shiftSlots, (int) $dayOffset, $offPlanByPegawai)
+                : $this->buildRoundRobinAssignments($pegawaiByJabatan, $shiftSlots, (int) $dayOffset);
 
             foreach ($pegawaiByJabatan as $pegawaiInJabatan) {
-                foreach ($pegawaiInJabatan->values() as $index => $pegawaiId) {
+                $pegawaiInJabatan = $pegawaiInJabatan->map(fn ($id) => (int) $id)->values();
+
+                foreach ($pegawaiInJabatan as $pegawaiId) {
                     $pegawaiId = (int) $pegawaiId;
-                    // Rotate shift per employee each day so one person is not locked to one shift.
-                    $shiftId = (int) $shiftIds[($index + $dayOffset) % count($shiftIds)];
 
                     $exists = JadwalShiftEntity::query()
                         ->where('pegawai_id', $pegawaiId)
-                        ->whereDate('tanggal', $date->toDateString())
+                        ->whereDate('tanggal', $dateString)
                         ->exists();
 
                     if ($exists && $skipExisting) {
@@ -482,16 +521,23 @@ class JadwalShiftService
                     if ($exists && !$skipExisting) {
                         JadwalShiftEntity::query()
                             ->where('pegawai_id', $pegawaiId)
-                            ->whereDate('tanggal', $date->toDateString())
+                            ->whereDate('tanggal', $dateString)
                             ->delete();
                     }
 
+                    $shiftId = $assignments[$pegawaiId] ?? null;
+                    $isLibur = $shiftId === null;
+
+                    if ($isLibur && !$generateLibur) {
+                        continue;
+                    }
+
                     JadwalShiftEntity::query()->create([
-                        'kode' => $this->generateCode($payload['kode_prefix'] ?? null, $date->toDateString(), $pegawaiId),
+                        'kode' => $this->generateCode($payload['kode_prefix'] ?? null, $dateString, $pegawaiId),
                         'pegawai_id' => $pegawaiId,
                         'shift_id' => $shiftId,
-                        'tanggal' => $date->toDateString(),
-                        'status' => $payload['status'] ?? 'published',
+                        'tanggal' => $dateString,
+                        'status' => $isLibur ? 'libur' : ($payload['status'] ?? 'published'),
                         'sumber_jadwal' => 'generate',
                         'catatan' => $payload['catatan'] ?? null,
                         'is_active' => true,
@@ -500,8 +546,6 @@ class JadwalShiftService
                     $created++;
                 }
             }
-
-            $dayOffset++;
         }
 
         return $created;
@@ -516,21 +560,367 @@ class JadwalShiftService
             ->orderBy('jabatan')
             ->orderBy('nama')
             ->get()
-            ->groupBy(fn ($item) => trim((string) ($item->jabatan ?: 'Tanpa Jabatan')))
+            ->groupBy(fn ($item) => $this->normalizeJabatanKey((string) ($item->jabatan ?: 'Tanpa Jabatan')))
             ->map(fn ($group) => $group->pluck('id')->values());
     }
 
-    private function getActiveShiftIds(): array
+    private function getShiftSlotMap(): array
     {
-        return PengaturanShiftEntity::query()
-            ->select(['id'])
+        $rows = PengaturanShiftEntity::query()
+            ->select(['id', 'kode', 'nama', 'jam_masuk', 'jam_keluar'])
             ->where('is_active', true)
             ->orderBy('jam_masuk')
             ->orderBy('nama')
-            ->pluck('id')
+            ->get();
+
+        $slots = [
+            'PAGI' => null,
+            'SIANG' => null,
+            'SORE' => null,
+        ];
+
+        $orderedIds = [];
+
+        foreach ($rows as $row) {
+            $shiftId = (int) $row->id;
+            $orderedIds[] = $shiftId;
+
+            $code = strtoupper(trim((string) ($row->kode ?? '')));
+            $name = strtolower(trim((string) ($row->nama ?? '')));
+
+            if ($slots['PAGI'] === null && (in_array($code, self::SHIFT_CODE_ALIASES_BY_SLOT['PAGI'], true) || str_contains($name, 'pagi'))) {
+                $slots['PAGI'] = $shiftId;
+                continue;
+            }
+
+            if ($slots['SIANG'] === null && (in_array($code, self::SHIFT_CODE_ALIASES_BY_SLOT['SIANG'], true) || str_contains($name, 'siang') || str_contains($name, 'middle'))) {
+                $slots['SIANG'] = $shiftId;
+                continue;
+            }
+
+            if ($slots['SORE'] === null && (in_array($code, self::SHIFT_CODE_ALIASES_BY_SLOT['SORE'], true) || str_contains($name, 'sore') || str_contains($name, 'tutup') || str_contains($name, 'closing'))) {
+                $slots['SORE'] = $shiftId;
+            }
+        }
+
+        if ($orderedIds !== []) {
+            if ($slots['PAGI'] === null) {
+                $slots['PAGI'] = (int) $orderedIds[0];
+            }
+
+            if ($slots['SORE'] === null) {
+                $slots['SORE'] = (int) $orderedIds[count($orderedIds) - 1];
+            }
+
+            if ($slots['SIANG'] === null) {
+                $middleIndex = (int) floor((count($orderedIds) - 1) / 2);
+                $slots['SIANG'] = (int) $orderedIds[$middleIndex];
+            }
+        }
+
+        return collect($slots)
+            ->filter(fn ($id) => $id !== null)
             ->map(fn ($id) => (int) $id)
-            ->values()
             ->all();
+    }
+
+    private function buildOffPlanByPegawai(Collection $pegawaiByJabatan, int $totalDays, int $targetOffCount, array $allowedIndexes): array
+    {
+        if ($totalDays < 3 || $targetOffCount <= 0 || $allowedIndexes === []) {
+            return [];
+        }
+
+        $plan = [];
+
+        foreach ($pegawaiByJabatan as $jabatanKey => $pegawaiInJabatan) {
+            if (!in_array((string) $jabatanKey, self::ROLES_WITH_OFF_PLAN, true)) {
+                continue;
+            }
+
+            $pegawaiInJabatan = $pegawaiInJabatan->map(fn ($id) => (int) $id)->values();
+
+            // Barista khusus: jika total 2 orang, jadwal libur diselang agar tidak bentrok.
+            if ((string) $jabatanKey === 'barista' && $pegawaiInJabatan->count() === 2) {
+                $firstPegawaiId = (int) $pegawaiInJabatan->get(0);
+                $secondPegawaiId = (int) $pegawaiInJabatan->get(1);
+
+                $firstOff = $this->buildFixedOffIndexes($totalDays, $targetOffCount, 3, $allowedIndexes);
+                $secondOff = $this->buildFixedOffIndexes($totalDays, $targetOffCount, 6, $allowedIndexes);
+
+                $plan[$firstPegawaiId] = $firstOff;
+                $plan[$secondPegawaiId] = $secondOff;
+                continue;
+            }
+
+            foreach ($pegawaiInJabatan as $position => $pegawaiId) {
+                $pegawaiId = (int) $pegawaiId;
+                $safeOffCount = min($targetOffCount, max(0, $totalDays - 2));
+
+                if ($safeOffCount <= 0) {
+                    continue;
+                }
+
+                $step = max(1, intdiv($totalDays, $safeOffCount + 1));
+                $offset = $position % $step;
+                $offIndexes = $this->buildFixedOffIndexes($totalDays, $safeOffCount, $offset + $step, $allowedIndexes);
+
+                $plan[$pegawaiId] = array_values(array_unique($offIndexes));
+            }
+        }
+
+        return $plan;
+    }
+
+    private function buildFixedOffIndexes(int $totalDays, int $offCount, int $startIndex, array $allowedIndexes): array
+    {
+        $allowedIndexes = array_values(array_unique(array_filter(
+            $allowedIndexes,
+            fn ($idx) => is_int($idx) && $idx >= 1 && $idx <= ($totalDays - 2)
+        )));
+
+        if ($allowedIndexes === []) {
+            return [];
+        }
+
+        $safeOffCount = min($offCount, count($allowedIndexes));
+        if ($safeOffCount <= 0) {
+            return [];
+        }
+
+        $step = max(1, intdiv($totalDays, $safeOffCount + 1));
+        $indexes = [];
+
+        for ($i = 0; $i < $safeOffCount; $i++) {
+            $candidate = $startIndex + ($i * $step);
+            $candidate = max(1, min($totalDays - 2, $candidate));
+
+            $candidate = $this->nearestAllowedIndex($candidate, $allowedIndexes, $indexes);
+            if ($candidate === null) {
+                break;
+            }
+
+            $indexes[] = $candidate;
+        }
+
+        return array_values(array_unique($indexes));
+    }
+
+    private function weekdayIndexesFromWorkingDates(array $workingDates): array
+    {
+        $indexes = [];
+
+        foreach ($workingDates as $index => $dateString) {
+            try {
+                $isoDay = (int) Carbon::parse($dateString)->dayOfWeekIso;
+            } catch (\Throwable) {
+                continue;
+            }
+
+            if (in_array($isoDay, [6, 7], true)) {
+                continue;
+            }
+
+            $indexes[] = (int) $index;
+        }
+
+        return $indexes;
+    }
+
+    private function nearestAllowedIndex(int $target, array $allowedIndexes, array $usedIndexes): ?int
+    {
+        $available = array_values(array_filter(
+            $allowedIndexes,
+            fn ($idx) => !in_array($idx, $usedIndexes, true)
+        ));
+
+        if ($available === []) {
+            return null;
+        }
+
+        usort($available, function ($a, $b) use ($target) {
+            $distanceA = abs($a - $target);
+            $distanceB = abs($b - $target);
+
+            if ($distanceA === $distanceB) {
+                return $a <=> $b;
+            }
+
+            return $distanceA <=> $distanceB;
+        });
+
+        return (int) $available[0];
+    }
+
+    private function buildRoundRobinAssignments(Collection $pegawaiByJabatan, array $shiftSlots, int $dayOffset): array
+    {
+        $assignments = [];
+        $shiftIds = collect(self::SHIFT_SLOT_KEYS)
+            ->map(fn ($slot) => $shiftSlots[$slot] ?? null)
+            ->filter(fn ($id) => $id !== null)
+            ->values()->all();
+
+        if ($shiftIds === []) {
+            return $assignments;
+        }
+
+        foreach ($pegawaiByJabatan as $pegawaiInJabatan) {
+            $pegawaiInJabatan = $pegawaiInJabatan->map(fn ($id) => (int) $id)->values();
+
+            foreach ($pegawaiInJabatan as $index => $pegawaiId) {
+                $assignments[(int) $pegawaiId] = (int) $shiftIds[($index + $dayOffset) % count($shiftIds)];
+            }
+        }
+
+        return $assignments;
+    }
+
+    private function buildFormulaAssignments(Collection $pegawaiByJabatan, array $shiftSlots, int $dayOffset, array $offPlanByPegawai): array
+    {
+        $assignments = [];
+
+        foreach ($pegawaiByJabatan as $jabatanKey => $pegawaiInJabatan) {
+            $pegawaiInJabatan = $pegawaiInJabatan->map(fn ($id) => (int) $id)->values();
+
+            if ($pegawaiInJabatan->isEmpty()) {
+                continue;
+            }
+
+            foreach ($pegawaiInJabatan as $position => $pegawaiId) {
+                $pegawaiId = (int) $pegawaiId;
+                $offIndexes = $offPlanByPegawai[$pegawaiId] ?? [];
+
+                if (in_array($dayOffset, $offIndexes, true)) {
+                    $assignments[$pegawaiId] = null;
+                    continue;
+                }
+
+                $preferredSlot = $this->preferredSlotByRole(
+                    (string) $jabatanKey,
+                    (int) $position,
+                    $dayOffset,
+                    $offIndexes
+                );
+
+                $slot = $preferredSlot ?? $this->defaultSlotByRole((string) $jabatanKey, (int) $position, $dayOffset);
+                $assignments[$pegawaiId] = $shiftSlots[$slot] ?? $this->firstAvailableShiftId($shiftSlots);
+            }
+        }
+
+        return $assignments;
+    }
+
+    private function rotatePegawai(Collection $pegawaiIds, int $dayOffset): array
+    {
+        $values = $pegawaiIds->values()->all();
+        $total = count($values);
+
+        if ($total <= 1) {
+            return $values;
+        }
+
+        $start = $dayOffset % $total;
+
+        return array_merge(
+            array_slice($values, $start),
+            array_slice($values, 0, $start)
+        );
+    }
+
+    private function preferredSlotByRole(string $jabatanKey, int $position, int $dayOffset, array $offIndexes): ?string
+    {
+        $isDayBeforeOff = in_array($dayOffset + 1, $offIndexes, true);
+        $isDayAfterOff = in_array($dayOffset - 1, $offIndexes, true);
+
+        if (in_array($jabatanKey, ['waiters', 'kitchen'], true)) {
+            if ($isDayBeforeOff) {
+                return 'PAGI';
+            }
+
+            if ($isDayAfterOff) {
+                return 'SIANG';
+            }
+
+            return null;
+        }
+
+        if ($jabatanKey === 'barista') {
+            if ($isDayBeforeOff) {
+                return 'SORE';
+            }
+
+            if ($isDayAfterOff) {
+                return 'PAGI';
+            }
+
+            return null;
+        }
+
+        return null;
+    }
+
+    private function defaultSlotByRole(string $jabatanKey, int $position, int $dayOffset): string
+    {
+        $phase = ($position + $dayOffset) % 2;
+
+        if (in_array($jabatanKey, ['waiters', 'kitchen'], true)) {
+            return $phase === 0 ? 'PAGI' : 'SIANG';
+        }
+
+        if ($jabatanKey === 'barista') {
+            return $phase === 0 ? 'SIANG' : 'SORE';
+        }
+
+        if ($jabatanKey === 'kasir') {
+            return $phase === 0 ? 'PAGI' : 'SORE';
+        }
+
+        if ($jabatanKey === 'dishwasher') {
+            return match (($position + $dayOffset) % 3) {
+                0 => 'PAGI',
+                1 => 'SIANG',
+                default => 'SORE',
+            };
+        }
+
+        return 'PAGI';
+    }
+
+    private function firstAvailableShiftId(array $shiftSlots): ?int
+    {
+        foreach (self::SHIFT_SLOT_KEYS as $slot) {
+            if (isset($shiftSlots[$slot])) {
+                return (int) $shiftSlots[$slot];
+            }
+        }
+
+        return null;
+    }
+
+    private function normalizeJabatanKey(string $jabatan): string
+    {
+        $value = strtolower(trim($jabatan));
+
+        if (str_contains($value, 'waiter')) {
+            return 'waiters';
+        }
+
+        if (str_contains($value, 'kitchen') || str_contains($value, 'cook') || str_contains($value, 'chef')) {
+            return 'kitchen';
+        }
+
+        if (str_contains($value, 'barista')) {
+            return 'barista';
+        }
+
+        if (str_contains($value, 'kasir') || str_contains($value, 'cashier')) {
+            return 'kasir';
+        }
+
+        if (str_contains($value, 'dishwasher') || str_contains($value, 'dish washer')) {
+            return 'dishwasher';
+        }
+
+        return $value !== '' ? $value : 'tanpa-jabatan';
     }
 
     private function normalizePayload(array $payload, bool $isGenerate): array

@@ -113,6 +113,38 @@ class DataPegawaiKhususSeeder extends Seeder
 				'nomor_telepon' => '082272983859',
 				'email' => 'ahmadaffandy008@gmail.com',
 			],
+			[
+				'no_identitas' => '33140214230212',
+				'nama' => 'MUHAMMAD ARFIAN NUR HUDA',
+				'jabatan' => 'Manajer',
+				'alamat' => 'Gemolong, Sragen',
+				'nomor_telepon' => '085600026142',
+				'email' => 'marfian00@gmail.com',
+			],
+			[
+				'no_identitas' => '3314070705060001',
+				'nama' => 'RAGIL FADLY ARDIYANTO',
+				'jabatan' => 'Kitchen',
+				'alamat' => 'Pungkruk sambungmacan karanganyar sragen',
+				'nomor_telepon' => '085879734391',
+				'email' => '@ragilfadlyardiyanto3@gmail.com',
+			],
+			[
+				'no_identitas' => '8271062406960001',
+				'nama' => 'Rian Subekti',
+				'jabatan' => 'Waiters',
+				'alamat' => 'Wonorejo Rt. 027/Rw.006 Kelurahan Bendungan, Kecamatan Kedawung, Kabupaten Sragen, Jawa Tengah. ',
+				'nomor_telepon' => '082188847106',
+				'email' => 'riansubekti91@gmail.com',
+			],
+			[
+				'no_identitas' => '1174030809020004',
+				'nama' => 'Reza Nanda Saputra',
+				'jabatan' => 'Barista',
+				'alamat' => 'Jalan Mayor Achmadi,Kadiloyo, Kelurahan Wonosari, kecamatan Gondangrejo, kabupaten Karanganyar',
+				'nomor_telepon' => '089603781440',
+				'email' => 'rejananda132@gmail.com',
+			],
 		];
 
 		$emails = array_column($rows, 'email');
