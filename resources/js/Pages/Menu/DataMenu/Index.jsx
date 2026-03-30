@@ -7,6 +7,7 @@ import Form from "@/Pages/Menu/DataMenu/Form";
 import POSStatusBadge from "@/components/shared/pos/POSStatusBadge";
 import { formatIDR } from "@/components/shared/pos/format";
 import TableToolbar from "@/components/shared/table/TableToolbar";
+import BulkDeleteDialog, { BulkDeleteHeaderCheckbox, BulkDeleteRowCheckbox, useBulkDeleteSelection } from "@/components/shared/table/BulkDeleteDialog";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -33,6 +34,8 @@ export default function Index({ dataMenu, kategoriOptions, filters, flashMessage
     const [editingItem, setEditingItem] = useState(null);
 
     const hasData = (dataMenu?.data ?? []).length > 0;
+    const currentRows = (dataMenu?.data ?? []);
+    const bulkDelete = useBulkDeleteSelection(endpoint, currentRows);
 
     const submitSearch = (event) => {
         event.preventDefault();
@@ -103,12 +106,15 @@ export default function Index({ dataMenu, kategoriOptions, filters, flashMessage
                         searchPlaceholder="Cari nama atau kode menu"
                         onSubmit={submitSearch}
                         flashMessage={flashMessage?.success}
+                    
+                        rightContent={<BulkDeleteDialog bulkDelete={bulkDelete} />}
                     />
 
                     <div className="w-full overflow-x-auto">
                         <Table>
                             <TableHeader>
                                 <TableRow>
+                                <BulkDeleteHeaderCheckbox bulkDelete={bulkDelete} />
                                     <TableHead>Kategori</TableHead>
                                     <TableHead>Kode</TableHead>
                                     <TableHead>Nama</TableHead>
@@ -121,6 +127,7 @@ export default function Index({ dataMenu, kategoriOptions, filters, flashMessage
                                 {hasData ? (
                                     dataMenu.data.map((item) => (
                                         <TableRow key={item.id}>
+                                            <BulkDeleteRowCheckbox bulkDelete={bulkDelete} rowId={item.id} />
                                             <TableCell>{item.kategori_nama || "-"}</TableCell>
                                             <TableCell>{item.kode || "-"}</TableCell>
                                             <TableCell className="font-medium">{item.nama}</TableCell>
@@ -156,7 +163,7 @@ export default function Index({ dataMenu, kategoriOptions, filters, flashMessage
                                     ))
                                 ) : (
                                     <TableRow>
-                                        <TableCell colSpan={6} className="py-12 text-center text-sm text-muted-foreground">Belum ada data menu.</TableCell>
+                                        <TableCell colSpan={7} className="py-12 text-center text-sm text-muted-foreground">Belum ada data menu.</TableCell>
                                     </TableRow>
                                 )}
                             </TableBody>

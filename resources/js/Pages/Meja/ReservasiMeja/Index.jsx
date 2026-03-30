@@ -6,6 +6,7 @@ import DashboardLayout from "@/layouts/DashboardLayout";
 import Form from "@/Pages/Meja/ReservasiMeja/Form";
 import POSStatusBadge from "@/components/shared/pos/POSStatusBadge";
 import TableToolbar from "@/components/shared/table/TableToolbar";
+import BulkDeleteDialog, { BulkDeleteHeaderCheckbox, BulkDeleteRowCheckbox, useBulkDeleteSelection } from "@/components/shared/table/BulkDeleteDialog";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -44,6 +45,8 @@ export default function Index({ reservasiMeja, mejaOptions, statusOptions, filte
     const [editingItem, setEditingItem] = useState(null);
 
     const hasData = (reservasiMeja?.data ?? []).length > 0;
+    const currentRows = (reservasiMeja?.data ?? []);
+    const bulkDelete = useBulkDeleteSelection(endpoint, currentRows);
 
     const submitSearch = (event) => {
         event.preventDefault();
@@ -108,12 +111,15 @@ export default function Index({ reservasiMeja, mejaOptions, statusOptions, filte
                         searchPlaceholder="Cari nama pelanggan, kode, atau no hp"
                         onSubmit={submitSearch}
                         flashMessage={flashMessage?.success}
+                    
+                        rightContent={<BulkDeleteDialog bulkDelete={bulkDelete} />}
                     />
 
                     <div className="w-full overflow-x-auto">
                         <Table>
                             <TableHeader>
                                 <TableRow>
+                                <BulkDeleteHeaderCheckbox bulkDelete={bulkDelete} />
                                     <TableHead>Kode</TableHead>
                                     <TableHead>Pelanggan</TableHead>
                                     <TableHead>Meja</TableHead>
@@ -127,6 +133,7 @@ export default function Index({ reservasiMeja, mejaOptions, statusOptions, filte
                                 {hasData ? (
                                     reservasiMeja.data.map((item) => (
                                         <TableRow key={item.id}>
+                                            <BulkDeleteRowCheckbox bulkDelete={bulkDelete} rowId={item.id} />
                                             <TableCell>{item.kode || "-"}</TableCell>
                                             <TableCell>
                                                 <p className="font-medium">{item.nama_pelanggan}</p>
@@ -159,7 +166,7 @@ export default function Index({ reservasiMeja, mejaOptions, statusOptions, filte
                                     ))
                                 ) : (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="py-12 text-center text-sm text-muted-foreground">Belum ada reservasi meja.</TableCell>
+                                        <TableCell colSpan={8} className="py-12 text-center text-sm text-muted-foreground">Belum ada reservasi meja.</TableCell>
                                     </TableRow>
                                 )}
                             </TableBody>

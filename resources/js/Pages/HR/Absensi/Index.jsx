@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import POSStatusBadge from "@/components/shared/pos/POSStatusBadge";
 import TableToolbar from "@/components/shared/table/TableToolbar";
+import BulkDeleteDialog, { BulkDeleteHeaderCheckbox, BulkDeleteRowCheckbox, useBulkDeleteSelection } from "@/components/shared/table/BulkDeleteDialog";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -32,6 +33,8 @@ export default function Index({ absensi, pegawaiOptions, filters, flashMessage }
     const [editingItem, setEditingItem] = useState(null);
 
     const hasData = (absensi?.data ?? []).length > 0;
+    const currentRows = (absensi?.data ?? []);
+    const bulkDelete = useBulkDeleteSelection(endpoint, currentRows);
 
     const submitSearch = (event) => {
         event.preventDefault();
@@ -92,11 +95,14 @@ export default function Index({ absensi, pegawaiOptions, filters, flashMessage }
                         searchPlaceholder="Cari kode, nama pegawai, status, atau tanggal"
                         onSubmit={submitSearch}
                         flashMessage={flashMessage?.success}
+                    
+                        rightContent={<BulkDeleteDialog bulkDelete={bulkDelete} />}
                     />
 
                     <Table>
                         <TableHeader>
                             <TableRow>
+                                <BulkDeleteHeaderCheckbox bulkDelete={bulkDelete} />
                                 <TableHead>Kode</TableHead>
                                 <TableHead>Pegawai</TableHead>
                                 <TableHead>Tanggal</TableHead>
@@ -110,6 +116,7 @@ export default function Index({ absensi, pegawaiOptions, filters, flashMessage }
                             {hasData ? (
                                 absensi.data.map((item) => (
                                     <TableRow key={item.id}>
+                                            <BulkDeleteRowCheckbox bulkDelete={bulkDelete} rowId={item.id} />
                                         <TableCell>{item.kode || "-"}</TableCell>
                                         <TableCell className="font-medium">{item.pegawai_nama || "-"}</TableCell>
                                         <TableCell>{item.tanggal || "-"}</TableCell>
@@ -148,7 +155,7 @@ export default function Index({ absensi, pegawaiOptions, filters, flashMessage }
                                 ))
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={7} className="py-12 text-center text-sm text-muted-foreground">
+                                    <TableCell colSpan={8} className="py-12 text-center text-sm text-muted-foreground">
                                         Belum ada data absensi.
                                     </TableCell>
                                 </TableRow>

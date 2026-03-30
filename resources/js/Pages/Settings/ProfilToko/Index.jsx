@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Building2, Mail, MapPin, Phone, Globe2, Languages, Wallet } from "lucide-react";
 
 import POSStatusBadge from "@/components/shared/pos/POSStatusBadge";
+import BulkDeleteDialog from "@/components/shared/table/BulkDeleteDialog";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -117,6 +118,10 @@ export default function Index({ profilToko, filters, flashMessage }) {
                         {flashMessage?.success ? (
                             <p className="mb-4 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{flashMessage.success}</p>
                         ) : null}
+
+                        <div className="mb-4 flex justify-end">
+                            <BulkDeleteDialog endpoint={endpoint} items={records} title="Hapus Profil Toko Massal" description="Pilih profil toko yang ingin dihapus dari halaman ini." />
+                        </div>
 
                         <div className="rounded-2xl border bg-linear-to-r from-slate-900 to-slate-800 p-5 text-white">
                             <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">

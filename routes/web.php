@@ -134,10 +134,32 @@ if (File::exists($modulesPath)) {
                         if (in_array('destroy', $availableActions, true)) {
                             Route::post($urlSlug . '/delete', function (Request $request) use ($resourceClass) {
                                 $validated = $request->validate([
-                                    'id' => ['required', 'integer', 'min:1'],
+                                    'id' => ['nullable', 'integer', 'min:1'],
+                                    'ids' => ['nullable', 'array', 'min:1'],
+                                    'ids.*' => ['integer', 'min:1'],
                                 ]);
 
-                                return app($resourceClass)->destroy((int) $validated['id']);
+                                $ids = collect($validated['ids'] ?? []);
+
+                                if (isset($validated['id']) && (int) $validated['id'] > 0) {
+                                    $ids->push((int) $validated['id']);
+                                }
+
+                                $ids = $ids
+                                    ->map(fn ($id) => (int) $id)
+                                    ->filter(fn ($id) => $id > 0)
+                                    ->unique()
+                                    ->values();
+
+                                if ($ids->isEmpty()) {
+                                    abort(422, 'Parameter id atau ids wajib diisi.');
+                                }
+
+                                foreach ($ids as $id) {
+                                    app($resourceClass)->destroy((int) $id);
+                                }
+
+                                return back()->with('success', 'Data berhasil dihapus.');
                             })
                                 ->middleware(['auth', 'permission:' . $permissionKey])
                                 ->name($routeName . '.delete');

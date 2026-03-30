@@ -4,6 +4,7 @@ import { useState } from "react";
 import POSStatusBadge from "@/components/shared/pos/POSStatusBadge";
 import { formatIDR } from "@/components/shared/pos/format";
 import TableToolbar from "@/components/shared/table/TableToolbar";
+import BulkDeleteDialog, { BulkDeleteHeaderCheckbox, BulkDeleteRowCheckbox, useBulkDeleteSelection } from "@/components/shared/table/BulkDeleteDialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -20,6 +21,8 @@ export default function Index({ entries, rekonsiliasi, summary, filters, flashMe
     const [editingItem, setEditingItem] = useState(null);
 
     const hasData = (entries?.data ?? []).length > 0;
+    const currentRows = (entries?.data ?? []);
+    const bulkDelete = useBulkDeleteSelection(endpoint, currentRows);
 
     const submitSearch = (event) => {
         event.preventDefault();
@@ -103,11 +106,14 @@ export default function Index({ entries, rekonsiliasi, summary, filters, flashMe
                         </div>
                     </form>
 
-                    <TableToolbar searchValue={searchValue} searchPlaceholder="Cari data" onSubmit={submitSearch} flashMessage={flashMessage?.success} />
+                    <TableToolbar searchValue={searchValue} searchPlaceholder="Cari data" onSubmit={submitSearch} flashMessage={flashMessage?.success}
+                        rightContent={<BulkDeleteDialog bulkDelete={bulkDelete} />}
+                    />
 
                     <Table>
                         <TableHeader>
                             <TableRow>
+                                <BulkDeleteHeaderCheckbox bulkDelete={bulkDelete} />
                                 <TableHead>Tanggal</TableHead>
                                 <TableHead>Ref</TableHead>
                                 <TableHead>Akun</TableHead>
@@ -121,6 +127,7 @@ export default function Index({ entries, rekonsiliasi, summary, filters, flashMe
                         <TableBody>
                             {hasData ? entries.data.map((item) => (
                                 <TableRow key={item.id}>
+                                            <BulkDeleteRowCheckbox bulkDelete={bulkDelete} rowId={item.id} />
                                     <TableCell>{item.tanggal}</TableCell>
                                     <TableCell>{item.referensi_kode || "-"}</TableCell>
                                     <TableCell>{item.jenis_akun}</TableCell>
@@ -146,7 +153,7 @@ export default function Index({ entries, rekonsiliasi, summary, filters, flashMe
                                     </TableCell>
                                 </TableRow>
                             )) : (
-                                <TableRow><TableCell colSpan={8} className="py-8 text-center text-sm text-muted-foreground">Belum ada data arus kas.</TableCell></TableRow>
+                                <TableRow><TableCell colSpan={9} className="py-8 text-center text-sm text-muted-foreground">Belum ada data arus kas.</TableCell></TableRow>
                             )}
                         </TableBody>
                     </Table>

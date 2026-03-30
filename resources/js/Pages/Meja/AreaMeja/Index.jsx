@@ -6,6 +6,7 @@ import DashboardLayout from "@/layouts/DashboardLayout";
 import Form from "@/Pages/Meja/AreaMeja/Form";
 import POSStatusBadge from "@/components/shared/pos/POSStatusBadge";
 import TableToolbar from "@/components/shared/table/TableToolbar";
+import BulkDeleteDialog, { BulkDeleteHeaderCheckbox, BulkDeleteRowCheckbox, useBulkDeleteSelection } from "@/components/shared/table/BulkDeleteDialog";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -32,6 +33,8 @@ export default function Index({ areaMeja, filters, flashMessage }) {
     const [editingItem, setEditingItem] = useState(null);
 
     const hasData = (areaMeja?.data ?? []).length > 0;
+    const currentRows = (areaMeja?.data ?? []);
+    const bulkDelete = useBulkDeleteSelection(endpoint, currentRows);
 
     const submitSearch = (event) => {
         event.preventDefault();
@@ -94,11 +97,14 @@ export default function Index({ areaMeja, filters, flashMessage }) {
                         searchPlaceholder="Cari nama atau kode area"
                         onSubmit={submitSearch}
                         flashMessage={flashMessage?.success}
+                    
+                        rightContent={<BulkDeleteDialog bulkDelete={bulkDelete} />}
                     />
 
                     <Table>
                         <TableHeader>
                             <TableRow>
+                                <BulkDeleteHeaderCheckbox bulkDelete={bulkDelete} />
                                 <TableHead>Kode</TableHead>
                                 <TableHead>Nama</TableHead>
                                 <TableHead>Deskripsi</TableHead>
@@ -111,6 +117,7 @@ export default function Index({ areaMeja, filters, flashMessage }) {
                             {hasData ? (
                                 areaMeja.data.map((item) => (
                                     <TableRow key={item.id}>
+                                            <BulkDeleteRowCheckbox bulkDelete={bulkDelete} rowId={item.id} />
                                         <TableCell>{item.kode || "-"}</TableCell>
                                         <TableCell className="font-medium">{item.nama}</TableCell>
                                         <TableCell>{item.deskripsi || "-"}</TableCell>
@@ -139,7 +146,7 @@ export default function Index({ areaMeja, filters, flashMessage }) {
                                 ))
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={6} className="py-12 text-center text-sm text-muted-foreground">Belum ada area meja.</TableCell>
+                                    <TableCell colSpan={7} className="py-12 text-center text-sm text-muted-foreground">Belum ada area meja.</TableCell>
                                 </TableRow>
                             )}
                         </TableBody>

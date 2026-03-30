@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 
 import DashboardLayout from "@/layouts/DashboardLayout";
 import Form from "@/Pages/HR/HakAkses/Form";
+import BulkDeleteDialog, { BulkDeleteHeaderCheckbox, BulkDeleteRowCheckbox, useBulkDeleteSelection } from "@/components/shared/table/BulkDeleteDialog";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -31,6 +32,8 @@ export default function Index({ hakAkses, userOptions, permissionCatalog, filter
     const [editingItem, setEditingItem] = useState(null);
 
     const hasData = (hakAkses?.data ?? []).length > 0;
+    const currentRows = (hakAkses?.data ?? []);
+    const bulkDelete = useBulkDeleteSelection(endpoint, currentRows);
 
     const badgeClass = useMemo(
         () => ({
@@ -115,15 +118,19 @@ export default function Index({ hakAkses, userOptions, permissionCatalog, filter
                             <Button variant="outline" type="submit">Cari</Button>
                         </form>
 
-                        {flashMessage?.success ? (
-                            <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{flashMessage.success}</p>
-                        ) : null}
+                        <div className="flex items-center gap-2">
+                            <BulkDeleteDialog endpoint={endpoint} items={currentRows} />
+                            {flashMessage?.success ? (
+                                <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{flashMessage.success}</p>
+                            ) : null}
+                        </div>
                     </div>
 
                     <div className="w-full overflow-x-auto">
                         <Table className="w-full table-fixed">
                         <TableHeader>
                             <TableRow>
+                                <BulkDeleteHeaderCheckbox bulkDelete={bulkDelete} />
                                 <TableHead>Kode</TableHead>
                                 <TableHead>Nama</TableHead>
                                 <TableHead className="w-[34%]">Permission</TableHead>
@@ -136,6 +143,7 @@ export default function Index({ hakAkses, userOptions, permissionCatalog, filter
                             {hasData ? (
                                 hakAkses.data.map((item) => (
                                     <TableRow key={item.id}>
+                                            <BulkDeleteRowCheckbox bulkDelete={bulkDelete} rowId={item.id} />
                                         <TableCell>{item.kode}</TableCell>
                                         <TableCell className="font-medium">{item.nama}</TableCell>
                                         <TableCell className="wrap-break-word whitespace-normal">{item.permissions.join(", ") || "-"}</TableCell>
@@ -187,7 +195,7 @@ export default function Index({ hakAkses, userOptions, permissionCatalog, filter
                                 ))
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={6} className="py-12 text-center text-sm text-muted-foreground">
+                                    <TableCell colSpan={7} className="py-12 text-center text-sm text-muted-foreground">
                                         Belum ada role hak akses.
                                     </TableCell>
                                 </TableRow>

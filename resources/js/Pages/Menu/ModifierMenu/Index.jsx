@@ -6,6 +6,7 @@ import DashboardLayout from "@/layouts/DashboardLayout";
 import Form from "@/Pages/Menu/ModifierMenu/Form";
 import POSStatusBadge from "@/components/shared/pos/POSStatusBadge";
 import TableToolbar from "@/components/shared/table/TableToolbar";
+import BulkDeleteDialog, { BulkDeleteHeaderCheckbox, BulkDeleteRowCheckbox, useBulkDeleteSelection } from "@/components/shared/table/BulkDeleteDialog";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -32,6 +33,8 @@ export default function Index({ modifierMenu, filters, flashMessage }) {
     const [editingItem, setEditingItem] = useState(null);
 
     const hasData = (modifierMenu?.data ?? []).length > 0;
+    const currentRows = (modifierMenu?.data ?? []);
+    const bulkDelete = useBulkDeleteSelection(endpoint, currentRows);
 
     const submitSearch = (event) => {
         event.preventDefault();
@@ -95,12 +98,15 @@ export default function Index({ modifierMenu, filters, flashMessage }) {
                         searchPlaceholder="Cari nama atau kode modifier"
                         onSubmit={submitSearch}
                         flashMessage={flashMessage?.success}
+                    
+                        rightContent={<BulkDeleteDialog bulkDelete={bulkDelete} />}
                     />
 
                     <div className="w-full overflow-x-auto">
                         <Table>
                             <TableHeader>
                                 <TableRow>
+                                <BulkDeleteHeaderCheckbox bulkDelete={bulkDelete} />
                                     <TableHead>Kode</TableHead>
                                     <TableHead>Nama</TableHead>
                                     <TableHead>Tipe</TableHead>
@@ -114,6 +120,7 @@ export default function Index({ modifierMenu, filters, flashMessage }) {
                                 {hasData ? (
                                     modifierMenu.data.map((item) => (
                                         <TableRow key={item.id}>
+                                            <BulkDeleteRowCheckbox bulkDelete={bulkDelete} rowId={item.id} />
                                             <TableCell>{item.kode || "-"}</TableCell>
                                             <TableCell className="font-medium">{item.nama}</TableCell>
                                             <TableCell className="capitalize">{item.tipe}</TableCell>
@@ -143,7 +150,7 @@ export default function Index({ modifierMenu, filters, flashMessage }) {
                                     ))
                                 ) : (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="py-12 text-center text-sm text-muted-foreground">Belum ada modifier menu.</TableCell>
+                                        <TableCell colSpan={8} className="py-12 text-center text-sm text-muted-foreground">Belum ada modifier menu.</TableCell>
                                     </TableRow>
                                 )}
                             </TableBody>

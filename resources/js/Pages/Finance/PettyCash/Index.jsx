@@ -4,6 +4,7 @@ import { useState } from "react";
 import POSStatusBadge from "@/components/shared/pos/POSStatusBadge";
 import { formatIDR } from "@/components/shared/pos/format";
 import TableToolbar from "@/components/shared/table/TableToolbar";
+import BulkDeleteDialog, { BulkDeleteHeaderCheckbox, BulkDeleteRowCheckbox, useBulkDeleteSelection } from "@/components/shared/table/BulkDeleteDialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -135,11 +136,14 @@ export default function Index({ pettyCash, summary, filters, flashMessage, bahan
                         <Button type="submit">Filter</Button>
                     </form>
 
-                    <TableToolbar searchValue={searchValue} searchPlaceholder="Cari data" onSubmit={submitSearch} flashMessage={flashMessage?.success} />
+                    <TableToolbar searchValue={searchValue} searchPlaceholder="Cari data" onSubmit={submitSearch} flashMessage={flashMessage?.success} 
+                        rightContent={<BulkDeleteDialog bulkDelete={bulkDelete} />}
+                    />
 
                     <Table>
                         <TableHeader>
                             <TableRow>
+                                <BulkDeleteHeaderCheckbox bulkDelete={bulkDelete} />
                                 <TableHead>Kode</TableHead>
                                 <TableHead>Tanggal</TableHead>
                                 <TableHead>Jenis</TableHead>
@@ -154,6 +158,7 @@ export default function Index({ pettyCash, summary, filters, flashMessage, bahan
                         <TableBody>
                             {(pettyCash?.data ?? []).length > 0 ? pettyCash.data.map((item) => (
                                 <TableRow key={item.id}>
+                                            <BulkDeleteRowCheckbox bulkDelete={bulkDelete} rowId={item.id} />
                                     <TableCell>{item.kode}</TableCell>
                                     <TableCell>{item.tanggal}</TableCell>
                                     <TableCell>{item.jenis_transaksi}</TableCell>
@@ -176,7 +181,7 @@ export default function Index({ pettyCash, summary, filters, flashMessage, bahan
                                         </div>
                                     </TableCell>
                                 </TableRow>
-                            )) : <TableRow><TableCell colSpan={9} className="py-8 text-center text-sm text-muted-foreground">Belum ada data petty cash.</TableCell></TableRow>}
+                            )) : <TableRow><TableCell colSpan={10} className="py-8 text-center text-sm text-muted-foreground">Belum ada data petty cash.</TableCell></TableRow>}
                         </TableBody>
                     </Table>
                 </section>

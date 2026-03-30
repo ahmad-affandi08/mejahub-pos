@@ -5,6 +5,7 @@ import { useState } from "react";
 import POSStatusBadge from "@/components/shared/pos/POSStatusBadge";
 import { formatIDR } from "@/components/shared/pos/format";
 import TableToolbar from "@/components/shared/table/TableToolbar";
+import BulkDeleteDialog, { BulkDeleteHeaderCheckbox, BulkDeleteRowCheckbox, useBulkDeleteSelection } from "@/components/shared/table/BulkDeleteDialog";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -35,6 +36,8 @@ export default function Index({ penggajian, pegawaiOptions, gajiPokokTemplatePer
     const [editingItem, setEditingItem] = useState(null);
 
     const hasData = (penggajian?.data ?? []).length > 0;
+    const currentRows = (penggajian?.data ?? []);
+    const bulkDelete = useBulkDeleteSelection(endpoint, currentRows);
 
     const submitSearch = (event) => {
         event.preventDefault();
@@ -117,11 +120,14 @@ export default function Index({ penggajian, pegawaiOptions, gajiPokokTemplatePer
                         searchPlaceholder="Cari kode, pegawai, periode, atau status"
                         onSubmit={submitSearch}
                         flashMessage={flashMessage?.success}
+                    
+                        rightContent={<BulkDeleteDialog bulkDelete={bulkDelete} />}
                     />
 
                     <Table>
                         <TableHeader>
                             <TableRow>
+                                <BulkDeleteHeaderCheckbox bulkDelete={bulkDelete} />
                                 <TableHead>Kode</TableHead>
                                 <TableHead>Pegawai</TableHead>
                                 <TableHead>Periode</TableHead>
@@ -138,6 +144,7 @@ export default function Index({ penggajian, pegawaiOptions, gajiPokokTemplatePer
                             {hasData ? (
                                 penggajian.data.map((item) => (
                                     <TableRow key={item.id}>
+                                            <BulkDeleteRowCheckbox bulkDelete={bulkDelete} rowId={item.id} />
                                         <TableCell>{item.kode || "-"}</TableCell>
                                         <TableCell className="font-medium">{item.pegawai_nama || "-"}</TableCell>
                                         <TableCell>{item.periode}</TableCell>
@@ -185,7 +192,7 @@ export default function Index({ penggajian, pegawaiOptions, gajiPokokTemplatePer
                                 ))
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={10} className="py-12 text-center text-sm text-muted-foreground">
+                                    <TableCell colSpan={11} className="py-12 text-center text-sm text-muted-foreground">
                                         Belum ada data penggajian.
                                     </TableCell>
                                 </TableRow>

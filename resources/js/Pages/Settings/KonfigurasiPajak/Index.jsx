@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import POSStatusBadge from "@/components/shared/pos/POSStatusBadge";
 import TableToolbar from "@/components/shared/table/TableToolbar";
+import BulkDeleteDialog, { BulkDeleteHeaderCheckbox, BulkDeleteRowCheckbox, useBulkDeleteSelection } from "@/components/shared/table/BulkDeleteDialog";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -32,6 +33,8 @@ export default function Index({ konfigurasiPajak, filters, flashMessage }) {
     const [editingItem, setEditingItem] = useState(null);
 
     const hasData = (konfigurasiPajak?.data ?? []).length > 0;
+    const currentRows = (konfigurasiPajak?.data ?? []);
+    const bulkDelete = useBulkDeleteSelection(endpoint, currentRows);
 
     const submitSearch = (event) => {
         event.preventDefault();
@@ -79,12 +82,15 @@ export default function Index({ konfigurasiPajak, filters, flashMessage }) {
                 </section>
 
                 <section className="rounded-3xl border bg-white p-4 shadow-sm md:p-6">
-                    <TableToolbar searchValue={searchValue} searchPlaceholder="Cari kode, nama, jenis, applies to" onSubmit={submitSearch} flashMessage={flashMessage?.success} />
+                    <TableToolbar searchValue={searchValue} searchPlaceholder="Cari kode, nama, jenis, applies to" onSubmit={submitSearch} flashMessage={flashMessage?.success} 
+                        rightContent={<BulkDeleteDialog bulkDelete={bulkDelete} />}
+                    />
 
                     <div className="w-full overflow-x-auto">
                         <Table>
                             <TableHeader>
                                 <TableRow>
+                                <BulkDeleteHeaderCheckbox bulkDelete={bulkDelete} />
                                     <TableHead>Kode</TableHead>
                                     <TableHead>Nama</TableHead>
                                     <TableHead>Jenis</TableHead>
@@ -98,6 +104,7 @@ export default function Index({ konfigurasiPajak, filters, flashMessage }) {
                                 {hasData ? (
                                     konfigurasiPajak.data.map((item) => (
                                         <TableRow key={item.id}>
+                                            <BulkDeleteRowCheckbox bulkDelete={bulkDelete} rowId={item.id} />
                                             <TableCell>{item.kode}</TableCell>
                                             <TableCell className="font-medium">{item.nama}</TableCell>
                                             <TableCell>{item.jenis}</TableCell>
@@ -129,7 +136,7 @@ export default function Index({ konfigurasiPajak, filters, flashMessage }) {
                                     ))
                                 ) : (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="py-12 text-center text-sm text-muted-foreground">Belum ada konfigurasi pajak.</TableCell>
+                                        <TableCell colSpan={8} className="py-12 text-center text-sm text-muted-foreground">Belum ada konfigurasi pajak.</TableCell>
                                     </TableRow>
                                 )}
                             </TableBody>

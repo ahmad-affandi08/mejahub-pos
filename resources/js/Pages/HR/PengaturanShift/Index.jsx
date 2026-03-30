@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import POSStatusBadge from "@/components/shared/pos/POSStatusBadge";
 import TableToolbar from "@/components/shared/table/TableToolbar";
+import BulkDeleteDialog, { BulkDeleteHeaderCheckbox, BulkDeleteRowCheckbox, useBulkDeleteSelection } from "@/components/shared/table/BulkDeleteDialog";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -32,6 +33,8 @@ export default function Index({ shiftSettings, filters, flashMessage }) {
     const [editingItem, setEditingItem] = useState(null);
 
     const hasData = (shiftSettings?.data ?? []).length > 0;
+    const currentRows = (shiftSettings?.data ?? []);
+    const bulkDelete = useBulkDeleteSelection(endpoint, currentRows);
 
     const submitSearch = (event) => {
         event.preventDefault();
@@ -84,11 +87,14 @@ export default function Index({ shiftSettings, filters, flashMessage }) {
                         searchPlaceholder="Cari nama atau kode shift"
                         onSubmit={submitSearch}
                         flashMessage={flashMessage?.success}
+                    
+                        rightContent={<BulkDeleteDialog bulkDelete={bulkDelete} />}
                     />
 
                     <Table>
                         <TableHeader>
                             <TableRow>
+                                <BulkDeleteHeaderCheckbox bulkDelete={bulkDelete} />
                                 <TableHead>Kode</TableHead>
                                 <TableHead>Shift</TableHead>
                                 <TableHead>Jam</TableHead>
@@ -102,6 +108,7 @@ export default function Index({ shiftSettings, filters, flashMessage }) {
                             {hasData ? (
                                 shiftSettings.data.map((item) => (
                                     <TableRow key={item.id}>
+                                            <BulkDeleteRowCheckbox bulkDelete={bulkDelete} rowId={item.id} />
                                         <TableCell>{item.kode || "-"}</TableCell>
                                         <TableCell className="font-medium">{item.nama}</TableCell>
                                         <TableCell>{item.jam_masuk} - {item.jam_keluar}</TableCell>
@@ -133,7 +140,7 @@ export default function Index({ shiftSettings, filters, flashMessage }) {
                                 ))
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={7} className="py-12 text-center text-sm text-muted-foreground">Belum ada pengaturan shift.</TableCell>
+                                    <TableCell colSpan={8} className="py-12 text-center text-sm text-muted-foreground">Belum ada pengaturan shift.</TableCell>
                                 </TableRow>
                             )}
                         </TableBody>

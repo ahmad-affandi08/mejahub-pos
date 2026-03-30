@@ -5,6 +5,7 @@ import { useState } from "react";
 import POSStatusBadge from "@/components/shared/pos/POSStatusBadge";
 import { formatIDR } from "@/components/shared/pos/format";
 import TableToolbar from "@/components/shared/table/TableToolbar";
+import BulkDeleteDialog, { BulkDeleteHeaderCheckbox, BulkDeleteRowCheckbox, useBulkDeleteSelection } from "@/components/shared/table/BulkDeleteDialog";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -33,6 +34,8 @@ export default function Index({ purchaseOrders, supplierOptions, bahanBakuOption
     const [editingItem, setEditingItem] = useState(null);
 
     const hasData = (purchaseOrders?.data ?? []).length > 0;
+    const currentRows = (purchaseOrders?.data ?? []);
+    const bulkDelete = useBulkDeleteSelection(endpoint, currentRows);
 
     const submitSearch = (event) => {
         event.preventDefault();
@@ -100,12 +103,15 @@ export default function Index({ purchaseOrders, supplierOptions, bahanBakuOption
                         searchPlaceholder="Cari kode PO atau supplier"
                         onSubmit={submitSearch}
                         flashMessage={flashMessage?.success}
+                    
+                        rightContent={<BulkDeleteDialog bulkDelete={bulkDelete} />}
                     />
 
                     <div className="w-full overflow-x-auto">
                         <Table>
                             <TableHeader>
                                 <TableRow>
+                                <BulkDeleteHeaderCheckbox bulkDelete={bulkDelete} />
                                     <TableHead>Kode</TableHead>
                                     <TableHead>Supplier</TableHead>
                                     <TableHead>Tanggal</TableHead>
@@ -119,6 +125,7 @@ export default function Index({ purchaseOrders, supplierOptions, bahanBakuOption
                                 {hasData ? (
                                     purchaseOrders.data.map((item) => (
                                         <TableRow key={item.id}>
+                                            <BulkDeleteRowCheckbox bulkDelete={bulkDelete} rowId={item.id} />
                                             <TableCell className="font-medium">{item.kode}</TableCell>
                                             <TableCell>{item.supplier_nama || "-"}</TableCell>
                                             <TableCell>{item.tanggal_po || "-"}</TableCell>
@@ -154,7 +161,7 @@ export default function Index({ purchaseOrders, supplierOptions, bahanBakuOption
                                     ))
                                 ) : (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="py-12 text-center text-sm text-muted-foreground">Belum ada purchase order.</TableCell>
+                                        <TableCell colSpan={8} className="py-12 text-center text-sm text-muted-foreground">Belum ada purchase order.</TableCell>
                                     </TableRow>
                                 )}
                             </TableBody>

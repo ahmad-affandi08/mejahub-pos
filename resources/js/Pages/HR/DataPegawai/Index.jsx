@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 
 import DashboardLayout from "@/layouts/DashboardLayout";
 import Form from "@/Pages/HR/DataPegawai/Form";
+import BulkDeleteDialog, { BulkDeleteHeaderCheckbox, BulkDeleteRowCheckbox, useBulkDeleteSelection } from "@/components/shared/table/BulkDeleteDialog";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -31,6 +32,8 @@ export default function Index({ pegawai, filters, flashMessage }) {
     const [editingItem, setEditingItem] = useState(null);
 
     const hasData = (pegawai?.data ?? []).length > 0;
+    const currentRows = (pegawai?.data ?? []);
+    const bulkDelete = useBulkDeleteSelection(endpoint, currentRows);
 
     const badgeClass = useMemo(
         () => ({
@@ -114,16 +117,20 @@ export default function Index({ pegawai, filters, flashMessage }) {
                             <Button variant="outline" type="submit">Cari</Button>
                         </form>
 
-                        {flashMessage?.success ? (
-                            <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-                                {flashMessage.success}
-                            </p>
-                        ) : null}
+                        <div className="flex items-center gap-2">
+                            <BulkDeleteDialog endpoint={endpoint} items={currentRows} />
+                            {flashMessage?.success ? (
+                                <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                                    {flashMessage.success}
+                                </p>
+                            ) : null}
+                        </div>
                     </div>
 
                     <Table>
                         <TableHeader>
                             <TableRow>
+                                <BulkDeleteHeaderCheckbox bulkDelete={bulkDelete} />
                                 <TableHead>No Identitas</TableHead>
                                 <TableHead>Nama</TableHead>
                                 <TableHead>Jabatan</TableHead>
@@ -136,6 +143,7 @@ export default function Index({ pegawai, filters, flashMessage }) {
                             {hasData ? (
                                 pegawai.data.map((item) => (
                                     <TableRow key={item.id}>
+                                            <BulkDeleteRowCheckbox bulkDelete={bulkDelete} rowId={item.id} />
                                         <TableCell>{item.no_identitas || "-"}</TableCell>
                                         <TableCell className="font-medium">{item.nama}</TableCell>
                                         <TableCell>{item.jabatan || "-"}</TableCell>
@@ -187,7 +195,7 @@ export default function Index({ pegawai, filters, flashMessage }) {
                                 ))
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={6} className="py-12 text-center text-sm text-muted-foreground">
+                                    <TableCell colSpan={7} className="py-12 text-center text-sm text-muted-foreground">
                                         Belum ada data pegawai.
                                     </TableCell>
                                 </TableRow>

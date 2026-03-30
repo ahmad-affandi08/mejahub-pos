@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import POSStatusBadge from "@/components/shared/pos/POSStatusBadge";
 import TableToolbar from "@/components/shared/table/TableToolbar";
+import BulkDeleteDialog, { BulkDeleteHeaderCheckbox, BulkDeleteRowCheckbox, useBulkDeleteSelection } from "@/components/shared/table/BulkDeleteDialog";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -30,6 +31,8 @@ export default function Index({ opnameStok, bahanBakuOptions, filters, flashMess
     const [openCreate, setOpenCreate] = useState(false);
 
     const hasData = (opnameStok?.data ?? []).length > 0;
+    const currentRows = (opnameStok?.data ?? []);
+    const bulkDelete = useBulkDeleteSelection(endpoint, currentRows);
 
     const submitSearch = (event) => {
         event.preventDefault();
@@ -84,12 +87,15 @@ export default function Index({ opnameStok, bahanBakuOptions, filters, flashMess
                 </section>
 
                 <section className="rounded-3xl border bg-white p-4 shadow-sm md:p-6">
-                    <TableToolbar searchValue={searchValue} searchPlaceholder="Cari kode opname atau bahan" onSubmit={submitSearch} flashMessage={flashMessage?.success} />
+                    <TableToolbar searchValue={searchValue} searchPlaceholder="Cari kode opname atau bahan" onSubmit={submitSearch} flashMessage={flashMessage?.success} 
+                        rightContent={<BulkDeleteDialog bulkDelete={bulkDelete} />}
+                    />
 
                     <div className="w-full overflow-x-auto">
                         <Table>
                             <TableHeader>
                                 <TableRow>
+                                <BulkDeleteHeaderCheckbox bulkDelete={bulkDelete} />
                                     <TableHead>Kode</TableHead>
                                     <TableHead>Bahan</TableHead>
                                     <TableHead>Tanggal</TableHead>
@@ -104,6 +110,7 @@ export default function Index({ opnameStok, bahanBakuOptions, filters, flashMess
                                 {hasData ? (
                                     opnameStok.data.map((item) => (
                                         <TableRow key={item.id}>
+                                            <BulkDeleteRowCheckbox bulkDelete={bulkDelete} rowId={item.id} />
                                             <TableCell className="font-medium">{item.kode}</TableCell>
                                             <TableCell>{item.bahan_baku_nama}</TableCell>
                                             <TableCell>{item.tanggal_opname || "-"}</TableCell>
@@ -116,7 +123,7 @@ export default function Index({ opnameStok, bahanBakuOptions, filters, flashMess
                                     ))
                                 ) : (
                                     <TableRow>
-                                        <TableCell colSpan={8} className="py-12 text-center text-sm text-muted-foreground">Belum ada data opname stok.</TableCell>
+                                        <TableCell colSpan={9} className="py-12 text-center text-sm text-muted-foreground">Belum ada data opname stok.</TableCell>
                                     </TableRow>
                                 )}
                             </TableBody>

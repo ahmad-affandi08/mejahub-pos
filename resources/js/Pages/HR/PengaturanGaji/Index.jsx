@@ -5,6 +5,7 @@ import { useState } from "react";
 import { formatIDR } from "@/components/shared/pos/format";
 import POSStatusBadge from "@/components/shared/pos/POSStatusBadge";
 import TableToolbar from "@/components/shared/table/TableToolbar";
+import BulkDeleteDialog, { BulkDeleteHeaderCheckbox, BulkDeleteRowCheckbox, useBulkDeleteSelection } from "@/components/shared/table/BulkDeleteDialog";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -33,6 +34,8 @@ export default function Index({ salaryTemplates, pegawaiOptions, filters, flashM
     const [editingItem, setEditingItem] = useState(null);
 
     const hasData = (salaryTemplates?.data ?? []).length > 0;
+    const currentRows = (salaryTemplates?.data ?? []);
+    const bulkDelete = useBulkDeleteSelection(endpoint, currentRows);
 
     const submitSearch = (event) => {
         event.preventDefault();
@@ -92,11 +95,14 @@ export default function Index({ salaryTemplates, pegawaiOptions, filters, flashM
                         searchPlaceholder="Cari pegawai, jabatan, atau catatan"
                         onSubmit={submitSearch}
                         flashMessage={flashMessage?.success}
+                    
+                        rightContent={<BulkDeleteDialog bulkDelete={bulkDelete} />}
                     />
 
                     <Table>
                         <TableHeader>
                             <TableRow>
+                                <BulkDeleteHeaderCheckbox bulkDelete={bulkDelete} />
                                 <TableHead>Pegawai</TableHead>
                                 <TableHead>Jabatan</TableHead>
                                 <TableHead>Gaji Pokok</TableHead>
@@ -110,6 +116,7 @@ export default function Index({ salaryTemplates, pegawaiOptions, filters, flashM
                             {hasData ? (
                                 salaryTemplates.data.map((item) => (
                                     <TableRow key={item.id}>
+                                            <BulkDeleteRowCheckbox bulkDelete={bulkDelete} rowId={item.id} />
                                         <TableCell className="font-medium">{item.pegawai_nama || "-"}</TableCell>
                                         <TableCell>{item.jabatan || "-"}</TableCell>
                                         <TableCell>{formatIDR(item.gaji_pokok)}</TableCell>
@@ -157,7 +164,7 @@ export default function Index({ salaryTemplates, pegawaiOptions, filters, flashM
                                 ))
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={7} className="py-12 text-center text-sm text-muted-foreground">
+                                    <TableCell colSpan={8} className="py-12 text-center text-sm text-muted-foreground">
                                         Belum ada template gaji pegawai.
                                     </TableCell>
                                 </TableRow>
